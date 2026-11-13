@@ -4,5 +4,27 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+[features]
+temporal-runtime = ["dep:temporalio-sdk", "dep:temporalio-client", "dep:temporalio-common", "dep:temporalio-macros", "dep:tokio", "dep:serde", "dep:serde_json", "dep:sha2", "dep:anyhow", "dep:temporalio-workflow", "dep:futures", "dep:url"]
+
+[dependencies]
+url = { version = "2.5", optional = true }
+futures = { version = "0.3", optional = true }
+temporalio-workflow = { version = "=1.2.0", optional = true }
+temporalio-sdk = { version = "=1.2.0", default-features = false, optional = true }
+temporalio-client = { version = "=1.2.0", default-features = false, optional = true }
+temporalio-common = { version = "=1.2.0", default-features = false, optional = true }
+temporalio-macros = { version = "=1.2.0", optional = true }
+tokio = { version = "1.47", features = ["rt-multi-thread", "macros", "signal"], optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+sha2 = { version = "0.10", optional = true }
+anyhow = { version = "1", optional = true }
+
+[[bin]]
+name = "temporal-runtime"
+path = "src/bin/temporal-runtime.rs"
+required-features = ["temporal-runtime"]
+
 [lib]
 path = "src/lib.rs"

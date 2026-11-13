@@ -5,5 +5,5 @@
   "implementation_language": "rust",
   "repository": "newdarwindev/runspindle-core",
   "schema_version": 1,
-  "stage": "contract_candidate"
+  "stage": "temporal_development_candidate"
 }

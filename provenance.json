@@ -1,7 +1,23 @@
 {
   "license_status": "No blanket license is granted to imported material. See LEGAL.md.",
-  "new_files": "New scaffold, specifications and original in-memory contract candidate, plus an owner-directed pinned subset of original synthetic Runspindle fixtures (see fixtures/shared-v1.pin.json and docs/SHARED_FIXTURES.md); no legacy executable source or Git history imported.",
+  "new_files": "Original bounded Temporal development workflows, scripted synthetic activity ports and tests, alongside prior process-local models and owner-directed fixture subset. No legacy executable source/history imported.",
   "provenance_policy": "Public IDs resolve to a privately retained source record containing repository, exact commit, path, source hash and review notes. Private repository names, URLs and operational details are omitted.",
   "schema_version": 1,
-  "sources": []
+  "sources": [],
+  "runtime_contract": {
+    "repository": "newdarwindev/runspindle",
+    "commit": "4b700269be9a4feab7b955faf0229fbdd77d8aa9",
+    "path": "specs/runtime-v1.md",
+    "mapping": "specs/runtime.md",
+    "classification": "semantic_development_contract"
+  },
+  "temporal_dependency": {
+    "source_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
+    "crate": "temporalio-sdk",
+    "version": "1.2.0",
+    "inventory": "docs/runtime-dependencies.json",
+    "lockfile": "Cargo.lock",
+    "notice": "licenses/temporal-sdk-MIT.txt",
+    "reuse": "Crates.io dependency with exact version and checksums; original notice retained; no executable SDK source copied into repository."
+  }
 }
