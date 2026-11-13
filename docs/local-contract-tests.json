@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "component": "runspindle-core",
+  "completed_utc": "2026-11-13T11:47:59.131320+00:00",
+  "evidence_class": "local_synthetic_component_tests",
+  "github_ci": false,
+  "isolated_integration": "not_run",
+  "live_acceptance": "blocked_not_run",
+  "deployment": "not_run",
+  "platform": "Linux x86_64",
+  "toolchain": {
+    "rustc -Vv": {
+      "exit_code": 0,
+      "output": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8\n"
+    },
+    "cargo -V": {
+      "exit_code": 0,
+      "output": "cargo 1.94.1 (29ea6fb6a 2026-03-24)\n"
+    },
+    "rustfmt -V": {
+      "exit_code": 0,
+      "output": "rustfmt 1.8.0-stable (e408947bfd 2026-03-25)\n"
+    },
+    "cargo clippy --version": {
+      "exit_code": 0,
+      "output": "clippy 0.1.94 (e408947bfd 2026-03-25)\n"
+    },
+    "python3 --version": {
+      "exit_code": 0,
+      "output": "Python 3.14.8\n"
+    }
+  },
+  "code_input_sha256": {
+    "Cargo.toml": "5913a5eac861fc496add2d684dc13787199ef3b833423ee5fa0b0b30f3efcd53",
+    "src/artifact.rs": "ea1656b4db8bfef30b072ce60f6a5849121c2bc480d870d713c6e62d5ae027ca",
+    "src/identity.rs": "c5f87a3281bed1e9a09b945d11408dc026cce19e1c004eb725972e2ea612d8d3",
+    "src/lib.rs": "340c0761561cef4a6f0706a34aa0abbdd3ed44cfba00c4f4ab7058f8ebe7f5e1",
+    "tests/contracts.rs": "09f9db2802cc517655a86f4bd6f8c685bffee909ce74c7216841b69e1c69fe88"
+  },
+  "final_code_sha256": {
+    "Cargo.toml": "5913a5eac861fc496add2d684dc13787199ef3b833423ee5fa0b0b30f3efcd53",
+    "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+    "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+    "src/lib.rs": "340c0761561cef4a6f0706a34aa0abbdd3ed44cfba00c4f4ab7058f8ebe7f5e1",
+    "tests/contracts.rs": "1a192f9ae3ab7083d36133d199ffac7eeee46ceb5ceb3b0b5a2acd8f77762433"
+  },
+  "initial_source_transfer_verified_files": 19,
+  "initial_results": [
+    {
+      "label": "initial-fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 1
+    },
+    {
+      "label": "initial-test",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "initial-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "initial-structure",
+      "command": [
+        "python3",
+        "tools/check_scaffold.py"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "initial-acceptance",
+      "command": [
+        "python3",
+        "tools/acceptance_gate.py",
+        "live"
+      ],
+      "exit_code": 78
+    }
+  ],
+  "formatted_results": [
+    {
+      "label": "apply-fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "formatted-fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "formatted-test",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "formatted-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "formatted-structure",
+      "command": [
+        "python3",
+        "tools/check_scaffold.py"
+      ],
+      "exit_code": 0
+    },
+    {
+      "label": "formatted-acceptance",
+      "command": [
+        "python3",
+        "tools/acceptance_gate.py",
+        "live"
+      ],
+      "exit_code": 78
+    }
+  ],
+  "synthetic_test_counts": {
+    "initial": {
+      "unit": 1,
+      "contract": 16,
+      "passed": 17,
+      "failed": 0
+    },
+    "formatted": {
+      "unit": 1,
+      "contract": 16,
+      "passed": 17,
+      "failed": 0
+    }
+  },
+  "formatting_fix": {
+    "method": "cargo fmt --all on disposable copy only",
+    "changed_files": [
+      "src/artifact.rs",
+      "src/identity.rs",
+      "tests/contracts.rs"
+    ],
+    "patch_sha256": "ca17ffc306918ed3b919148f5518f287f37669240d2743afdb170a621f065e2d"
+  },
+  "activation": "NotImplemented",
+  "external_effects": "not_implemented",
+  "limitations": [
+    "Synthetic component tests only; no live integrations or GitHub Actions execution.",
+    "Code input hashes bind this execution; later cloud documentation/workflow edits are not covered.",
+    "Caller-supplied identities, digests and evidence are compared, not authenticated."
+  ],
+  "defects": [
+    "Initial rustfmt check failed; formatted candidate passed."
+  ]
+}

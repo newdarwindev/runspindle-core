@@ -1,10 +1,16 @@
 {
+  "contract_test_evidence": "docs/local-contract-tests.json",
+  "contract_tests": "passed",
   "dev_deployment": "not_run",
-  "implementation": "not_implemented",
+  "external_effects": "not_implemented",
+  "github_ci": "not_run",
+  "implementation": "partial_contract_model",
   "legacy_archival": "not_started",
   "live_acceptance": "not_run",
+  "native_activation": "not_implemented",
   "production_deployment": "not_run",
   "runner_capacity": "unverified",
   "selected_source_migration": "partial",
-  "stage": "scaffold"
+  "stage": "contract_candidate",
+  "temporal_integration": "not_implemented"
 }

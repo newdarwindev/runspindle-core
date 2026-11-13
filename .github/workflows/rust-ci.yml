@@ -1,5 +1,6 @@
-# Planned contents: Rust fmt, clippy, unit and schema checks after compiler and implementation qualification.
-# Current scope: scaffold structure only, not the planned product checks.
+# Configured checks: structure plus synthetic Rust component contracts.
+# Requires a pre-provisioned qualified local toolchain. No install or fallback.
+# Workflow configuration is not evidence of a CI run or product acceptance.
 name: rust-ci
 on:
   push:
@@ -11,7 +12,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  scaffold-structure:
+  component-contracts:
     runs-on: [self-hosted, linux, x64, runspindle-isolated]
     timeout-minutes: 10
     steps:
@@ -20,3 +21,9 @@ jobs:
           persist-credentials: false
       - name: Validate scaffold only
         run: python3 tools/check_scaffold.py
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Test synthetic component contracts offline
+        run: cargo test --offline --all-targets
+      - name: Lint component contracts offline
+        run: cargo clippy --offline --all-targets -- -D warnings

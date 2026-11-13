@@ -1,0 +1,74 @@
+{
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "tools/check_scaffold.py"
+      ],
+      "evidence_class": "scaffold_structure_and_artifact_integrity",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "stderr": "",
+      "stdout": "{\"evidence_class\": \"artifact_integrity\", \"files\": 19, \"status\": \"passed\", \"runtime_acceptance\": \"not_run\"}\n{\"evidence_class\": \"scaffold_structure\", \"product_acceptance\": \"not_run\", \"repository\": \"newdarwindev/runspindle\", \"status\": \"passed\"}\n",
+      "working_scope": "composition"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/check_scaffold.py"
+      ],
+      "evidence_class": "scaffold_structure",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "stderr": "",
+      "stdout": "{\"evidence_class\": \"scaffold_structure\", \"product_acceptance\": \"not_run\", \"repository\": \"newdarwindev/runspindle-core\", \"status\": \"passed\"}\n",
+      "working_scope": "core"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "evidence_class": "diff_whitespace",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "stderr": "",
+      "stdout": "",
+      "working_scope": "core"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/acceptance_gate.py",
+        "integration"
+      ],
+      "evidence_class": "negative_control_not_integration",
+      "exit_code": 78,
+      "expected_exit_code": 78,
+      "stderr": "",
+      "stdout": "{\"gate\": \"integration\", \"reason\": \"Implementation, qualified local capacity and acceptance evidence are not yet available.\", \"status\": \"blocked\"}\n",
+      "working_scope": "core"
+    }
+  ],
+  "dev_deployment": "not_run",
+  "product_acceptance": "not_run",
+  "production_deployment": "not_run",
+  "rust_checks": {
+    "reason": "cargo and rustc were not found on PATH or inspected standard binary paths; no toolchain installed.",
+    "status": "not_run"
+  },
+  "rust_source_sha256": {
+    "src/artifact.rs": "ea1656b4db8bfef30b072ce60f6a5849121c2bc480d870d713c6e62d5ae027ca",
+    "src/identity.rs": "c5f87a3281bed1e9a09b945d11408dc026cce19e1c004eb725972e2ea612d8d3",
+    "src/lib.rs": "340c0761561cef4a6f0706a34aa0abbdd3ed44cfba00c4f4ab7058f8ebe7f5e1",
+    "tests/contracts.rs": "09f9db2802cc517655a86f4bd6f8c685bffee909ce74c7216841b69e1c69fe88"
+  },
+  "schema_version": 1,
+  "scope": "Local source preparation; no published repository changed.",
+  "source_base": {
+    "composition": "d3a828be44294ec20fe951963e0bbc7482a988df",
+    "core": "0bf9b5e4d0f88181d6f8156231c3578512cb84f3"
+  },
+  "timestamp_utc": "2026-11-13T11:43:58.183088+00:00"
+}

@@ -7,8 +7,18 @@ for name in required:
     assert (root/name).is_file(), f'Missing {name}'
 c = json.loads((root/'component.json').read_text())
 s = json.loads((root/'STATUS.json').read_text())
-assert c['stage'] == 'scaffold'
-assert s['implementation'] == 'not_implemented'
+assert c['stage'] == s['stage']
+assert (c['stage'], s['implementation']) in {
+    ('scaffold', 'not_implemented'),
+    ('contract_candidate', 'partial_contract_model'),
+}
+if c['stage'] == 'contract_candidate':
+    for name in ['src/identity.rs', 'src/artifact.rs', 'tests/contracts.rs',
+                 'specs/contracts.md', 'docs/IMPLEMENTATION_EVIDENCE.md']:
+        assert (root/name).is_file(), f'Missing {name}'
+    assert s['contract_tests'] in ['not_run', 'passed', 'failed']
+    for name in ['native_activation', 'temporal_integration', 'external_effects']:
+        assert s[name] == 'not_implemented'
 assert s['live_acceptance'] == 'not_run'
 p = json.loads((root/'provenance.json').read_text())
 for item in p['sources']:
