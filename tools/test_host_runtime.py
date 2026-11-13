@@ -28,7 +28,7 @@ def wait(read,predicate,deadline=35):
     raise AssertionError('observation deadline: '+str(last))
 def admission(seed):
     return {'version':'runspindle.runtime.v1','delivery_namespace':'synthetic','delivery_id':f'delivery-{seed}','task_id':f'task-{seed}','revision':1,'predecessor_revision':None,'operation_id':f'operation-{seed}','normalized_digest':hashlib.sha256(f'synthetic-{seed}'.encode()).hexdigest(),'policy_revision':'policy','host_id':'explicit-host','workspace_id':'workspace','lease_epoch':1,'grant_ref':'synthetic-grant'}
-def run(platform,platform_prepared,core_prepared,seed=17,crash_before=False):
+def run(platform,platform_prepared,core_prepared,seed=17,crash_before=False,observer=None):
     manifest=validate(ROOT,core_prepared)
     require(manifest.get('features') in ('host-runtime','host-runtime,artifact-store','delivery-runtime'),'host-runtime feature not prepared')
     source=pathlib.Path(platform)/'tools/temporal_lane.py'
@@ -133,6 +133,10 @@ def run(platform,platform_prepared,core_prepared,seed=17,crash_before=False):
                     race_calls=[action for action,b in db.execute('SELECT action,binding FROM calls ORDER BY id') if json.loads(b)==race_binding]
                 require(race_calls.count('launch')==1 and race_calls.count('cancel')==0,'completion race created duplicate launch or late cancellation effect')
                 result={'boundary':'after_peer_effect','launch_calls':1,'cancels':1,'session':'observed-peer-session','terminal':'completed','pre_dispatch_cancel':'durable_local_outcome','cancel_during_terminal_observation':'accepted_intent_preserved','replay':'passed'}
+            if observer is not None:
+                context={'request':request,'before':crash_before,'seed':seed,'result':result}
+                if not crash_before:context['terminal_race']={'request':race_request,'held':held,'core':raced,'accepted_events':accepted_ids,'completed_events':completed_ids}
+                observer(directory,context)
     return result
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--platform',required=True);p.add_argument('--platform-prepared',required=True);p.add_argument('--core-prepared',default=str(ROOT/'local/runtime-prepared'));p.add_argument('--repeat',type=int,default=2);p.add_argument('--seed',type=int,default=17);a=p.parse_args()

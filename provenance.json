@@ -6,6 +6,12 @@
     "legacy_source_import": "none",
     "mapping": "specs/durable-artifacts.md"
   },
+  "durable_delivery_source": {
+    "Tether": "No legacy Tether code, history, credentials or transport imported; selected-source/transport rights blockers remain.",
+    "classification": "original_outbox_and_synthetic_transport_controller",
+    "contract_commit": "96299842505ce7662178b7c7b00fd31f6c2754f0",
+    "mapping": "specs/durable-delivery.md"
+  },
   "host_library_dependency": {
     "boundary": "immutable Git library dependency",
     "inventory": "docs/runtime-dependencies.json",

@@ -6,9 +6,13 @@
 #![forbid(unsafe_code)]
 
 pub mod artifact;
+#[cfg(feature = "delivery-runtime")]
+pub mod delivery_runtime;
 #[cfg(feature = "artifact-store")]
 pub mod durable;
 pub mod identity;
+#[cfg(feature = "delivery-runtime")]
+pub mod outbox;
 
 #[cfg(feature = "temporal-runtime")]
 pub mod runtime;
