@@ -2,6 +2,11 @@
 #[cfg(feature = "host-runtime")]
 use runspindle_core::integration::*;
 use runspindle_core::runtime::*;
+#[cfg(feature = "delivery-runtime")]
+use runspindle_core::{
+    delivery_runtime::{artifact_command, DeliveryPorts, DeliveryWorkflow},
+    outbox::DeliveryRequest,
+};
 use serde::Deserialize;
 use std::{io::Read, path::PathBuf, time::Duration};
 use temporalio_client::{
@@ -15,6 +20,15 @@ use temporalio_sdk::{
 #[derive(Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
+    #[cfg(feature = "delivery-runtime")]
+    Deliver {
+        workflow_id: String,
+        request: DeliveryRequest,
+    },
+    #[cfg(feature = "delivery-runtime")]
+    Delivery {
+        workflow_id: String,
+    },
     #[cfg(feature = "host-runtime")]
     StartHost {
         registry_id: String,
@@ -73,9 +87,26 @@ async fn main() -> anyhow::Result<()> {
         let replay_options = replay_options
             .register_workflow::<NativeOperationWorkflow>()?
             .register_workflow::<HostAdmissionRegistry>()?;
+        #[cfg(feature = "delivery-runtime")]
+        let replay_options = replay_options.register_workflow::<DeliveryWorkflow>()?;
         let replayer = WorkflowReplayer::new(replay_options.build())?;
         replayer.replay_workflow(history).await?;
         println!("{{\"status\":\"passed\",\"evidence_class\":\"isolated_integration\",\"check\":\"history_replay\"}}");
+        return Ok(());
+    }
+    #[cfg(feature = "delivery-runtime")]
+    if args.get(1).map(String::as_str) == Some("artifact") {
+        anyhow::ensure!(
+            args.get(2).map(String::as_str) == Some("/effects"),
+            "explicit synthetic /effects directory required"
+        );
+        let action = args
+            .get(3)
+            .ok_or_else(|| anyhow::anyhow!("artifact action required"))?;
+        println!(
+            "{}",
+            artifact_command(std::path::Path::new("/effects"), action)?
+        );
         return Ok(());
     }
     let mode = args.get(1).map(String::as_str).unwrap_or("");
@@ -115,6 +146,12 @@ async fn main() -> anyhow::Result<()> {
             .register_activities(HostPorts {
                 directory: script_directory,
             });
+        #[cfg(feature = "delivery-runtime")]
+        let options = options
+            .register_workflow::<DeliveryWorkflow>()?
+            .register_activities(DeliveryPorts {
+                directory: args.get(3).map(PathBuf::from),
+            });
         let options = options.build();
         Worker::new(&runtime, client, options)?
             .run_until(tokio::signal::ctrl_c())
@@ -134,6 +171,31 @@ async fn main() -> anyhow::Result<()> {
     anyhow::ensure!(input.len() <= 1_048_576, "oversized input");
     let command: Command = serde_json::from_str(&input)?;
     let result = match command {
+        #[cfg(feature = "delivery-runtime")]
+        Command::Deliver {
+            workflow_id,
+            request,
+        } => {
+            anyhow::ensure!(
+                valid_id(&workflow_id) && request.valid(),
+                "invalid delivery workflow request"
+            );
+            let h = client
+                .start_workflow(
+                    DeliveryWorkflow::run,
+                    request,
+                    WorkflowStartOptions::new(QUEUE, workflow_id.clone()).build(),
+                )
+                .await?;
+            serde_json::json!({"workflow_id":workflow_id,"run_id":h.run_id()})
+        }
+        #[cfg(feature = "delivery-runtime")]
+        Command::Delivery { workflow_id } => serde_json::to_value(
+            client
+                .get_workflow_handle::<DeliveryWorkflow>(workflow_id)
+                .query(DeliveryWorkflow::snapshot, (), Default::default())
+                .await?,
+        )?,
         #[cfg(feature = "host-runtime")]
         Command::StartHost { registry_id } => {
             anyhow::ensure!(valid_id(&registry_id), "invalid registry");
