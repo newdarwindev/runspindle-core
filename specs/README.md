@@ -28,3 +28,10 @@ Preserve explicit authority and unknown outcomes. Distinguish request admission,
 
 Isolated integration, live acceptance, restart and rollback gates have not run.
 The synthetic component test status is recorded separately in the evidence document.
+
+## Engineering direction
+
+[Desired intent](desired-intent.md) connects this component to scoped access,
+managed sessions, explicit human exceptions and evaluated maintained workflows.
+It adds design and verification obligations without changing runtime schemas,
+existing acceptance results or operational permissions.
