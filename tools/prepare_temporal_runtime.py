@@ -31,10 +31,10 @@ def verify_git_dependency(base, source):
     actual = subprocess.check_output(['git','rev-parse','HEAD'],cwd=base,text=True).strip()
     if actual != expected:
         raise RuntimeError('cached host checkout differs from locked revision')
-    untracked = subprocess.check_output(['git','ls-files','--others','--exclude-standard'],cwd=base,text=True).splitlines()
+    untracked = subprocess.check_output(['git','ls-files','--others'],cwd=base,text=True).splitlines()
     if any(path != '.cargo-ok' for path in untracked):
         raise RuntimeError('untracked files in pinned host checkout')
-    for relative in subprocess.check_output(['git','ls-files','src','Cargo.toml','Cargo.lock'],cwd=base,text=True).splitlines():
+    for relative in subprocess.check_output(['git','ls-files'],cwd=base,text=True).splitlines():
         expected_bytes = subprocess.check_output(['git','show',actual+':'+relative],cwd=base)
         if (base/relative).read_bytes() != expected_bytes:
             raise RuntimeError('cached pinned host library bytes changed')

@@ -42,3 +42,12 @@ an unchanged Runtime v1 Admission. Unknown versions and changed bindings deny.
 The exact prepared runtime registers both workflow families for separate tests
 and same-version replay. No upgrade/replay compatibility with prior histories is
 claimed.
+
+Core retains an accepted Temporal cancellation request independently of host
+observation state. Queries project Requested while the host action is pending.
+When a held actual terminal observation wins the race, core retains that outcome
+and marks the accepted cancellation ObservedTerminal. This combines two observed
+facts without fabricating a native cancellation effect or changing session IDs.
+The controlled H02 terminal-reply barrier independently persists the host's
+completion with no cancellation, accepts the Temporal cancel update, then checks
+return-receipt and history order. No late peer cancel is dispatched.

@@ -59,6 +59,7 @@ fn script() -> NativeScript {
         session_override: None,
         sequence_override: None,
         observed_at_override: None,
+        reconcile_barrier: false,
     }
 }
 fn write(t: &Temp, s: &NativeScript) {
@@ -194,4 +195,25 @@ fn revoked_authority_and_changed_epoch_have_no_effects() {
     c.request.admission.binding.lease_epoch = 2;
     assert!(p.invoke(c).is_err());
     assert!(!t.0.join("host.sqlite").exists());
+}
+
+#[test]
+fn accepted_cancellation_survives_a_terminal_observation_return() {
+    use runspindle_host::lifecycle as h;
+    let mut snapshot = h::Snapshot {
+        binding: host_binding(&request().admission.binding),
+        execution: h::Execution::Terminal(h::Terminal::Completed),
+        cancellation: h::Cancellation::None,
+        native_session_id: Some("actual-native".into()),
+        last_sequence: 2,
+        observed_at_ms: Some(1),
+        cancel_dispatched: false,
+    };
+    preserve_cancellation(&mut snapshot, true);
+    assert_eq!(
+        snapshot.execution,
+        h::Execution::Terminal(h::Terminal::Completed)
+    );
+    assert_eq!(snapshot.cancellation, h::Cancellation::ObservedTerminal);
+    assert!(!snapshot.cancel_dispatched);
 }

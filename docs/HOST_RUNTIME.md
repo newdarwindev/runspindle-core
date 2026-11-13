@@ -31,3 +31,9 @@ ambiguous observations and default-deny/changed authority. Existing scripted-cor
 Temporal tests remain a separate suite. Native/core/host library integration is
 bounded development evidence with a scripted peer; native wire, production and
 full-system/live acceptance remain blocked.
+
+Mutation builds use a distinct target per mutation, clean the component there,
+and assert the qualification target's file inventory remains unchanged. Cached
+host verification compares the full locked Git revision and all tracked/untracked
+files, including ignored build scripts. Earlier shared-target mutation evidence
+was discarded; retained results follow an explicit component clean rebuild.

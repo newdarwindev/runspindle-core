@@ -72,6 +72,8 @@ pub struct NativeScript {
     pub sequence_override: Option<u64>,
     #[serde(default)]
     pub observed_at_override: Option<u64>,
+    #[serde(default)]
+    pub reconcile_barrier: bool,
 }
 struct Grant<'a>(&'a NativeScript);
 impl host::Verifier for Grant<'_> {
@@ -293,13 +295,60 @@ impl HostPorts {
         _ctx: ActivityContext,
         call: HostCall,
     ) -> Result<host::Snapshot, ActivityError> {
-        Ok(self.invoke(call)?)
+        let snapshot = self.invoke(call.clone())?;
+        if matches!(call.action, HostAction::Reconcile)
+            && matches!(snapshot.execution, host::Execution::Terminal(_))
+        {
+            if let Some(dir) = &self.directory {
+                let script = read_script(&dir.join("native-script.json"))?;
+                if script.reconcile_barrier {
+                    let operation = &call.request.admission.binding.operation_id;
+                    let write_receipt = |name: &str| -> anyhow::Result<()> {
+                        use std::io::Write;
+                        let mut file = std::fs::OpenOptions::new()
+                            .write(true)
+                            .create_new(true)
+                            .open(dir.join(format!("{name}-{operation}.json")))?;
+                        file.write_all(&serde_json::to_vec(&snapshot)?)?;
+                        file.sync_all()?;
+                        Ok(())
+                    };
+                    write_receipt("reconcile-ready")?;
+                    let release = dir.join(format!("reconcile-release-{operation}.json"));
+                    let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+                    while !release.exists() {
+                        if tokio::time::Instant::now() >= deadline {
+                            return Err(
+                                anyhow::anyhow!("synthetic reconcile barrier deadline").into()
+                            );
+                        }
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                    let release_binding: Binding =
+                        serde_json::from_slice(&std::fs::read(release)?)?;
+                    if release_binding != call.request.admission.binding {
+                        return Err(anyhow::anyhow!("barrier binding mismatch").into());
+                    }
+                    write_receipt("reconcile-returned")?;
+                }
+            }
+        }
+        Ok(snapshot)
     }
 }
 pub fn once() -> ActivityOptions {
     ActivityOptions::with_start_to_close_timeout(Duration::from_secs(3))
         .retry_policy(RetryPolicy::builder().maximum_attempts(1).build())
         .build()
+}
+pub fn preserve_cancellation(snapshot: &mut host::Snapshot, requested: bool) {
+    if requested && snapshot.cancellation == host::Cancellation::None {
+        snapshot.cancellation = if matches!(snapshot.execution, host::Execution::Terminal(_)) {
+            host::Cancellation::ObservedTerminal
+        } else {
+            host::Cancellation::Requested
+        };
+    }
 }
 pub fn terminal(s: &host::Snapshot) -> bool {
     matches!(
@@ -337,7 +386,11 @@ impl NativeOperationWorkflow {
             }
             let action = match snapshot {
                 None => HostAction::Prepare,
-                Some(ref s) if cancel && s.cancellation == host::Cancellation::None => {
+                Some(ref s)
+                    if cancel
+                        && (s.cancellation == host::Cancellation::None
+                            || s.execution == host::Execution::Queued) =>
+                {
                     HostAction::Cancel
                 }
                 Some(ref s) if cancel && !s.cancel_dispatched && s.native_session_id.is_some() => {
@@ -346,11 +399,24 @@ impl NativeOperationWorkflow {
                 Some(ref s) if s.execution == host::Execution::Queued => HostAction::Dispatch,
                 _ => HostAction::Reconcile,
             };
+            let options = if matches!(action, HostAction::Reconcile) {
+                ActivityOptions::with_start_to_close_timeout(Duration::from_secs(25))
+                    .retry_policy(RetryPolicy::builder().maximum_attempts(1).build())
+                    .build()
+            } else {
+                once()
+            };
             let result = ctx
-                .execute_activity(HostPorts::coordinate, HostCall { request, action }, once())
+                .execute_activity(HostPorts::coordinate, HostCall { request, action }, options)
                 .await;
             if let Ok(snapshot) = result {
-                ctx.state_mut(|s| s.snapshot = Some(snapshot));
+                ctx.state_mut(|s| {
+                    let mut snapshot = snapshot;
+                    if terminal(&snapshot) {
+                        preserve_cancellation(&mut snapshot, s.cancel_requested);
+                    }
+                    s.snapshot = Some(snapshot);
+                });
             }
             ctx.timer(Duration::from_millis(250)).await;
         }
@@ -370,7 +436,10 @@ impl NativeOperationWorkflow {
     }
     #[query]
     pub fn snapshot(&self, _ctx: &WorkflowContextView) -> Option<host::Snapshot> {
-        self.snapshot.clone()
+        self.snapshot.clone().map(|mut snapshot| {
+            preserve_cancellation(&mut snapshot, self.cancel_requested);
+            snapshot
+        })
     }
 }
 

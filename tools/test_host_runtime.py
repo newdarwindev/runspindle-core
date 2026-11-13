@@ -109,7 +109,30 @@ def run(platform,platform_prepared,core_prepared,seed=17,crash_before=False):
                 lane.restart(abrupt=True);worker()
                 local=next_query()
                 require(local['execution']=='CancelledBeforeDispatch' and ledger().count('launch')==1,'pre-dispatch cancel lost after fresh process')
-                result={'boundary':'after_peer_effect','launch_calls':1,'cancels':1,'session':'observed-peer-session','terminal':'completed','pre_dispatch_cancel':'durable_local_outcome','replay':'passed'}
+                race_admission=admission(seed+2);race_request={'version':'runspindle.integration.v1','admission':race_admission}
+                script['request']=race_request;script['online']=True;write()
+                race_reply=client({'command':'admit_host','registry_id':registry,'request':race_request});require(race_reply['status']=='admitted','race admission failed')
+                race_job=race_reply['job_id'];race_binding={k:race_admission[k] for k in binding}
+                race_query=lambda:client({'command':'native','job_id':race_job})
+                wait(race_query,lambda s:s and s['native_session_id']=='observed-peer-session')
+                script['reconcile_barrier']=True;script['terminal']='completed';write()
+                ready=directory/('reconcile-ready-'+race_binding['operation_id']+'.json')
+                held=wait(lambda:json.loads(ready.read_text()) if ready.exists() else None,lambda s:s is not None)
+                require(held['execution']=={'Terminal':'Completed'} and held['cancellation']=='None','terminal reply barrier missing actual host outcome')
+                require(client({'command':'cancel_native','job_id':race_job,'binding':race_binding})['accepted'],'cancel while terminal reply pending was denied')
+                pending=race_query();require(pending['cancellation']=='Requested','accepted pending cancel intent missing')
+                release=directory/('reconcile-release-'+race_binding['operation_id']+'.json');pending_release=release.with_suffix('.next');pending_release.write_text(json.dumps(race_binding));pending_release.replace(release)
+                raced=wait(race_query,lambda s:s and s['execution']=={'Terminal':'Completed'})
+                require(raced['cancellation']=='ObservedTerminal' and raced['native_session_id']==held['native_session_id'],'completion race dropped accepted cancel or changed native outcome')
+                returned=directory/('reconcile-returned-'+race_binding['operation_id']+'.json');require(returned.exists(),'held native reply was not independently returned')
+                history=client({'command':'history','workflow_id':race_job})
+                accepted_ids=[int(e['event_id']) for e in history['events'] if 'WorkflowExecutionUpdateAcceptedEventAttributes' in e.get('attributes',{})]
+                completed_ids=[int(e['event_id']) for e in history['events'] if 'ActivityTaskCompletedEventAttributes' in e.get('attributes',{})]
+                require(accepted_ids and max(completed_ids)>max(accepted_ids),'Temporal history did not place terminal activity return after cancel acceptance')
+                with sqlite3.connect(directory/'native-peer.sqlite') as db:
+                    race_calls=[action for action,b in db.execute('SELECT action,binding FROM calls ORDER BY id') if json.loads(b)==race_binding]
+                require(race_calls.count('launch')==1 and race_calls.count('cancel')==0,'completion race created duplicate launch or late cancellation effect')
+                result={'boundary':'after_peer_effect','launch_calls':1,'cancels':1,'session':'observed-peer-session','terminal':'completed','pre_dispatch_cancel':'durable_local_outcome','cancel_during_terminal_observation':'accepted_intent_preserved','replay':'passed'}
     return result
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--platform',required=True);p.add_argument('--platform-prepared',required=True);p.add_argument('--core-prepared',default=str(ROOT/'local/runtime-prepared'));p.add_argument('--repeat',type=int,default=2);p.add_argument('--seed',type=int,default=17);a=p.parse_args()
