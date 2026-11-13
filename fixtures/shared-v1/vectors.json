@@ -1,0 +1,106 @@
+[
+  {
+    "expected_error": "schema-version",
+    "id": "admission.observed-unknown-version",
+    "kind": "admission.observed",
+    "mutation": {
+      "path": [
+        "schema"
+      ],
+      "value": "runspindle.fixture.v99"
+    }
+  },
+  {
+    "expected_error": "identity-mismatch",
+    "id": "admission.observed-wrong-host",
+    "kind": "admission.observed",
+    "mutation": {
+      "path": [
+        "identity",
+        "host_id"
+      ],
+      "value": "synthetic-other-host"
+    }
+  },
+  {
+    "expected_error": "schema-version",
+    "id": "native.observed-unknown-version",
+    "kind": "native.observed",
+    "mutation": {
+      "path": [
+        "schema"
+      ],
+      "value": "runspindle.fixture.v99"
+    }
+  },
+  {
+    "expected_error": "identity-mismatch",
+    "id": "native.observed-wrong-host",
+    "kind": "native.observed",
+    "mutation": {
+      "path": [
+        "identity",
+        "host_id"
+      ],
+      "value": "synthetic-other-host"
+    }
+  },
+  {
+    "expected_error": "schema-version",
+    "id": "artifact.observed-unknown-version",
+    "kind": "artifact.observed",
+    "mutation": {
+      "path": [
+        "schema"
+      ],
+      "value": "runspindle.fixture.v99"
+    }
+  },
+  {
+    "expected_error": "identity-mismatch",
+    "id": "artifact.observed-wrong-host",
+    "kind": "artifact.observed",
+    "mutation": {
+      "path": [
+        "identity",
+        "host_id"
+      ],
+      "value": "synthetic-other-host"
+    }
+  },
+  {
+    "expected_error": "identity-mismatch",
+    "id": "changed-artifact",
+    "kind": "artifact.observed",
+    "mutation": {
+      "path": [
+        "identity",
+        "artifact_digest"
+      ],
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  {
+    "expected_error": "uncertainty-is-not-success",
+    "id": "unknown-not-success",
+    "kind": "artifact.observed",
+    "mutation": {
+      "path": [
+        "state"
+      ],
+      "value": "unknown"
+    }
+  },
+  {
+    "expected_error": "missing-independent-receipt",
+    "id": "fabricated-delivery",
+    "kind": "artifact.observed",
+    "mutation": {
+      "path": [
+        "detail",
+        "receipt_id"
+      ],
+      "value": "synthetic-forged"
+    }
+  }
+]

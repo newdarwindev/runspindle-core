@@ -1,0 +1,45 @@
+{
+  "components": {
+    "browser": [
+      "browser.observed"
+    ],
+    "console": [
+      "native.observed",
+      "browser.observed",
+      "artifact.observed",
+      "telemetry.observed"
+    ],
+    "core": [
+      "admission.observed",
+      "native.observed",
+      "artifact.observed"
+    ],
+    "host": [
+      "native.observed"
+    ],
+    "platform": [
+      "telemetry.observed",
+      "candidate.observed"
+    ],
+    "refinery": [
+      "feedback.observed",
+      "candidate.observed"
+    ],
+    "tether": [
+      "admission.observed",
+      "event.observed",
+      "feedback.observed"
+    ]
+  },
+  "files": {
+    "artifact.txt": "5d331381d2f6ae517386fdda84eb4f92011915473935b57385c69648cc85bbc8",
+    "contract.json": "f707f1d2b7147797042292b6374afd34aecc39c09916ec7a809ae7587ee556a9",
+    "faults.json": "0e7ee372f9d43feef36efc643f07782205e322bc126921312ec45fffc7856dad",
+    "fixturekit.py": "1bd6d10ae7105a44a0d583a8974230dde56af603c6ed2b75f67fe3f1fb16319f",
+    "golden.json": "241c795972ccd5491ac006a2bbbf53fda2c57dd204f7899d3b4f3930848747ab",
+    "vectors.json": "60fee97e6911b2141145f6bfb949deab013386899be08af5447a424e6678a3be"
+  },
+  "provenance": "Original synthetic fixtures; no imported source, private data or real credentials.",
+  "schema": "runspindle.fixture.v1",
+  "upstream_compatibility": "provisional-not-qualified"
+}

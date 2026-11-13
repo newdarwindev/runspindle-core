@@ -103,3 +103,19 @@ operational gate. Shared-fixture adoption and all real adapter/store/Temporal
 suites remain blocked/not run; issue #1 is not complete. The local macOS result
 is separate from the earlier Linux result and does not qualify a native session,
 a runner, a deployed system or cross-process durability.
+
+
+## Pinned synthetic fixture consumer (2026-11-13)
+
+A later [core fixture subset](SHARED_FIXTURES.md) pins composition source commit
+`e8cd5779968fede213443db13a591c992cd0e183`, its original manifest and deterministic
+core export. The offline checker verifies hashes before executing byte-preserved
+fixture code and exercises three golden observations plus nine negative vectors.
+Eleven Python tests cover consumer isolation, pin/inventory tampering, receipt and
+identity rejection, socket denial and deliberate validator permissiveness.
+[shared-fixture-tests.json](shared-fixture-tests.json) records exact local inputs
+and outcomes. Existing Rust model source/workflows/gates are unchanged.
+
+This is Python fixture consumer conformance, not Rust/runtime adapter mapping,
+authenticated authority, durable recovery or upstream qualification. Core #1 and
+its actual adapter work remain open; operational acceptance continues to fail closed.

@@ -1,6 +1,6 @@
 {
   "license_status": "No blanket license is granted to imported material. See LEGAL.md.",
-  "new_files": "New scaffold, specifications and original in-memory contract candidate; no old executable source or Git history imported.",
+  "new_files": "New scaffold, specifications and original in-memory contract candidate, plus an owner-directed pinned subset of original synthetic Runspindle fixtures (see fixtures/shared-v1.pin.json and docs/SHARED_FIXTURES.md); no legacy executable source or Git history imported.",
   "provenance_policy": "Public IDs resolve to a privately retained source record containing repository, exact commit, path, source hash and review notes. Private repository names, URLs and operational details are omitted.",
   "schema_version": 1,
   "sources": []

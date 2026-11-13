@@ -13,6 +13,13 @@
   "production_deployment": "not_run",
   "runner_capacity": "unverified",
   "selected_source_migration": "partial",
+  "shared_fixture_consumer": {
+    "evidence": "docs/shared-fixture-tests.json",
+    "pin": "fixtures/shared-v1.pin.json",
+    "runtime_adapter_conformance": "not_run",
+    "status": "locally_tested_synthetic_consumer",
+    "version": "runspindle.fixture.v1"
+  },
   "stage": "contract_candidate",
   "temporal_integration": "not_implemented"
 }

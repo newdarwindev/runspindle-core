@@ -2,7 +2,9 @@
 
 Scope: local synthetic model test extension for [issue #1](https://github.com/newdarwindev/runspindle-core/issues/1).
 This is a reviewable test plan, not an agreed runtime or shared wire protocol.
-No shared fixture version is consumed here; composition issue #1 owns that agreement.
+The original model-only extension below consumes no shared fixtures. A later
+[pinned test-only subset](SHARED_FIXTURES.md) now exercises core fixture consumption;
+runtime adapter mapping remains unagreed and composition issue #1 owns shared changes.
 
 ## Run locally
 

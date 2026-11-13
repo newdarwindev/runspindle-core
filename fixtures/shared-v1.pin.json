@@ -1,0 +1,11 @@
+{
+  "component": "core",
+  "fixture_schema": "runspindle.fixture.v1",
+  "origin_manifest_sha256": "1dd35d045064056dd66e6da3619ff100549e1c3e81c928f076cfd4109a524d81",
+  "schema": "runspindle.fixture.pin.v1",
+  "source_commit": "e8cd5779968fede213443db13a591c992cd0e183",
+  "source_manifest_git_blob": "aa24016460196fb4e5fa0a335035394efb05eb12",
+  "source_path": "fixtures/v1",
+  "source_repository": "newdarwindev/runspindle",
+  "subset_manifest_sha256": "4ece21a0af164e15ae29fa68adad32657dee0236d9395ea253326cd5d5cbbd34"
+}
