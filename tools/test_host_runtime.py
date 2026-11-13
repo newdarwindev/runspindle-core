@@ -30,7 +30,7 @@ def admission(seed):
     return {'version':'runspindle.runtime.v1','delivery_namespace':'synthetic','delivery_id':f'delivery-{seed}','task_id':f'task-{seed}','revision':1,'predecessor_revision':None,'operation_id':f'operation-{seed}','normalized_digest':hashlib.sha256(f'synthetic-{seed}'.encode()).hexdigest(),'policy_revision':'policy','host_id':'explicit-host','workspace_id':'workspace','lease_epoch':1,'grant_ref':'synthetic-grant'}
 def run(platform,platform_prepared,core_prepared,seed=17,crash_before=False):
     manifest=validate(ROOT,core_prepared)
-    require(manifest.get('features') in ('host-runtime','delivery-runtime'),'host-runtime feature not prepared')
+    require(manifest.get('features') in ('host-runtime','host-runtime,artifact-store','delivery-runtime'),'host-runtime feature not prepared')
     source=pathlib.Path(platform)/'tools/temporal_lane.py'
     module=types.ModuleType('verified_lane');module.__file__=str(source)
     exec(compile(source.read_bytes(),str(source),'exec'),module.__dict__)

@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [features]
+artifact-store = ["temporal-runtime", "dep:rusqlite"]
 host-runtime = ["temporal-runtime", "dep:runspindle-host", "dep:rusqlite"]
 temporal-runtime = ["dep:temporalio-sdk", "dep:temporalio-client", "dep:temporalio-common", "dep:temporalio-macros", "dep:tokio", "dep:serde", "dep:serde_json", "dep:sha2", "dep:anyhow", "dep:temporalio-workflow", "dep:futures", "dep:url"]
 
