@@ -15,6 +15,7 @@ This repository is one boundary of [Runspindle](https://github.com/newdarwindev/
 - Read [specifications](specs/README.md), [agent guidance](AGENTS.md), [provenance](provenance.json), [status](STATUS.json) and [legal status](LEGAL.md).
 - Run `python3 tools/check_scaffold.py` for structural validation only.
 - Run `cargo test --offline --all-targets` for synthetic component tests when a qualified Rust toolchain is available. Tests are not integration or deployment acceptance.
+- Run `python3 tools/check_shared_fixtures.py` for the [pinned synthetic fixture consumer](docs/SHARED_FIXTURES.md); actual runtime adapter conformance remains blocked.
 - Operational entrypoints and acceptance gates deliberately fail closed until implemented.
 - GitHub Actions use isolated **self-hosted local runners only**. No GitHub-hosted fallback. Runner capacity is not established by publishing workflows.
 - `rust-ci.yml` is configured to run the structural check, Rust formatting, offline tests and offline clippy using a pre-provisioned toolchain. A missing toolchain fails the job; nothing is installed or silently skipped. These are configured checks, not evidence that CI ran.

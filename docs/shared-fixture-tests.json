@@ -1,0 +1,187 @@
+{
+  "completed_utc": "2026-11-13T18:45:48.159558+00:00",
+  "counts": {
+    "golden_core_fixtures": 3,
+    "model_mutations_detected": 3,
+    "negative_vectors": 9,
+    "python_consumer_tests": 11,
+    "rust_model_tests": 20
+  },
+  "deployment": "not_run",
+  "evidence_class": "synthetic_fixture_consumer_conformance",
+  "github_ci": "not_run",
+  "initial_test_defects": [
+    "The valid bytecode-cache test initially used an environment-global pycache prefix. Fixed the test to scope pycache_prefix=None inside its temporary directory; final full suite passed."
+  ],
+  "input_sha256": {
+    "Cargo.lock": "605f92da1e6198027fe64b7cf37a66773db5f735e78aa89af1099bf4732e29d8",
+    "Cargo.toml": "5913a5eac861fc496add2d684dc13787199ef3b833423ee5fa0b0b30f3efcd53",
+    "docs/SHARED_FIXTURES.md": "9825cbb8797ee397548883f96a482593636be9f68151d49ea48c7ef6b93129bc",
+    "fixtures/shared-v1.origin-manifest.json": "1dd35d045064056dd66e6da3619ff100549e1c3e81c928f076cfd4109a524d81",
+    "fixtures/shared-v1.pin.json": "53b27ffd7e720ac06f6dbbf72f7c2e0c73e43ba59263c253a543eec3946c365c",
+    "fixtures/shared-v1/artifact.txt": "5d331381d2f6ae517386fdda84eb4f92011915473935b57385c69648cc85bbc8",
+    "fixtures/shared-v1/contract.json": "f707f1d2b7147797042292b6374afd34aecc39c09916ec7a809ae7587ee556a9",
+    "fixtures/shared-v1/fixturekit.py": "1bd6d10ae7105a44a0d583a8974230dde56af603c6ed2b75f67fe3f1fb16319f",
+    "fixtures/shared-v1/golden.json": "24f8076021b5181f03b63162c687499e6e4b51ab016474472d52285546d7aa1e",
+    "fixtures/shared-v1/manifest.json": "4ece21a0af164e15ae29fa68adad32657dee0236d9395ea253326cd5d5cbbd34",
+    "fixtures/shared-v1/vectors.json": "04baf8efb5b4048d673e2a7d83ca3720a5df6a5f60c44329228bcc3b4d561a94",
+    "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+    "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+    "src/lib.rs": "340c0761561cef4a6f0706a34aa0abbdd3ed44cfba00c4f4ab7058f8ebe7f5e1",
+    "tests/contracts.rs": "1a192f9ae3ab7083d36133d199ffac7eeee46ceb5ceb3b0b5a2acd8f77762433",
+    "tests/sequence_contracts.rs": "d8dfbab21fc0edd9a6aef30eaf5a5c243a76b2fe5ee8076569f5bcfa2e3808dd",
+    "tests/test_shared_fixtures.py": "2b3fccd7d6b8057966f3a9fbbe91f275d7f4c7dc5e5472d1e04a5295cd1c9ff2",
+    "tools/check_shared_fixtures.py": "a932119006021a81db7517df8ba8dc24a43db56ac31d2f537386c2b5a422ba0c"
+  },
+  "isolated_integration": "not_run",
+  "live_acceptance": "blocked_not_run",
+  "network_boundary": "Python socket guard plus no transport implementation; not an OS sandbox for native/untrusted code",
+  "platform": "Darwin arm64",
+  "remaining_issue_1": "Actual Temporal/store/authenticated host/browser/delivery adapter suites remain blocked/not run.",
+  "results": [
+    {
+      "command": [
+        "python3",
+        "tools/check_shared_fixtures.py"
+      ],
+      "exit_code": 0,
+      "report": {
+        "component": "core",
+        "evidence_class": "synthetic_fixture_consumer_conformance",
+        "golden": 3,
+        "integration": "not-run",
+        "live_acceptance": "not-run",
+        "negative_vectors_detected": 9,
+        "runtime_adapter": "not-implemented",
+        "source_commit": "e8cd5779968fede213443db13a591c992cd0e183",
+        "status": "passed"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_shared_fixtures.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "result_lines": [
+        "Ran 11 tests in 0.162s",
+        "OK"
+      ]
+    },
+    {
+      "command": [
+        "python3",
+        "tools/check_scaffold.py"
+      ],
+      "exit_code": 0,
+      "report": {
+        "evidence_class": "scaffold_structure",
+        "product_acceptance": "not_run",
+        "repository": "newdarwindev/runspindle-core",
+        "status": "passed"
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "result_lines": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "python3",
+        "tools/check_model_mutations.py"
+      ],
+      "exit_code": 0,
+      "report": {
+        "evidence_class": "local_synthetic_mutation_tests",
+        "mutations": [
+          {
+            "mutation": "uncertain_becomes_retryable",
+            "outcome": "detected",
+            "test": "every_artifact_action_trace_through_length_seven_matches_transition_table"
+          },
+          {
+            "mutation": "id_accepts_129_bytes",
+            "outcome": "detected",
+            "test": "id_alphabet_and_length_boundaries_are_exhaustive_for_ascii"
+          },
+          {
+            "mutation": "conflict_consumes_intent_revision",
+            "outcome": "detected",
+            "test": "failed_delivery_reuse_does_not_register_a_new_task_or_revision"
+          }
+        ],
+        "product_acceptance": "not_run",
+        "status": "passed",
+        "temporary_copy_cleanup": "completed"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "tools/acceptance_gate.py",
+        "live"
+      ],
+      "exit_code": 78,
+      "report": {
+        "gate": "live",
+        "reason": "Implementation, qualified local capacity and acceptance evidence are not yet available.",
+        "status": "blocked"
+      }
+    }
+  ],
+  "runtime_adapter_conformance": "not_run",
+  "schema_version": 1,
+  "source_base": "9f6c94d64aecf62e688a6b0f3429beaf10a4ccbb",
+  "toolchain": {
+    "cargo -V": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "cargo clippy --version": "clippy 0.1.94 (e408947bfd 2026-03-25)",
+    "python3 --version": "Python 3.9.6",
+    "rustc -Vv": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-apple-darwin\nrelease: 1.94.1\nLLVM version: 21.1.8",
+    "rustfmt -V": "rustfmt 1.8.0-stable (e408947bfd 2026-03-25)"
+  },
+  "upstream_fixture_source": {
+    "commit": "e8cd5779968fede213443db13a591c992cd0e183",
+    "method": "GitHub exact merged commit tree compared to local blob SHA1 before subset export",
+    "repository": "newdarwindev/runspindle",
+    "verified_git_blob_count": 7
+  }
+}

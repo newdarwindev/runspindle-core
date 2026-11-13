@@ -1,0 +1,12 @@
+{
+  "component": "core",
+  "files": {
+    "artifact.txt": "5d331381d2f6ae517386fdda84eb4f92011915473935b57385c69648cc85bbc8",
+    "contract.json": "f707f1d2b7147797042292b6374afd34aecc39c09916ec7a809ae7587ee556a9",
+    "fixturekit.py": "1bd6d10ae7105a44a0d583a8974230dde56af603c6ed2b75f67fe3f1fb16319f",
+    "golden.json": "24f8076021b5181f03b63162c687499e6e4b51ab016474472d52285546d7aa1e",
+    "vectors.json": "04baf8efb5b4048d673e2a7d83ca3720a5df6a5f60c44329228bcc3b4d561a94"
+  },
+  "origin_manifest_sha256": "1dd35d045064056dd66e6da3619ff100549e1c3e81c928f076cfd4109a524d81",
+  "schema": "runspindle.fixture.v1"
+}
