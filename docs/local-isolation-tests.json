@@ -1,0 +1,141 @@
+{
+  "completed_utc": "2026-11-13T18:36:09.632118+00:00",
+  "component": "runspindle-core",
+  "deployment": "not_run",
+  "evidence_class": "local_synthetic_component_tests",
+  "github_ci": "not_run",
+  "initial_defects": [
+    "Initial new-test Clippy run rejected needless_range_loop; fixed with enumerated declarative rule iteration; final lint passed."
+  ],
+  "input_sha256": {
+    "Cargo.lock": "605f92da1e6198027fe64b7cf37a66773db5f735e78aa89af1099bf4732e29d8",
+    "Cargo.toml": "5913a5eac861fc496add2d684dc13787199ef3b833423ee5fa0b0b30f3efcd53",
+    "docs/ISOLATION_TEST_PLAN.md": "4d096a6079f4250b605ef183f1efdaa23591516d8d1a1a187a446b7d24b3c0d2",
+    "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+    "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+    "src/lib.rs": "340c0761561cef4a6f0706a34aa0abbdd3ed44cfba00c4f4ab7058f8ebe7f5e1",
+    "tests/contracts.rs": "1a192f9ae3ab7083d36133d199ffac7eeee46ceb5ceb3b0b5a2acd8f77762433",
+    "tests/sequence_contracts.rs": "d8dfbab21fc0edd9a6aef30eaf5a5c243a76b2fe5ee8076569f5bcfa2e3808dd",
+    "tools/check_model_mutations.py": "93d21df1d5364949a1a498a02440f3e1a8dd797c8598a48d7eb52e7dee65bf56"
+  },
+  "isolated_integration": "not_run",
+  "issue_1": "partial",
+  "limitations": [
+    "No production model or external/shared protocol changed.",
+    "No durable store, authenticated evidence, real hashing, native host adapter, freshness validation or Temporal suite implemented.",
+    "Mutation tests are disposable source copies; their passing is test-sensitivity evidence only."
+  ],
+  "live_acceptance": "blocked_not_run",
+  "platform": "Darwin arm64",
+  "results": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "result_lines": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "python3",
+        "tools/check_model_mutations.py"
+      ],
+      "exit_code": 0,
+      "report": {
+        "evidence_class": "local_synthetic_mutation_tests",
+        "mutations": [
+          {
+            "mutation": "uncertain_becomes_retryable",
+            "outcome": "detected",
+            "test": "every_artifact_action_trace_through_length_seven_matches_transition_table"
+          },
+          {
+            "mutation": "id_accepts_129_bytes",
+            "outcome": "detected",
+            "test": "id_alphabet_and_length_boundaries_are_exhaustive_for_ascii"
+          },
+          {
+            "mutation": "conflict_consumes_intent_revision",
+            "outcome": "detected",
+            "test": "failed_delivery_reuse_does_not_register_a_new_task_or_revision"
+          }
+        ],
+        "product_acceptance": "not_run",
+        "status": "passed",
+        "temporary_copy_cleanup": "completed"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "tools/check_scaffold.py"
+      ],
+      "exit_code": 0,
+      "report": {
+        "evidence_class": "scaffold_structure",
+        "product_acceptance": "not_run",
+        "repository": "newdarwindev/runspindle-core",
+        "status": "passed"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "tools/acceptance_gate.py",
+        "live"
+      ],
+      "exit_code": 78,
+      "report": {
+        "gate": "live",
+        "reason": "Implementation, qualified local capacity and acceptance evidence are not yet available.",
+        "status": "blocked"
+      }
+    }
+  ],
+  "schema_version": 1,
+  "source_base": "e9244235228069db83e221832e1682393c10d88c",
+  "tests": {
+    "action_prefix_transitions": 97655,
+    "added": 3,
+    "failed": 0,
+    "mutations_detected": 3,
+    "passed": 20,
+    "retained": 17
+  },
+  "toolchain": {
+    "cargo -V": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "cargo clippy --version": "clippy 0.1.94 (e408947bfd 2026-03-25)",
+    "python3 --version": "Python 3.9.6",
+    "rustc -Vv": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-apple-darwin\nrelease: 1.94.1\nLLVM version: 21.1.8",
+    "rustfmt -V": "rustfmt 1.8.0-stable (e408947bfd 2026-03-25)"
+  }
+}
