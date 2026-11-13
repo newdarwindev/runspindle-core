@@ -122,7 +122,28 @@
     "upgrades",
     "Tether/browser/provider/full-system/live acceptance"
   ],
-  "runtime_mutations": "three registry mutations behaviorally detected; standalone tool rerun after bind-mount cleanup improvement",
+  "runtime_mutations": {
+    "status": "passed",
+    "evidence_class": "component",
+    "mutations": [
+      {
+        "mutation": "capacity_disabled",
+        "test": "known_duplicates_reconcile_at_capacity_without_eviction_or_new_delivery",
+        "detected": true
+      },
+      {
+        "mutation": "delivery_conflict_ignored",
+        "test": "conflicts_revisions_and_malformed_inputs_preserve_state",
+        "detected": true
+      },
+      {
+        "mutation": "old_operation_reused",
+        "test": "any_prior_operation_id_reuse_is_rejected_after_terminal_revisions",
+        "detected": true
+      }
+    ]
+  },
   "native_model_mutations": "three detected",
-  "python_fixture_tests": 11
+  "python_fixture_tests": 11,
+  "preparation_negative_tests": 3
 }
