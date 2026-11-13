@@ -6,7 +6,7 @@
   "contract_commit": "96299842505ce7662178b7c7b00fd31f6c2754f0",
   "tests": {
     "artifact_tests": 8,
-    "all_feature_tests": 35,
+    "all_feature_tests": 39,
     "strict_clippy": "passed",
     "formatting": "passed",
     "scaffold": "passed"
@@ -33,5 +33,37 @@
     "power loss/filesystem corruption qualification",
     "production authority",
     "provider/native/Tether/live acceptance"
-  ]
+  ],
+  "host_regression": {
+    "lane": "H02",
+    "status": "passed",
+    "evidence_class": "isolated_integration",
+    "repeat_runs": 2,
+    "seed": 17,
+    "normalized_outcomes": [
+      {
+        "boundary": "after_peer_effect",
+        "launch_calls": 1,
+        "cancels": 1,
+        "session": "observed-peer-session",
+        "terminal": "completed",
+        "pre_dispatch_cancel": "durable_local_outcome",
+        "cancel_during_terminal_observation": "accepted_intent_preserved",
+        "replay": "passed"
+      },
+      {
+        "boundary": "before_peer_effect",
+        "launch_calls": 1,
+        "native_receipts": 0,
+        "unknown": true
+      }
+    ],
+    "scripted": [
+      "native_peer"
+    ],
+    "live_acceptance": "not_run"
+  },
+  "build_integrity": "Earlier shared-target runs discarded. Retained checks use clean original component outputs; each mutant has a private copied/cleaned target and asserts the original target is unchanged.",
+  "build_record": "docs/runtime-build.json",
+  "bridge_merge": "a306e61b68b8b335d03f80f2d0de004c1d91a6f8"
 }

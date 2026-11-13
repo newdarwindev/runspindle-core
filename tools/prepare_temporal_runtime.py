@@ -145,6 +145,6 @@ if __name__=='__main__':
     p=argparse.ArgumentParser()
     p.add_argument('--directory',default=str(ROOT/'local/runtime-prepared'))
     p.add_argument('--acquire',action='store_true',help='explicit network preparation only')
-    p.add_argument('--features',choices=['temporal-runtime','host-runtime','delivery-runtime'],default='temporal-runtime')
+    p.add_argument('--features',choices=['temporal-runtime','host-runtime','host-runtime,artifact-store','delivery-runtime'],default='temporal-runtime')
     a=p.parse_args()
     prepare(a.directory,a.acquire,a.features)
