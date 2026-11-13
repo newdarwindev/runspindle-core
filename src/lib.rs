@@ -11,6 +11,9 @@ pub mod identity;
 #[cfg(feature = "temporal-runtime")]
 pub mod runtime;
 
+#[cfg(feature = "host-runtime")]
+pub mod integration;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ReadinessError {
     NotImplemented,

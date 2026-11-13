@@ -3,15 +3,27 @@
   "contract_test_evidence": "docs/local-contract-tests.json",
   "contract_tests": "passed",
   "dev_deployment": "not_run",
+  "durable_admission": "bounded_temporal_registry_1024",
   "external_effects": "not_implemented",
   "github_ci": "not_run",
+  "host_library_integration": {
+    "evidence": "docs/host-runtime-tests.json",
+    "host_revision": "6caf08d3f642691ceecffc76c5aa378fbdd7a352",
+    "native_wire": "blocked",
+    "status": "locally_tested_real_core_host_temporal_scripted_peer",
+    "version": "runspindle.integration.v1"
+  },
   "implementation": "partial_temporal_development_runtime",
   "isolation_adapter_tests": "blocked",
   "legacy_archival": "not_started",
   "live_acceptance": "not_run",
+  "multiple_registry_authorities": "not_supported",
   "native_activation": "not_implemented",
+  "native_freshness_and_core_host_wire": "not_qualified",
   "production_deployment": "not_run",
   "runner_capacity": "unverified",
+  "runtime_contract": "runspindle.runtime.v1",
+  "runtime_test_evidence": "docs/runtime-tests.json",
   "selected_source_migration": "partial",
   "shared_fixture_consumer": {
     "evidence": "docs/shared-fixture-tests.json",
@@ -21,10 +33,5 @@
     "version": "runspindle.fixture.v1"
   },
   "stage": "temporal_development_candidate",
-  "temporal_integration": "locally_tested_pinned_development_server",
-  "runtime_contract": "runspindle.runtime.v1",
-  "durable_admission": "bounded_temporal_registry_1024",
-  "runtime_test_evidence": "docs/runtime-tests.json",
-  "native_freshness_and_core_host_wire": "not_qualified",
-  "multiple_registry_authorities": "not_supported"
+  "temporal_integration": "locally_tested_pinned_development_server"
 }

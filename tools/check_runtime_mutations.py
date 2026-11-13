@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Deliberately break real registry code in throwaway copies; no source edits."""
+import contextlib
+import time
 import json
 import pathlib
 import shutil
@@ -7,6 +9,24 @@ import subprocess
 import tempfile
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
+
+
+@contextlib.contextmanager
+def scratch(**kwargs):
+    path = tempfile.mkdtemp(**kwargs)
+    try:
+        yield path
+    finally:
+        # Docker Desktop can briefly retain a bind mount after container exit.
+        # Retry only local disposal, never a workflow or external effect.
+        for attempt in range(10):
+            try:
+                shutil.rmtree(path)
+                break
+            except PermissionError:
+                if attempt == 9:
+                    raise
+                time.sleep(0.2)
 
 
 def main():
@@ -18,9 +38,8 @@ def main():
     ]
     observed=[]
     for name,old,new,test in mutations:
-        with tempfile.TemporaryDirectory(prefix=f'core-mutation-{name}-',dir=ROOT/'local') as tmp:
+        with scratch(prefix=f'core-mutation-{name}-',dir=ROOT/'local') as tmp:
             directory=pathlib.Path(tmp)
-            (directory/'local/linux-target').mkdir(parents=True)
             for f in ['Cargo.toml','Cargo.lock']:
                 shutil.copyfile(ROOT/f,directory/f)
             for f in ['src','tests']:
@@ -37,10 +56,10 @@ def main():
                 raise RuntimeError(f'mutation anchor changed: {name}')
             path.write_text(original.replace(old,new))
             result=subprocess.run(['docker','run','--rm','--pull','never','--network','none',
-                '-v',f'{directory}:/work:ro','-v',f'{ROOT}/local/linux-target:/work/local/linux-target',
-                '-v',f'{pathlib.Path.home()}/.cargo/registry:/usr/local/cargo/registry:ro','-w','/work',
+                '-v',f'{directory}:/work:ro','-v',f'{ROOT}/local/linux-target:/target',
+                '-v',f'{pathlib.Path.home()}/.cargo/registry:/usr/local/cargo/registry:ro','-v',f'{pathlib.Path.home()}/.cargo/git:/usr/local/cargo/git:ro','-w','/work',
                 pins['builder_image_id'],'cargo','test','--locked','--offline','--features','temporal-runtime',
-                '--target-dir','local/linux-target','--test','runtime',test,'--','--exact'],capture_output=True,text=True,timeout=240)
+                '--target-dir','/target','--test','runtime',test,'--','--exact'],capture_output=True,text=True,timeout=240)
             output=result.stdout+result.stderr
             detected=result.returncode!=0 and f'test {test} ... FAILED' in output and 'could not compile' not in output
             if not detected:

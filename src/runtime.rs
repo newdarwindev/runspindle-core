@@ -147,11 +147,11 @@ impl AdmissionReply {
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RegistryState {
-    deliveries: BTreeMap<String, Admission>,
-    revisions: BTreeMap<String, Admission>,
-    terminal: BTreeMap<String, OperationSnapshot>,
-    pending: Vec<String>,
-    active: Option<String>,
+    pub(crate) deliveries: BTreeMap<String, Admission>,
+    pub(crate) revisions: BTreeMap<String, Admission>,
+    pub(crate) terminal: BTreeMap<String, OperationSnapshot>,
+    pub(crate) pending: Vec<String>,
+    pub(crate) active: Option<String>,
 }
 impl RegistryState {
     fn key(a: &Admission) -> String {

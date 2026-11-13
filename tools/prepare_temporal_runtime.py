@@ -23,7 +23,7 @@ def source_hashes():
     return {str(p.relative_to(ROOT)): sha(p) for p in paths}
 
 
-def prepare(directory, acquire=False):
+def prepare(directory, acquire=False, features="temporal-runtime"):
     directory = pathlib.Path(directory).resolve()
     directory.mkdir(parents=True, exist_ok=True)
     pins = json.loads((ROOT/'temporal/toolchain.json').read_text())
@@ -33,6 +33,18 @@ def prepare(directory, acquire=False):
     deps = json.loads((ROOT/'docs/runtime-dependencies.json').read_text())
     if deps['cargo_lock_sha256'] != sha(ROOT/'Cargo.lock') or len(deps['dependencies']) < 200:
         raise RuntimeError('dependency lock/license inventory not qualified')
+    metadata = json.loads(subprocess.check_output(['cargo','metadata','--locked','--offline','--all-features','--format-version','1'],cwd=ROOT,text=True))
+    for package in metadata['packages']:
+        base = pathlib.Path(package['manifest_path']).parent
+        row = next((r for r in deps['dependencies'] if r['name']==package['name'] and r['version']==package['version']),None)
+        if package['name']=='libsqlite3-sys':
+            if not row or any(sha(base/p)!=digest for p,digest in row['bundled_sources'].items()):
+                raise RuntimeError('bundled SQLite byte pin mismatch')
+        if package['name']=='runspindle-host':
+            for relative in subprocess.check_output(['git','ls-files','src','Cargo.toml','Cargo.lock'],cwd=base,text=True).splitlines():
+                expected = subprocess.check_output(['git','show','HEAD:'+relative],cwd=base)
+                if (base/relative).read_bytes()!=expected:
+                    raise RuntimeError('cached pinned host library bytes changed')
     if sha(ROOT/'licenses/temporal-sdk-MIT.txt') != pins['sdk']['license_sha256']:
         raise RuntimeError('SDK license mismatch')
     builderfile = directory/'Dockerfile.builder'
@@ -76,8 +88,8 @@ def prepare(directory, acquire=False):
     registry = pathlib.Path.home()/'.cargo/registry'
     before_sources = source_hashes()
     run(['docker','run','--rm','--pull','never','--network','none',
-         '-v',f'{ROOT}:/work:ro','-v',f'{target}:/work/local/linux-target', '-v',f'{registry}:/usr/local/cargo/registry:ro',
-         '-w','/work',builder,'cargo','build','--locked','--offline','--features','temporal-runtime','--target-dir','local/linux-target'])
+         '-v',f'{ROOT}:/work:ro','-v',f'{target}:/work/local/linux-target', '-v',f'{registry}:/usr/local/cargo/registry:ro', '-v',f'{pathlib.Path.home()}/.cargo/git:/usr/local/cargo/git:ro',
+         '-w','/work',builder,'cargo','build','--locked','--offline','--features',features,'--target-dir','local/linux-target'])
     if before_sources != source_hashes():
         raise RuntimeError('source changed while building')
     binary = target/'debug/temporal-runtime'
@@ -103,7 +115,7 @@ def prepare(directory, acquire=False):
     dockerfile.write_text(f"FROM {pins['rust_image']}\n{labels}COPY temporal-runtime /usr/local/bin/temporal-runtime\nCOPY notices /third-party-notices\nCOPY runtime-dependencies.json /third-party-notices/inventory.json\nENTRYPOINT [\"/usr/local/bin/temporal-runtime\"]\n")
     run(['docker','build','--network','none','--pull=false','-t','runspindle-core-runtime:prepared','-f',dockerfile,directory])
     image = subprocess.check_output(['docker','image','inspect','runspindle-core-runtime:prepared','--format','{{.Id}}'],text=True).strip()
-    manifest = {'schema_version':1,'evidence_class':'prepared_dependency_artifacts','image_id':image,
+    manifest = {'schema_version':1,'features':features,'evidence_class':'prepared_dependency_artifacts','image_id':image,
                 'builder_image_id':builder,'source_hashes':source_hashes(),'source_sha256':fingerprint,'binary_sha256':sha(binary),
                 'cargo_lock_sha256':sha(ROOT/'Cargo.lock'),'sdk_revision':pins['sdk']['revision'],
                 'sdk_version':pins['sdk']['version'],'rust_version':pins['rust_version'],
@@ -119,5 +131,6 @@ if __name__=='__main__':
     p=argparse.ArgumentParser()
     p.add_argument('--directory',default=str(ROOT/'local/runtime-prepared'))
     p.add_argument('--acquire',action='store_true',help='explicit network preparation only')
+    p.add_argument('--features',choices=['temporal-runtime','host-runtime','delivery-runtime'],default='temporal-runtime')
     a=p.parse_args()
-    prepare(a.directory,a.acquire)
+    prepare(a.directory,a.acquire,a.features)
