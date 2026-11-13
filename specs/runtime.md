@@ -81,8 +81,10 @@ worker containers use only the platform lane's internal DNS origin.
 A synthetic `script.json` is an array of exact admission/grant records with
 `authorized`, `online`, observed `native_session_id`, `launch_lost_reply`,
 `crash_after_launch`, nullable `terminal` (`completed|failed|cancelled`) and
-`cancel_acknowledged`. Optional `observe_delay_ms` defaults to zero and is bounded
-to 1000 for the cancellation-race test. No public operational endpoint is enabled.
+`cancel_acknowledged`. Optional `observe_barrier` defaults to false. For the cancellation-race test it
+holds the Online reply until a bounded controller release, after an observed
+persisted cancellation request. The peer writes a separate bound Online return
+receipt after that release; absence of release fails within 20 seconds. No public operational endpoint is enabled.
 Independent `calls.jsonl` records are fully encoded then appended under a
 process-safe file lock and fsynced. The fake peer uses create-new, fsynced receipt
 files to observe effects independently of workflow results. Those files model a

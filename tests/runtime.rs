@@ -146,7 +146,7 @@ fn parallel_port_calls_write_complete_process_safe_spy_records() {
         crash_after_launch: false,
         terminal: None,
         cancel_acknowledged: true,
-        observe_delay_ms: 0,
+        observe_barrier: false,
     };
     std::fs::write(
         directory.join("script.json"),

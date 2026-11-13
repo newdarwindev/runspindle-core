@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Actual SDK/Temporal development recovery with independent synthetic peer ledger."""
 import argparse
+import base64
 import concurrent.futures
 import copy
 import hashlib
@@ -101,7 +102,7 @@ def test(platform, platform_prepared, core_prepared):
             snap=poll(lambda:(s if (s:=client({'command':'operation','job_id':job}))['native_session_id']=='actual-peer-session' else None))
             check(snap['binding']==binding,'native discovery changed binding')
             check(sum(e['action']=='launch' for e in events())==1,'lost launch reply blindly retried')
-            checks+=['fresh_worker_and_server_database_recovery','expired_authority_no_effect','same_observed_native_identity','lost_reply_discover_before_retry']
+            checks+=['fresh_worker_and_server_database_recovery','revoked_authority_no_effect','same_observed_native_identity','lost_reply_discover_before_retry']
             wrong=copy.deepcopy(binding);wrong['lease_epoch']=2
             check(client({'command':'cancel','job_id':job,'binding':wrong})['accepted'] is False,'stale cancellation accepted')
             check(client({'command':'cancel','job_id':job,'binding':binding})['accepted'] is True,'bound cancellation denied')
@@ -121,13 +122,25 @@ def test(platform, platform_prepared, core_prepared):
             checks+=['next_revision_after_terminal','old_duplicate_original_binding']
             # Hold an online host observation while a concurrent cancel update arrives.
             race=copy.deepcopy(a);race.update(task_id='task-race',delivery_id='race-delivery',operation_id='race-operation')
-            scripts.append({**scripts[0],'admission':race,'authorized':True,'online':True,'terminal':None,'observe_delay_ms':750})
+            scripts.append({**scripts[0],'admission':race,'authorized':True,'online':True,'terminal':None,'observe_barrier':True})
             write_scripts()
             race_job='job-'+hashlib.sha256(b'task-race\n1').hexdigest()
             check(client({'command':'admit','registry_id':'registry-v1','admission':race})['status']=='admitted','race admission failed')
             poll(lambda:any(e['action']=='observe_host' and e['admission']['task_id']=='task-race' for e in events()))
             race_binding={k:race[k] for k in binding}
             check(client({'command':'cancel','job_id':race_job,'binding':race_binding})['accepted'],'cancel-during-observe rejected')
+            held=client({'command':'operation','job_id':race_job})
+            check(held['cancellation']=='requested' and held['state']=='scheduled','cancel request was not recorded while online reply held')
+            release=directory/f'observe-release-{race_job}.json'
+            temporary_release=directory/f'observe-release-{race_job}.next'
+            with temporary_release.open('w') as f:
+                json.dump(race_binding,f);f.flush()
+                import os
+                os.fsync(f.fileno())
+            temporary_release.replace(release)
+            returned=directory/f'observe-returned-{race_job}.json'
+            online_reply=poll(lambda:json.loads(returned.read_text()) if returned.exists() else None)
+            check(online_reply['status']=='online' and online_reply['binding']==race_binding,'held online reply was not independently observed after release')
             stopped=poll(lambda:(s if (s:=client({'command':'operation','job_id':race_job}))['state']=='observed_cancelled' else None))
             check(stopped['native_session_id'] is None,'pre-dispatch cancellation invented native session')
             check(not any(e['action']=='launch' and e['admission']['task_id']=='task-race' for e in events()),'cancellation raced into initial launch')
@@ -139,6 +152,30 @@ def test(platform, platform_prepared, core_prepared):
             check(first_actions.index('launch')<first_actions.index('discover')<first_actions.index('cancel'),'reconciliation call order')
             for workflow_id in [job,job2,race_job,'registry-v1']:
                 history=client({'command':'history','workflow_id':workflow_id})
+                if workflow_id==race_job:
+                    scheduled={}
+                    completed_online=[]
+                    cancel_updates=[]
+                    # SDK1.2 exports History through its Rust Serde representation:
+                    # snake_case event fields and an externally tagged attributes enum.
+                    for event in history['events']:
+                        attrs=event.get('attributes') or {}
+                        if 'ActivityTaskScheduledEventAttributes' in attrs:
+                            scheduled_attrs=attrs['ActivityTaskScheduledEventAttributes']
+                            value=json.loads(base64.b64decode(scheduled_attrs['input']['payloads'][0]['data']))
+                            scheduled[str(event['event_id'])]=value
+                        if 'WorkflowExecutionUpdateAcceptedEventAttributes' in attrs:
+                            cancel_updates.append(int(event['event_id']))
+                        if 'ActivityTaskCompletedEventAttributes' in attrs:
+                            completed_attrs=attrs['ActivityTaskCompletedEventAttributes']
+                            original=scheduled[str(completed_attrs['scheduled_event_id'])]
+                            value=json.loads(base64.b64decode(completed_attrs['result']['payloads'][0]['data']))
+                            if original['action']=='observe_host' and value['status']=='online':
+                                completed_online.append(int(event['event_id']))
+                    check(len(cancel_updates)==1 and len(completed_online)==1 and cancel_updates[0]<completed_online[0],
+                          f'Temporal history did not record held Online reply completion after cancel acceptance: updates={cancel_updates}, online={completed_online}')
+                    race_history_order={'cancel_update_accepted_event':cancel_updates[0],'online_activity_completed_event':completed_online[0]}
+                    checks+=['history_records_online_reply_after_cancel_acceptance']
                 path=directory/f'history-{workflow_id}.json';path.write_text(json.dumps(history))
                 result=lane.run_client(image,['replay',f'/effects/{path.name}'],mounts=mounts,deadline=40)
                 check(json.loads(result.stdout)['status']=='passed','real history replay failed')
@@ -149,7 +186,7 @@ def test(platform, platform_prepared, core_prepared):
             check(subprocess.run(['docker','inspect',name],capture_output=True,timeout=30).returncode!=0,'container leaked')
         report={'status':'passed','evidence_class':'isolated_integration','checks':checks,'image_id':image,
                 'sdk_revision':manifest['sdk_revision'],'source_hashes':manifest['source_hashes'],
-                'launch_count':2,'cancel_count':1,'cleanup':'passed','live_acceptance':'not_run',
+                'launch_count':2,'cancel_count':1,'race_observations':{'before_release':held,'online_reply_after_release':online_reply,'temporal_history_order':race_history_order},'cleanup':'passed','live_acceptance':'not_run',
                 'boundary_matrix':{'core':'real','temporal':'real_dev_database','host':'scripted_activity_peer',
                                    'browser':'not_exercised','delivery':'not_exercised','provider':'not_exercised'}}
         return report

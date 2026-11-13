@@ -278,7 +278,7 @@ pub struct SyntheticScript {
     pub terminal: Option<PortStatus>,
     pub cancel_acknowledged: bool,
     #[serde(default)]
-    pub observe_delay_ms: u64,
+    pub observe_barrier: bool,
 }
 fn read_bounded(path: &std::path::Path) -> anyhow::Result<Vec<u8>> {
     use std::io::Read;
@@ -336,11 +336,6 @@ impl Ports {
         match call.action {
             PortAction::Verify => reply.status = PortStatus::Verified,
             PortAction::ObserveHost => {
-                anyhow::ensure!(
-                    script.observe_delay_ms <= 1000,
-                    "script delay exceeds bound"
-                );
-                std::thread::sleep(Duration::from_millis(script.observe_delay_ms));
                 reply.status = if script.online {
                     PortStatus::Online
                 } else {
@@ -414,11 +409,55 @@ impl Ports {
         _ctx: ActivityContext,
         call: PortCall,
     ) -> Result<PortReply, ActivityError> {
-        self.invoke(&call).map_err(Into::into)
+        let reply = self.invoke(&call)?;
+        if call.action == PortAction::ObserveHost && reply.status == PortStatus::Online {
+            if let Some(dir) = &self.script_directory {
+                let scripts: Vec<SyntheticScript> =
+                    serde_json::from_slice(&read_bounded(&dir.join("script.json"))?)?;
+                if scripts
+                    .iter()
+                    .any(|s| s.admission == call.admission && s.observe_barrier)
+                {
+                    let job = child_id(
+                        &call.admission.binding.task_id,
+                        call.admission.binding.revision,
+                    );
+                    let release = dir.join(format!("observe-release-{job}.json"));
+                    let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+                    while !release.exists() {
+                        if tokio::time::Instant::now() >= deadline {
+                            return Err(
+                                anyhow::anyhow!("synthetic observation barrier deadline").into()
+                            );
+                        }
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                    let binding: Binding = serde_json::from_slice(&read_bounded(&release)?)?;
+                    if binding != call.admission.binding {
+                        return Err(anyhow::anyhow!(
+                            "synthetic observation barrier binding mismatch"
+                        )
+                        .into());
+                    }
+                    // Independent peer return receipt exists only after the controller
+                    // releases the exact held reply, following a persisted cancel update.
+                    let mut returned = std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(dir.join(format!("observe-returned-{job}.json")))?;
+                    serde_json::to_writer(&mut returned, &reply)?;
+                    returned.sync_all()?;
+                }
+            }
+        }
+        Ok(reply)
     }
 }
 fn single_attempt() -> ActivityOptions {
-    ActivityOptions::with_start_to_close_timeout(Duration::from_secs(2))
+    single_attempt_with_timeout(2)
+}
+fn single_attempt_with_timeout(seconds: u64) -> ActivityOptions {
+    ActivityOptions::with_start_to_close_timeout(Duration::from_secs(seconds))
         .retry_policy(RetryPolicy::builder().maximum_attempts(1).build())
         .build()
 }
@@ -552,7 +591,7 @@ impl OperationWorkflow {
                     .execute_activity(
                         Ports::invoke_port,
                         call(PortAction::ObserveHost, None),
-                        single_attempt(),
+                        single_attempt_with_timeout(25),
                     )
                     .await;
                 if !matches!(online, Ok(ref r) if r.status == PortStatus::Online && r.binding == a.binding)

@@ -51,7 +51,10 @@ The platform context owns an internal Docker network with isolated gateway mode,
 no published ports/UI, a disposable database volume, all workers/clients, readiness
 and process deadlines and cleanup on failure/cancellation. Prepared tests perform
 no downloads. Real Temporal workflow/history calls, not a process-start probe,
-produce the recovery observations. Same-version replay happens against histories
+produce the recovery observations. The cancellation race uses a bounded async
+peer barrier, a persisted pre-release cancellation snapshot, an independent Online
+return receipt and actual history event order; it does not depend on a fixed sleep
+window. Same-version replay happens against histories
 fetched from that real database and invokes no activity ports.
 
 Language checks (inside the exact prepared builder, no egress):

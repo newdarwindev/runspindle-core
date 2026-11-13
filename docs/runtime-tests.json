@@ -8,7 +8,7 @@
     "active_revision_denied",
     "unknown_version_denied",
     "fresh_worker_and_server_database_recovery",
-    "expired_authority_no_effect",
+    "revoked_authority_no_effect",
     "same_observed_native_identity",
     "lost_reply_discover_before_retry",
     "stale_cancel_denied",
@@ -17,10 +17,11 @@
     "next_revision_after_terminal",
     "old_duplicate_original_binding",
     "cancel_during_online_observation_zero_launch",
+    "history_records_online_reply_after_cancel_acceptance",
     "real_history_replay_registry_and_operations",
     "independent_launch_and_cancel_counts_and_order"
   ],
-  "image_id": "sha256:6225ade5d6450c010381289cfe89a2c281e9fbb33614259191daf57ce77095e3",
+  "image_id": "sha256:b615189193ec2ed422105a70bc78e3494c6512db23185fec503aecb7a55fca12",
   "sdk_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
   "source_hashes": {
     "Cargo.toml": "028bb1137c1d95ae65bf0a9ddec916646ee08fe089b4810f8d3a3f33a2d9aaf9",
@@ -30,10 +31,43 @@
     "src/bin/temporal-runtime.rs": "29c85e38fe86f6ecf022a534511656d07cd489f1411d87bee5def3e5b437383b",
     "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
     "src/lib.rs": "6d10ef4185567edc99297489524aed198ff09a08c178f19ea6539cfdfe011c07",
-    "src/runtime.rs": "6dbbec0dee301dd15c5352a8a2c6af6f90c1193c10881229641bbfc3bf807962"
+    "src/runtime.rs": "c7e9affa19f8c4f0097e5ae9a37f918a0db5638fb65df9b75a1dcdf983cb778f"
   },
   "launch_count": 2,
   "cancel_count": 1,
+  "race_observations": {
+    "before_release": {
+      "binding": {
+        "host_id": "offline-selected-host",
+        "lease_epoch": 1,
+        "operation_id": "race-operation",
+        "policy_revision": "policy-1",
+        "revision": 1,
+        "task_id": "task-race",
+        "workspace_id": "selected-workspace"
+      },
+      "cancellation": "requested",
+      "native_session_id": null,
+      "state": "scheduled"
+    },
+    "online_reply_after_release": {
+      "binding": {
+        "task_id": "task-race",
+        "revision": 1,
+        "operation_id": "race-operation",
+        "policy_revision": "policy-1",
+        "host_id": "offline-selected-host",
+        "workspace_id": "selected-workspace",
+        "lease_epoch": 1
+      },
+      "status": "online",
+      "native_session_id": null
+    },
+    "temporal_history_order": {
+      "cancel_update_accepted_event": 15,
+      "online_activity_completed_event": 18
+    }
+  },
   "cleanup": "passed",
   "live_acceptance": "not_run",
   "boundary_matrix": {
@@ -44,8 +78,8 @@
     "delivery": "not_exercised",
     "provider": "not_exercised"
   },
-  "observed_at": "2026-11-13T19:32:28.366681+00:00",
-  "core_base": "43d71d43fb9181addd138959bd94aa3359bcddf9",
+  "observed_at": "2026-11-13T19:44:45.466620+00:00",
+  "core_base": "37e0594269e52446d66b565adbbad0663394aa9d",
   "contract_commit": "4b700269be9a4feab7b955faf0229fbdd77d8aa9",
   "platform_commit": "96eb567ef32c68c52c19ea8fd77f11e5340e291b",
   "seed": 0,
@@ -53,8 +87,8 @@
     "rust_with_runtime": {
       "passed": 27,
       "failed": 0,
-      "builder_image_id": "sha256:3430fa06c8ebad7244d63cfcbad8dc5ce38864e43fd00a845291d678b3e3b17d",
-      "environment": "pinned Linux arm64 builder, --network none, --locked --offline; same rustc/protoc as final builder"
+      "builder_image_id": "sha256:061420d04a6f6ac173e3b1835b0594bcbe9d17044f5e015ca4fb767f9c57813e",
+      "environment": "pinned final Linux arm64 builder, --network none, --locked --offline"
     },
     "rust_default": {
       "passed": 20,
@@ -106,5 +140,13 @@
     "development database persistence is not production durability",
     "native macOS runtime build unavailable: host protoc absent",
     "isolated GitHub runner capacity unverified; live acceptance not run"
-  ]
+  ],
+  "review_regression": {
+    "prior_head": "41f27cc6d9b2655e6e43c96a0a723a19fab2779d",
+    "status_at_review": "failed",
+    "finding": "A fixed online-observation delay allowed initial launch before cancellation under compilation load.",
+    "correction": "An async bounded peer barrier holds the Online reply until a persisted scheduled/requested snapshot is read and an exact-binding release is atomically published. The independent Online return receipt and real history prove cancel acceptance event15 precedes Online activity completion18; zero race-task launches.",
+    "current_status": "passed",
+    "history_mapping": "Exact SDK1.2 Rust Serde tagged History representation; not a ProtoJSON wire claim."
+  }
 }
