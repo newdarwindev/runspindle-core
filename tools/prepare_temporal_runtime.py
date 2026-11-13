@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import pathlib
+import re
 import subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -21,6 +22,22 @@ def source_hashes():
     paths = [ROOT/'Cargo.toml', ROOT/'Cargo.lock', ROOT/'temporal/toolchain.json']
     paths += sorted((ROOT/'src').rglob('*.rs'))
     return {str(p.relative_to(ROOT)): sha(p) for p in paths}
+
+
+def verify_git_dependency(base, source):
+    expected = source.rsplit('#', 1)[-1]
+    if not re.fullmatch(r'[0-9a-f]{40}', expected):
+        raise RuntimeError('dependency source lacks exact Git revision')
+    actual = subprocess.check_output(['git','rev-parse','HEAD'],cwd=base,text=True).strip()
+    if actual != expected:
+        raise RuntimeError('cached host checkout differs from locked revision')
+    untracked = subprocess.check_output(['git','ls-files','--others','--exclude-standard'],cwd=base,text=True).splitlines()
+    if any(path != '.cargo-ok' for path in untracked):
+        raise RuntimeError('untracked files in pinned host checkout')
+    for relative in subprocess.check_output(['git','ls-files','src','Cargo.toml','Cargo.lock'],cwd=base,text=True).splitlines():
+        expected_bytes = subprocess.check_output(['git','show',actual+':'+relative],cwd=base)
+        if (base/relative).read_bytes() != expected_bytes:
+            raise RuntimeError('cached pinned host library bytes changed')
 
 
 def prepare(directory, acquire=False, features="temporal-runtime"):
@@ -41,10 +58,7 @@ def prepare(directory, acquire=False, features="temporal-runtime"):
             if not row or any(sha(base/p)!=digest for p,digest in row['bundled_sources'].items()):
                 raise RuntimeError('bundled SQLite byte pin mismatch')
         if package['name']=='runspindle-host':
-            for relative in subprocess.check_output(['git','ls-files','src','Cargo.toml','Cargo.lock'],cwd=base,text=True).splitlines():
-                expected = subprocess.check_output(['git','show','HEAD:'+relative],cwd=base)
-                if (base/relative).read_bytes()!=expected:
-                    raise RuntimeError('cached pinned host library bytes changed')
+            verify_git_dependency(base, package['source'])
     if sha(ROOT/'licenses/temporal-sdk-MIT.txt') != pins['sdk']['license_sha256']:
         raise RuntimeError('SDK license mismatch')
     builderfile = directory/'Dockerfile.builder'
