@@ -84,3 +84,22 @@ by these local component results.**
 `activate()` still returns `ReadinessError::NotImplemented`. The operational
 acceptance gate is unchanged and exits 78. This candidate does not unblock product
 acceptance, production activation, old-repository archival or credential use.
+
+
+## Additional isolation coverage (2026-11-13)
+
+The existing implementation and 17 tests above remain unchanged. The new
+[isolation coverage and seam plan](ISOLATION_TEST_PLAN.md) inventories those tests,
+adds three deterministic model tests (including 97,655 action-prefix checks), and
+specifies concrete unimplemented adapter prerequisites for core issues #1–5.
+[local-isolation-tests.json](local-isolation-tests.json) records this extension's
+exact input hashes, source base, toolchain and executed local checks. All 20 tests
+passed; three deliberately broken model copies were detected by named assertion
+failures. The first new-test lint run found a needless range loop; the iterator
+fix passed final Clippy. Existing historical receipts are preserved.
+
+This extension changes no production model, agreed schema, CI workflow or
+operational gate. Shared-fixture adoption and all real adapter/store/Temporal
+suites remain blocked/not run; issue #1 is not complete. The local macOS result
+is separate from the earlier Linux result and does not qualify a native session,
+a runner, a deployed system or cross-process durability.

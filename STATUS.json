@@ -1,10 +1,12 @@
 {
+  "additional_contract_test_evidence": "docs/local-isolation-tests.json",
   "contract_test_evidence": "docs/local-contract-tests.json",
   "contract_tests": "passed",
   "dev_deployment": "not_run",
   "external_effects": "not_implemented",
   "github_ci": "not_run",
   "implementation": "partial_contract_model",
+  "isolation_adapter_tests": "blocked",
   "legacy_archival": "not_started",
   "live_acceptance": "not_run",
   "native_activation": "not_implemented",
