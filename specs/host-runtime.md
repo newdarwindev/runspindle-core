@@ -51,3 +51,7 @@ facts without fabricating a native cancellation effect or changing session IDs.
 The controlled H02 terminal-reply barrier independently persists the host's
 completion with no cancellation, accepts the Temporal cancel update, then checks
 return-receipt and history order. No late peer cancel is dispatched.
+
+## Additional admission recovery qualification
+
+`tools/test_admission_runtime.py` exercises four concurrent authenticated (scripted exact-request authority) admission updates through the real HostAdmissionRegistry. It distinguishes delivery duplicates, existing revisions, authenticated conflicts and explicit successor gating, then replays registry and child histories with independent peer call counts. `authority_valid_until_ms` is an optional trusted synthetic grant expiry; it is checked at admission and every host action. The missing value retains the existing scripted authorization semantics; no production expiry/authentication claim follows. `crash_after_prepare` interrupts the synthetic development worker only after host queue commit and before its activity reply. Fresh worker/server recovery retains the same child and queues expired authority without launch. Admission replies are discarded/replayed; a precise server kill between the workflow admission mutation and child creation is not separately injected. See [evidence](../docs/admission-recovery-tests.json).

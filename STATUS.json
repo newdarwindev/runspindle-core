@@ -1,5 +1,10 @@
 {
   "additional_contract_test_evidence": "docs/local-isolation-tests.json",
+  "admission_recovery": {
+    "evidence": "docs/admission-recovery-tests.json",
+    "production_authentication": "not_qualified",
+    "status": "locally_tested_scripted_authority_real_Temporal_host_library"
+  },
   "contract_test_evidence": "docs/local-contract-tests.json",
   "contract_tests": "passed",
   "delivery_outbox": {

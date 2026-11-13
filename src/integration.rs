@@ -74,11 +74,23 @@ pub struct NativeScript {
     pub observed_at_override: Option<u64>,
     #[serde(default)]
     pub reconcile_barrier: bool,
+    #[serde(default)]
+    pub authority_valid_until_ms: Option<u64>,
+    #[serde(default)]
+    pub crash_after_prepare: bool,
+}
+impl NativeScript {
+    pub fn authorized_at(&self, now: u64) -> bool {
+        self.authorized
+            && self
+                .authority_valid_until_ms
+                .is_none_or(|until| now < until)
+    }
 }
 struct Grant<'a>(&'a NativeScript);
 impl host::Verifier for Grant<'_> {
     fn verify(&self, b: &host::Binding, _: host::Action) -> bool {
-        self.0.authorized
+        now_ms().is_ok_and(|now| self.0.authorized_at(now))
             && self.0.request.valid()
             && *b == host_binding(&self.0.request.admission.binding)
     }
@@ -212,7 +224,7 @@ impl HostPorts {
         anyhow::ensure!(
             script.request.version == call.request.version
                 && script.request.admission == call.request.admission
-                && script.authorized,
+                && script.authorized_at(now_ms()?),
             "denied host binding"
         );
         anyhow::ensure!(
@@ -285,7 +297,7 @@ impl HostPorts {
         };
         let script = read_script(&dir.join("native-script.json"))?;
         Ok(request.valid()
-            && script.authorized
+            && script.authorized_at(now_ms()?)
             && script.request.admission == request.admission
             && script.request.version == request.version)
     }
@@ -296,6 +308,13 @@ impl HostPorts {
         call: HostCall,
     ) -> Result<host::Snapshot, ActivityError> {
         let snapshot = self.invoke(call.clone())?;
+        if matches!(call.action, HostAction::Prepare) {
+            if let Some(dir) = &self.directory {
+                if read_script(&dir.join("native-script.json"))?.crash_after_prepare {
+                    std::process::exit(94);
+                }
+            }
+        }
         if matches!(call.action, HostAction::Reconcile)
             && matches!(snapshot.execution, host::Execution::Terminal(_))
         {

@@ -6,6 +6,7 @@ import hashlib
 import json
 import pathlib
 import sqlite3
+from contextlib import closing
 import subprocess
 import tempfile
 import time
@@ -44,7 +45,9 @@ def run(platform,platform_prepared,core_prepared,seed=17,crash_before=False,obse
         def ledger():
             p=directory/'native-peer.sqlite'
             if not p.exists():return []
-            with sqlite3.connect(p) as db:return [x[0] for x in db.execute('SELECT action FROM calls ORDER BY id')]
+            with closing(sqlite3.connect('file:'+str(p)+'?mode=rw',uri=True)) as db:
+                db.execute('PRAGMA query_only=ON')
+                return [x[0] for x in db.execute('SELECT action FROM calls ORDER BY id')]
         write()
         with module.Lane(platform_prepared) as lane:
             def client(command):
@@ -74,7 +77,7 @@ def run(platform,platform_prepared,core_prepared,seed=17,crash_before=False,obse
                 s=wait(query,lambda s:s and s['execution']=='Unknown')
                 wait(ledger,lambda calls:'discover' in calls)
                 require(ledger().count('launch')==1,'uncertain intent relaunched after interruption')
-                with sqlite3.connect(directory/'native-peer.sqlite') as db:
+                with closing(sqlite3.connect('file:'+str(directory/'native-peer.sqlite')+'?mode=rw',uri=True)) as db:
                     require(db.execute('SELECT count(*) FROM sessions').fetchone()[0]==0,'unexpected effect before peer interruption')
                 result={'boundary':'before_peer_effect','launch_calls':1,'native_receipts':0,'unknown':True}
             else:
@@ -88,7 +91,7 @@ def run(platform,platform_prepared,core_prepared,seed=17,crash_before=False,obse
                 terminal=wait(query,lambda s:s and s['execution']=={'Terminal':'Completed'})
                 require(terminal['cancellation']=='ObservedTerminal','cancel/completion race fabricated outcome')
                 calls=ledger();require(calls.count('launch')==1 and calls.count('cancel')==1 and calls.index('launch')<calls.index('discover')<calls.index('cancel'),'peer call count/order mismatch')
-                with sqlite3.connect(directory/'native-peer.sqlite') as db:
+                with closing(sqlite3.connect('file:'+str(directory/'native-peer.sqlite')+'?mode=rw',uri=True)) as db:
                     observations=[json.loads(x[0]) for x in db.execute('SELECT observation FROM sessions')]
                 require(len(observations)==1 and observations[0]['binding']==binding and observations[0]['native_session_id']=='observed-peer-session','independent native receipt mismatch')
                 history=client({'command':'history','workflow_id':job});(directory/'history.json').write_text(json.dumps(history));before=len(ledger())
@@ -129,7 +132,7 @@ def run(platform,platform_prepared,core_prepared,seed=17,crash_before=False,obse
                 accepted_ids=[int(e['event_id']) for e in history['events'] if 'WorkflowExecutionUpdateAcceptedEventAttributes' in e.get('attributes',{})]
                 completed_ids=[int(e['event_id']) for e in history['events'] if 'ActivityTaskCompletedEventAttributes' in e.get('attributes',{})]
                 require(accepted_ids and max(completed_ids)>max(accepted_ids),'Temporal history did not place terminal activity return after cancel acceptance')
-                with sqlite3.connect(directory/'native-peer.sqlite') as db:
+                with closing(sqlite3.connect('file:'+str(directory/'native-peer.sqlite')+'?mode=rw',uri=True)) as db:
                     race_calls=[action for action,b in db.execute('SELECT action,binding FROM calls ORDER BY id') if json.loads(b)==race_binding]
                 require(race_calls.count('launch')==1 and race_calls.count('cancel')==0,'completion race created duplicate launch or late cancellation effect')
                 result={'boundary':'after_peer_effect','launch_calls':1,'cancels':1,'session':'observed-peer-session','terminal':'completed','pre_dispatch_cancel':'durable_local_outcome','cancel_during_terminal_observation':'accepted_intent_preserved','replay':'passed'}
