@@ -49,3 +49,10 @@ send count, exact receipt bindings, duplicates, conflicting receipts and replay.
 Seeded repeats compare normalized outcomes. Rust tests add concurrent process
 owners, bounds, malformed/unauthorized requests and changed byte/target bindings.
 A mutation that accepts a fabricated acknowledgement without readback must fail.
+
+The first valid send acknowledgement is retained separately from a confirmed
+receipt. A different valid receipt from readback creates a durable conflict fence,
+including when the first readback was unavailable. Restart and repeated identical
+contradictory readback cannot clear it. The outbox preserves any already confirmed
+receipt and exposes the conflict flag; new workflows cannot report delivery
+success while fenced. No automatic conflict resolution is implemented.

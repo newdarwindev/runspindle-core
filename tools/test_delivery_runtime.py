@@ -12,7 +12,7 @@ import uuid
 from runtime_artifact import validate
 from test_host_runtime import require,wait,admission
 ROOT=pathlib.Path(__file__).resolve().parents[1]
-def run(platform,platform_prepared,core_prepared,seed,before):
+def run(platform,platform_prepared,core_prepared,seed,before,observer=None):
     manifest=validate(ROOT,core_prepared);require(manifest.get('features')=='delivery-runtime','delivery-runtime not prepared')
     source=pathlib.Path(platform)/'tools/temporal_lane.py';module=types.ModuleType('verified_lane');module.__file__=str(source);exec(compile(source.read_bytes(),str(source),'exec'),module.__dict__)
     fixture=f'synthetic delivered artifact {seed}'.encode()+b'\x00\xff';expected=hashlib.sha256(fixture).hexdigest()
@@ -28,7 +28,7 @@ def run(platform,platform_prepared,core_prepared,seed,before):
                 name=lane.spawn_client(manifest['image_id'],['artifact','/effects',action],mounts=mounts)
                 result=subprocess.run(['docker','wait',name],check=True,text=True,capture_output=True,timeout=40)
                 require(int(result.stdout.strip())==exit_code,'unexpected artifact process result')
-                logs=subprocess.check_output(['docker','logs',name],text=True)
+                logs=subprocess.run(['docker','logs',name],text=True,capture_output=True,check=True).stdout
                 return json.loads(logs) if logs.strip() else None
             def db_rows(sql):
                 with sqlite3.connect(directory/'core.sqlite') as db:return db.execute(sql).fetchall()
@@ -95,6 +95,7 @@ def run(platform,platform_prepared,core_prepared,seed,before):
                 require(replay['status']=='passed' and len(ledger())==count,'delivery replay repeated transport')
                 result={'boundary':'lost_ack_after_send','state':'delivered','send_calls':1,'receipt_count':1,'accepted_sha256':expected,'duplicate':'same_receipt','conflicting_receipt':'durably_fenced','replay':'passed'}
             require(db_rows('SELECT count(*) FROM artifacts')[0][0]==1 and db_rows('SELECT count(*) FROM acceptances')[0][0]==1 and not (directory/'artifact.bin').exists(),'delivery regenerated accepted work')
+            if observer is not None:observer(directory,{'request':request,'before':before,'seed':seed,'result':result})
     return result
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--platform',required=True);p.add_argument('--platform-prepared',required=True);p.add_argument('--core-prepared',default=str(ROOT/'local/runtime-prepared'));p.add_argument('--repeat',type=int,default=2);p.add_argument('--seed',type=int,default=17);a=p.parse_args();require(a.repeat>=2,'two seeded repeats required')

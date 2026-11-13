@@ -71,6 +71,7 @@ pub trait Transport {
     ) -> anyhow::Result<Option<DeliveryReceipt>>;
     fn lookup(&mut self, request: &DeliveryRequest) -> anyhow::Result<Vec<DeliveryReceipt>>;
 }
+type StoredDelivery = (String, String, Option<String>, u64, Option<String>, bool);
 pub struct Outbox {
     store: Store,
 }
@@ -96,7 +97,7 @@ impl Outbox {
         connection: &rusqlite::Connection,
         request: &DeliveryRequest,
     ) -> anyhow::Result<Option<DeliverySnapshot>> {
-        let row: Option<(String, String, Option<String>, u64, Option<String>,bool)> = connection
+        let row: Option<StoredDelivery> = connection
             .query_row(
                 "SELECT request,state,receipt,generation,acknowledgement,conflict FROM outbox WHERE operation=?1",
                 [&request.delivery_operation_id],

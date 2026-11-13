@@ -43,3 +43,7 @@ integration version and retained native/live blockers.
 
 The [durable artifact store](durable-artifacts.md) adds immutable byte storage,
 validation and default-deny authorized acceptance. Delivery and live gates remain separate.
+
+The [durable delivery mapping](durable-delivery.md) adds a single-send outbox and
+real Temporal H07 workflow with a scripted destination ledger. Actual Tether and
+full-system/live acceptance remain blocked.

@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "evidence_class": "isolated_integration",
+  "status": "passed",
+  "contract": "runspindle.integration.v1",
+  "tests": {
+    "rust_all_features": 48,
+    "outbox": 9,
+    "python": 16,
+    "strict_clippy": "passed",
+    "formatting": "passed",
+    "scaffold": "passed"
+  },
+  "H07": {
+    "lane": "H07",
+    "status": "passed",
+    "evidence_class": "isolated_integration",
+    "repeat_runs": 2,
+    "seed": 17,
+    "normalized_outcomes": [
+      {
+        "boundary": "lost_ack_after_send",
+        "state": "delivered",
+        "send_calls": 1,
+        "receipt_count": 1,
+        "accepted_sha256": "acd3de62416a434e6d3628e738f497c6ffde196e6d23888a3f50e8c1f120c39a",
+        "duplicate": "same_receipt",
+        "conflicting_receipt": "durably_fenced",
+        "replay": "passed"
+      },
+      {
+        "boundary": "reservation_before_send",
+        "state": "unknown",
+        "send_calls": 0,
+        "receipt_count": 0,
+        "accepted_sha256": "acd3de62416a434e6d3628e738f497c6ffde196e6d23888a3f50e8c1f120c39a"
+      }
+    ],
+    "scripted": [
+      "destination_transport"
+    ],
+    "Tether": "blocked_source_and_transport_dependency",
+    "live_acceptance": "not_run"
+  },
+  "H02": {
+    "lane": "H02",
+    "status": "passed",
+    "evidence_class": "isolated_integration",
+    "repeat_runs": 2,
+    "seed": 17,
+    "normalized_outcomes": [
+      {
+        "boundary": "after_peer_effect",
+        "launch_calls": 1,
+        "cancels": 1,
+        "session": "observed-peer-session",
+        "terminal": "completed",
+        "pre_dispatch_cancel": "durable_local_outcome",
+        "cancel_during_terminal_observation": "accepted_intent_preserved",
+        "replay": "passed"
+      },
+      {
+        "boundary": "before_peer_effect",
+        "launch_calls": 1,
+        "native_receipts": 0,
+        "unknown": true
+      }
+    ],
+    "scripted": [
+      "native_peer"
+    ],
+    "live_acceptance": "not_run"
+  },
+  "scripted_core_regression": {
+    "status": "passed",
+    "evidence_class": "isolated_integration",
+    "checks": [
+      "concurrent_duplicate_same_job",
+      "offline_pin_zero_launch",
+      "delivery_conflict_denied",
+      "active_revision_denied",
+      "unknown_version_denied",
+      "fresh_worker_and_server_database_recovery",
+      "revoked_authority_no_effect",
+      "same_observed_native_identity",
+      "lost_reply_discover_before_retry",
+      "stale_cancel_denied",
+      "cancel_ack_not_terminal",
+      "completion_wins_cancel_race",
+      "next_revision_after_terminal",
+      "old_duplicate_original_binding",
+      "cancel_during_online_observation_zero_launch",
+      "history_records_online_reply_after_cancel_acceptance",
+      "real_history_replay_registry_and_operations",
+      "independent_launch_and_cancel_counts_and_order"
+    ],
+    "image_id": "sha256:da947cd806e24acfdcc791e678505100b36c3acb348006477064d2304f95a1dd",
+    "sdk_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
+    "source_hashes": {
+      "Cargo.toml": "c4640f9d1bab4f2a3adff6d5deb3d61d0e8081c2aebf1dfabedd969854abf862",
+      "Cargo.lock": "df971ac2e789b5e6000731185485a32766eaec7b44f1055c872148f1e8698d68",
+      "temporal/toolchain.json": "3902172aac23f43d70c509a37930696f01102f6dc6e20c8c51607526b2611990",
+      "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+      "src/bin/temporal-runtime.rs": "d80e733db0e2209fd3db890ccea7f422310ae29e89c2437adaab0330261305d0",
+      "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+      "src/durable.rs": "5d20503b0bbf3d7912264f510fed89585296ae09e2f88087effafacb0cfccd56",
+      "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+      "src/integration.rs": "210f60622bfde9ede928ffc4ce599faf98e34b6f31cff57037a8d007eb375133",
+      "src/lib.rs": "8b5380c63ef1f9b54f781a2c686e5ee3734415f8c356d94760db3399f540df42",
+      "src/outbox.rs": "685e7faac482247b8b99dce1d5404e7408f13d1712a1a6713a02a18fef1df122",
+      "src/runtime.rs": "71af331a1d905852dba21b78580614ed1998ae5a6f01eee192b4277c704e8b04"
+    },
+    "launch_count": 2,
+    "cancel_count": 1,
+    "race_observations": {
+      "before_release": {
+        "binding": {
+          "host_id": "offline-selected-host",
+          "lease_epoch": 1,
+          "operation_id": "race-operation",
+          "policy_revision": "policy-1",
+          "revision": 1,
+          "task_id": "task-race",
+          "workspace_id": "selected-workspace"
+        },
+        "cancellation": "requested",
+        "native_session_id": null,
+        "state": "scheduled"
+      },
+      "online_reply_after_release": {
+        "binding": {
+          "task_id": "task-race",
+          "revision": 1,
+          "operation_id": "race-operation",
+          "policy_revision": "policy-1",
+          "host_id": "offline-selected-host",
+          "workspace_id": "selected-workspace",
+          "lease_epoch": 1
+        },
+        "status": "online",
+        "native_session_id": null
+      },
+      "temporal_history_order": {
+        "cancel_update_accepted_event": 15,
+        "online_activity_completed_event": 18
+      }
+    },
+    "cleanup": "passed",
+    "live_acceptance": "not_run",
+    "boundary_matrix": {
+      "core": "real",
+      "temporal": "real_dev_database",
+      "host": "scripted_activity_peer",
+      "browser": "not_exercised",
+      "delivery": "not_exercised",
+      "provider": "not_exercised"
+    }
+  },
+  "mutations": {
+    "status": "passed",
+    "evidence_class": "component_mutation",
+    "mutation": "fabricated_delivery_receipt",
+    "behavioral_failure_observed": true,
+    "qualification_target_unchanged": true
+  },
+  "build_record": "docs/runtime-build.json",
+  "build_integrity": "Positive outputs were clean rebuilt; all mutation outputs use isolated copied targets, clean the component package and verify original output inventory unchanged.",
+  "fresh_process_boundaries": [
+    "validation persisted before acceptance",
+    "acceptance committed before reply",
+    "delivery reservation committed before send",
+    "destination receipt persisted before lost acknowledgement",
+    "confirmed receipt contradiction fence retained across worker/server restart"
+  ],
+  "receipt_policy": "First valid acknowledgement retained; contradictory valid receipts fence future reconciliation; no resolver or resend implemented.",
+  "remaining_gaps": [
+    "real Tether source/transport and rights qualification",
+    "native app-server wire qualification",
+    "browser/provider/console/full-workflow live acceptance",
+    "production credentials, storage, power-loss and upgrade qualification"
+  ],
+  "live_acceptance": "not_run",
+  "system_aggregate": "blocked"
+}

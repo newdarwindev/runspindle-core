@@ -2,11 +2,18 @@
   "additional_contract_test_evidence": "docs/local-isolation-tests.json",
   "contract_test_evidence": "docs/local-contract-tests.json",
   "contract_tests": "passed",
+  "delivery_outbox": {
+    "evidence": "docs/delivery-runtime-tests.json",
+    "real_Tether_transport": "blocked",
+    "status": "locally_tested_bounded_sqlite_and_temporal",
+    "transport": "scripted_independent_sqlite_ledger",
+    "version": "runspindle.integration.v1"
+  },
   "dev_deployment": "not_run",
   "durable_admission": "bounded_temporal_registry_1024",
   "durable_artifacts": {
     "contract": "runspindle.integration.v1",
-    "delivery": "not_implemented_in_this_commit",
+    "delivery": "locally_tested_outbox_scripted_transport",
     "evidence": "docs/durable-artifact-tests.json",
     "status": "locally_tested_bounded_immutable_sqlite_acceptance",
     "store": "core_owned_sqlite_separate_from_host"
@@ -16,6 +23,7 @@
   "host_library_integration": {
     "evidence": "docs/host-runtime-tests.json",
     "host_revision": "6caf08d3f642691ceecffc76c5aa378fbdd7a352",
+    "latest_combined_evidence": "docs/delivery-runtime-tests.json",
     "native_wire": "blocked",
     "status": "locally_tested_real_core_host_temporal_scripted_peer",
     "version": "runspindle.integration.v1"
