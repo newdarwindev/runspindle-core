@@ -1,0 +1,9 @@
+{
+  "api_version": "runspindle.v1alpha0",
+  "component": "core",
+  "description": "Rust coordination, Temporal integration, task identity and receipts",
+  "implementation_language": "rust",
+  "repository": "newdarwindev/runspindle-core",
+  "schema_version": 1,
+  "stage": "scaffold"
+}
