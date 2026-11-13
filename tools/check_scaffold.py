@@ -11,14 +11,21 @@ assert c['stage'] == s['stage']
 assert (c['stage'], s['implementation']) in {
     ('scaffold', 'not_implemented'),
     ('contract_candidate', 'partial_contract_model'),
+    ('temporal_development_candidate', 'partial_temporal_development_runtime'),
 }
-if c['stage'] == 'contract_candidate':
+if c['stage'] in ['contract_candidate','temporal_development_candidate']:
     for name in ['src/identity.rs', 'src/artifact.rs', 'tests/contracts.rs',
                  'specs/contracts.md', 'docs/IMPLEMENTATION_EVIDENCE.md']:
         assert (root/name).is_file(), f'Missing {name}'
     assert s['contract_tests'] in ['not_run', 'passed', 'failed']
-    for name in ['native_activation', 'temporal_integration', 'external_effects']:
+    for name in ['native_activation', 'external_effects']:
         assert s[name] == 'not_implemented'
+    if c['stage']=='temporal_development_candidate':
+        assert s['temporal_integration']=='locally_tested_pinned_development_server'
+        for name in ['Cargo.lock','src/runtime.rs','specs/runtime.md','docs/runtime-build.json','docs/runtime-tests.json','temporal/toolchain.json']:
+            assert (root/name).is_file(), f'Missing {name}'
+    else:
+        assert s['temporal_integration']=='not_implemented'
 assert s['live_acceptance'] == 'not_run'
 p = json.loads((root/'provenance.json').read_text())
 for item in p['sources']:

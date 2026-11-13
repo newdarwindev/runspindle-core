@@ -2,13 +2,16 @@
 
 Rust coordination, Temporal integration, task identity and receipts.
 
-**Status: proposed in-memory contract slice, not a deployed or production-ready implementation.**
+**Status: bounded Temporal development runtime; integrated/live acceptance remains blocked.**
 
-The dependency-free Rust library models artifact evidence transitions, delivery
-uncertainty, request deduplication and explicit host pins. These are proposed model
-types, not an agreed cross-component protocol. It performs no I/O, authenticates no
-evidence and cannot activate native sessions or Temporal. See the
-[contract proposal](specs/contracts.md) and [evidence and gaps](docs/IMPLEMENTATION_EVIDENCE.md).
+The default dependency-free models retain their process-local limits. The opt-in
+`temporal-runtime` feature adds a real Rust Temporal client/worker, bounded durable
+admission registry and operation workflows with scripted synthetic activity ports.
+Fresh-process worker/server recovery and real history replay are tested against a
+pinned disposable development server. This supplies no production/native/browser/
+provider/delivery authority or deployment. Read [runtime semantics](specs/runtime.md)
+and [preparation/checks](docs/TEMPORAL_RUNTIME.md) for exact evidence and remaining gaps.
+The fixture schema remains a separate test format.
 
 This repository is one boundary of [Runspindle](https://github.com/newdarwindev/runspindle). Repository boundaries do not require one microservice each.
 

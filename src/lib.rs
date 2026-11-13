@@ -1,4 +1,4 @@
-//! Dependency-free, in-memory contracts. No I/O or runtime activation.
+//! Process-local contract models, plus an opt-in bounded Temporal development runtime.
 //!
 //! Caller-supplied observations and digests are compared, not authenticated.
 //! See `specs/contracts.md` for the trust boundary and remaining gaps.
@@ -8,12 +8,15 @@
 pub mod artifact;
 pub mod identity;
 
+#[cfg(feature = "temporal-runtime")]
+pub mod runtime;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ReadinessError {
     NotImplemented,
 }
 
-/// Native activation, Temporal integration and external effects are unimplemented.
+/// Production/native activation and external operational effects remain unavailable.
 pub fn activate() -> Result<(), ReadinessError> {
     Err(ReadinessError::NotImplemented)
 }

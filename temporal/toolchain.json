@@ -1,0 +1,26 @@
+{
+  "sdk": {
+    "version": "1.2.0",
+    "revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
+    "release": "https://github.com/temporalio/sdk-rust/releases/tag/v1.2.0",
+    "archive": "https://api.github.com/repos/temporalio/sdk-rust/tarball/c675c32469af707e1c979a7b808c70b4a0608b82",
+    "archive_sha256": "de6eb7e4ac0ab55310506b87baaccf02e0a03616ac3194fc562b433b1a19f3ae",
+    "license_sha256": "cf8fe04521deeb6f99f644570bc8bee71c11dc410dbb72bccfb3a51829860c7b"
+  },
+  "rust_image": "rust@sha256:6ae102bdbf528294bc79ad6e1fae682f6f7c2a6e6621506ba959f9685b308a55",
+  "rust_version": "1.94.1",
+  "protoc_debian_version": "3.21.12-3+deb12u1",
+  "contract_commit": "4b700269be9a4feab7b955faf0229fbdd77d8aa9",
+  "platform_lane": "tools/temporal_lane.py; prepared separately; CLI 1.10.0; no runtime downloads",
+  "builder_image_id": "sha256:061420d04a6f6ac173e3b1835b0594bcbe9d17044f5e015ca4fb767f9c57813e",
+  "builder_recipe_sha256": "250edcf236a6d6cc55bcc8f29fbd9f01bc4e8cef3580a2890edc03bdce07c0dd",
+  "protoc_sha256": "9c111a55670f73d3640186d8f9c7677c50adbce286d9bb4960f9f2a72086e88b",
+  "engine_os": "linux",
+  "engine_architecture": "aarch64",
+  "clippy_driver_sha256": "72e482ecaec739cbec1428bdc0d090c96a53f5c138b8aec82abe7d8844f6882b",
+  "clippy_artifact": {
+    "url": "https://static.rust-lang.org/dist/2026-03-26/clippy-1.94.1-aarch64-unknown-linux-gnu.tar.xz",
+    "sha256": "d35ce7705052d5bf43203012d8dceafcf13ca01ab9727f24c079b2ad9da45428",
+    "license": "MIT OR Apache-2.0; notices retained in official toolchain image share/doc/clippy"
+  }
+}

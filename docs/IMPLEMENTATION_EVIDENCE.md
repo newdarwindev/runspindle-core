@@ -1,3 +1,8 @@
+Current extension: the optional bounded Temporal runtime is documented in
+[TEMPORAL_RUNTIME.md](TEMPORAL_RUNTIME.md), [runtime-tests.json](runtime-tests.json)
+and [runtime-build.json](runtime-build.json). The records below retain the exact
+historical process-local model scope; they are not the current durable-lane report.
+
 # Core contract candidate: implementation evidence
 
 Prepared 2026-11-13 for independent review. This is an original dependency-free

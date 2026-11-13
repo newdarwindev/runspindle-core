@@ -5,7 +5,7 @@
   "dev_deployment": "not_run",
   "external_effects": "not_implemented",
   "github_ci": "not_run",
-  "implementation": "partial_contract_model",
+  "implementation": "partial_temporal_development_runtime",
   "isolation_adapter_tests": "blocked",
   "legacy_archival": "not_started",
   "live_acceptance": "not_run",
@@ -20,6 +20,11 @@
     "status": "locally_tested_synthetic_consumer",
     "version": "runspindle.fixture.v1"
   },
-  "stage": "contract_candidate",
-  "temporal_integration": "not_implemented"
+  "stage": "temporal_development_candidate",
+  "temporal_integration": "locally_tested_pinned_development_server",
+  "runtime_contract": "runspindle.runtime.v1",
+  "durable_admission": "bounded_temporal_registry_1024",
+  "runtime_test_evidence": "docs/runtime-tests.json",
+  "native_freshness_and_core_host_wire": "not_qualified",
+  "multiple_registry_authorities": "not_supported"
 }
