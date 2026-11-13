@@ -37,3 +37,6 @@ The synthetic component test status is recorded separately in the evidence docum
 managed sessions, explicit human exceptions and evaluated maintained workflows.
 It adds design and verification obligations without changing runtime schemas,
 existing acceptance results or operational permissions.
+
+The separate [host library mapping](host-runtime.md) describes H02, its explicit
+integration version and retained native/live blockers.

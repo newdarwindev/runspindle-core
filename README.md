@@ -41,3 +41,7 @@ is implied.
 Read [the component-specific technical intent](specs/desired-intent.md) for its
 interfaces, privacy boundaries, failure cases and acceptance obligations. Current
 implementation and evidence limits above remain unchanged.
+
+The optional [real host library lane](docs/HOST_RUNTIME.md) connects Temporal
+activities to the pinned durable host adapter, with a separate scripted native
+peer ledger. Native app-server and live acceptance remain unqualified.

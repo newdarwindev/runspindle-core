@@ -1,25 +1,27 @@
 {
   "schema_version": 1,
+  "features": "host-runtime",
   "evidence_class": "prepared_dependency_artifacts",
-  "image_id": "sha256:b615189193ec2ed422105a70bc78e3494c6512db23185fec503aecb7a55fca12",
+  "image_id": "sha256:feed0d7d9ccdfc95cb5e994bcc2c7aeacd5acb432950eb4ff25eba0ec2f0e668",
   "builder_image_id": "sha256:061420d04a6f6ac173e3b1835b0594bcbe9d17044f5e015ca4fb767f9c57813e",
   "source_hashes": {
-    "Cargo.toml": "028bb1137c1d95ae65bf0a9ddec916646ee08fe089b4810f8d3a3f33a2d9aaf9",
-    "Cargo.lock": "5ada42a96ee9eda3e68c1cb93080c2319322cc5bf8d3166fef785a96ced2d89d",
+    "Cargo.toml": "b3eeb3bf16f4ac4dccec381591e445d38a5ec974927ca93c93fa0bf7f7d3e792",
+    "Cargo.lock": "df971ac2e789b5e6000731185485a32766eaec7b44f1055c872148f1e8698d68",
     "temporal/toolchain.json": "3902172aac23f43d70c509a37930696f01102f6dc6e20c8c51607526b2611990",
     "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
-    "src/bin/temporal-runtime.rs": "29c85e38fe86f6ecf022a534511656d07cd489f1411d87bee5def3e5b437383b",
+    "src/bin/temporal-runtime.rs": "977c043945d9fda97f4e9c2f0d19a4a49530ee3800181f039f869299657cde70",
     "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
-    "src/lib.rs": "6d10ef4185567edc99297489524aed198ff09a08c178f19ea6539cfdfe011c07",
-    "src/runtime.rs": "c7e9affa19f8c4f0097e5ae9a37f918a0db5638fb65df9b75a1dcdf983cb778f"
+    "src/integration.rs": "210f60622bfde9ede928ffc4ce599faf98e34b6f31cff57037a8d007eb375133",
+    "src/lib.rs": "5420f736239d01b1821b90b2f76e350b01a7180fbf03dbf964affdd0d4efe554",
+    "src/runtime.rs": "71af331a1d905852dba21b78580614ed1998ae5a6f01eee192b4277c704e8b04"
   },
-  "source_sha256": "d2b2d59d8e450bea7324b492feed75b9dbe0bac74457d9a502f5b696d2b330e7",
-  "binary_sha256": "994e4687957cac46059133efb8557e8f960036da2fbe2baf3128956ea3da440b",
-  "cargo_lock_sha256": "5ada42a96ee9eda3e68c1cb93080c2319322cc5bf8d3166fef785a96ced2d89d",
+  "source_sha256": "8b32cbc173fae9787c0d9be0098ddc26b4b907a77e668441de4f9a94f049bc8c",
+  "binary_sha256": "d9e777eccce5fdd1fec8205aec207f1246c5009dfaf75e9bd13bdec672501549",
+  "cargo_lock_sha256": "df971ac2e789b5e6000731185485a32766eaec7b44f1055c872148f1e8698d68",
   "sdk_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
   "sdk_version": "1.2.0",
   "rust_version": "1.94.1",
-  "dependency_inventory_sha256": "caf5efe05c1dbfd24584263db64df6b2d7e1258dfd4b32c2e6f56d1881a77392",
+  "dependency_inventory_sha256": "4c7f6810c1bb61000584c54c5d249b8d945cd2239406cd286cb620222f338453",
   "isolation": "runtime must use platform internal network; no published ports; pull never",
   "operational_acceptance": "not_run"
 }

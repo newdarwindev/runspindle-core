@@ -1,4 +1,6 @@
 //! Explicit synthetic development CLI; never resolves credentials or production configuration.
+#[cfg(feature = "host-runtime")]
+use runspindle_core::integration::*;
 use runspindle_core::runtime::*;
 use serde::Deserialize;
 use std::{io::Read, path::PathBuf, time::Duration};
@@ -13,6 +15,28 @@ use temporalio_sdk::{
 #[derive(Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
+    #[cfg(feature = "host-runtime")]
+    StartHost {
+        registry_id: String,
+    },
+    #[cfg(feature = "host-runtime")]
+    AdmitHost {
+        registry_id: String,
+        request: HostRequest,
+    },
+    #[cfg(feature = "host-runtime")]
+    HostRegistry {
+        registry_id: String,
+    },
+    #[cfg(feature = "host-runtime")]
+    Native {
+        job_id: String,
+    },
+    #[cfg(feature = "host-runtime")]
+    CancelNative {
+        job_id: String,
+        binding: Binding,
+    },
     Start {
         registry_id: String,
     },
@@ -42,12 +66,14 @@ async fn main() -> anyhow::Result<()> {
             .get(2)
             .ok_or_else(|| anyhow::anyhow!("history path required"))?;
         let history = temporalio_client::WorkflowHistory::from_json(&std::fs::read(path)?)?;
-        let replayer = WorkflowReplayer::new(
-            WorkflowReplayerOptions::new()
-                .register_workflow::<AdmissionRegistry>()?
-                .register_workflow::<OperationWorkflow>()?
-                .build(),
-        )?;
+        let replay_options = WorkflowReplayerOptions::new()
+            .register_workflow::<AdmissionRegistry>()?
+            .register_workflow::<OperationWorkflow>()?;
+        #[cfg(feature = "host-runtime")]
+        let replay_options = replay_options
+            .register_workflow::<NativeOperationWorkflow>()?
+            .register_workflow::<HostAdmissionRegistry>()?;
+        let replayer = WorkflowReplayer::new(replay_options.build())?;
         replayer.replay_workflow(history).await?;
         println!("{{\"status\":\"passed\",\"evidence_class\":\"isolated_integration\",\"check\":\"history_replay\"}}");
         return Ok(());
@@ -79,8 +105,17 @@ async fn main() -> anyhow::Result<()> {
         let options = WorkerOptions::new(QUEUE)
             .register_workflow::<AdmissionRegistry>()?
             .register_workflow::<OperationWorkflow>()?
-            .register_activities(Ports { script_directory })
-            .build();
+            .register_activities(Ports {
+                script_directory: script_directory.clone(),
+            });
+        #[cfg(feature = "host-runtime")]
+        let options = options
+            .register_workflow::<NativeOperationWorkflow>()?
+            .register_workflow::<HostAdmissionRegistry>()?
+            .register_activities(HostPorts {
+                directory: script_directory,
+            });
+        let options = options.build();
         Worker::new(&runtime, client, options)?
             .run_until(tokio::signal::ctrl_c())
             .await?;
@@ -99,6 +134,46 @@ async fn main() -> anyhow::Result<()> {
     anyhow::ensure!(input.len() <= 1_048_576, "oversized input");
     let command: Command = serde_json::from_str(&input)?;
     let result = match command {
+        #[cfg(feature = "host-runtime")]
+        Command::StartHost { registry_id } => {
+            anyhow::ensure!(valid_id(&registry_id), "invalid registry");
+            let h = client
+                .start_workflow(
+                    HostAdmissionRegistry::run,
+                    (),
+                    WorkflowStartOptions::new(QUEUE, registry_id).build(),
+                )
+                .await?;
+            serde_json::json!({"status":"started","run_id":h.run_id()})
+        }
+        #[cfg(feature = "host-runtime")]
+        Command::AdmitHost {
+            registry_id,
+            request,
+        } => serde_json::to_value(
+            client
+                .get_workflow_handle::<HostAdmissionRegistry>(registry_id)
+                .execute_update(HostAdmissionRegistry::admit, request, Default::default())
+                .await?,
+        )?,
+        #[cfg(feature = "host-runtime")]
+        Command::HostRegistry { registry_id } => serde_json::to_value(
+            client
+                .get_workflow_handle::<HostAdmissionRegistry>(registry_id)
+                .query(HostAdmissionRegistry::snapshot, (), Default::default())
+                .await?,
+        )?,
+        #[cfg(feature = "host-runtime")]
+        Command::Native { job_id } => serde_json::to_value(
+            client
+                .get_workflow_handle::<NativeOperationWorkflow>(job_id)
+                .query(NativeOperationWorkflow::snapshot, (), Default::default())
+                .await?,
+        )?,
+        #[cfg(feature = "host-runtime")]
+        Command::CancelNative { job_id, binding } => {
+            serde_json::json!({"accepted":client.get_workflow_handle::<NativeOperationWorkflow>(job_id).execute_update(NativeOperationWorkflow::request_cancel,binding,Default::default()).await?})
+        }
         Command::Start { registry_id } => {
             anyhow::ensure!(valid_id(&registry_id), "invalid registry id");
             let h = client
