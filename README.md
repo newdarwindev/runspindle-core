@@ -2,13 +2,16 @@
 
 Rust coordination, Temporal integration, task identity and receipts.
 
-**Status: proposed in-memory contract slice, not a deployed or production-ready implementation.**
+**Status: bounded Temporal development runtime; integrated/live acceptance remains blocked.**
 
-The dependency-free Rust library models artifact evidence transitions, delivery
-uncertainty, request deduplication and explicit host pins. These are proposed model
-types, not an agreed cross-component protocol. It performs no I/O, authenticates no
-evidence and cannot activate native sessions or Temporal. See the
-[contract proposal](specs/contracts.md) and [evidence and gaps](docs/IMPLEMENTATION_EVIDENCE.md).
+The default dependency-free models retain their process-local limits. The opt-in
+`temporal-runtime` feature adds a real Rust Temporal client/worker, bounded durable
+admission registry and operation workflows with scripted synthetic activity ports.
+Fresh-process worker/server recovery and real history replay are tested against a
+pinned disposable development server. This supplies no production/native/browser/
+provider/delivery authority or deployment. Read [runtime semantics](specs/runtime.md)
+and [preparation/checks](docs/TEMPORAL_RUNTIME.md) for exact evidence and remaining gaps.
+The fixture schema remains a separate test format.
 
 This repository is one boundary of [Runspindle](https://github.com/newdarwindev/runspindle). Repository boundaries do not require one microservice each.
 
@@ -30,3 +33,22 @@ No old repository is retired by this scaffold. Migration and archival are separa
 ## Implemented validation
 
 Run `python3 tools/validate.py` for all implemented structural, language, fixture, artifact and mutation checks in this repository. The same entrypoint runs on trusted `main` and `ci/*` pushes and manual qualification using disposable Strix x64 guests. Logs include the checkout SHA, image/tool identities, command results and applicable artifact checksums. Unimplemented builds and product acceptance remain explicit in `STATUS.json`; blocked acceptance workflows retain their failing conclusions. ARM64 and native macOS qualification remain pending.
+
+## Desired technical direction
+
+Durable intent and effect coordination: this component contributes to turning authorized one-off work into
+repeatable, maintained cross-application workflows. Scoped access, managed
+sessions, explicit human exceptions and evaluated DSPy candidates are intended
+to compose into that capability; no automatic improvement or live integration
+is implied.
+
+Read [the component-specific technical intent](specs/desired-intent.md) for its
+interfaces, privacy boundaries, failure cases and acceptance obligations. Current
+implementation and evidence limits above remain unchanged.
+
+The optional [real host library lane](docs/HOST_RUNTIME.md) connects Temporal
+activities to the pinned durable host adapter, with a separate scripted native
+peer ledger. Native app-server and live acceptance remain unqualified.
+
+The [durable artifact store](specs/durable-artifacts.md) adds immutable byte storage,
+validation and default-deny authorized acceptance. Delivery and live gates remain separate.

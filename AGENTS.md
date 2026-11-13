@@ -30,3 +30,13 @@ Update evidence for implemented stories and their remaining gaps. Do not mark se
 ![validation](https://github.com/newdarwindev/runspindle-core/actions/workflows/validation.yml/badge.svg) [validation](https://github.com/newdarwindev/runspindle-core/actions/workflows/validation.yml)
 
 ![fleet-qualification](https://github.com/newdarwindev/runspindle-core/actions/workflows/fleet-qualification.yml/badge.svg) [fleet-qualification](https://github.com/newdarwindev/runspindle-core/actions/workflows/fleet-qualification.yml)
+
+## Desired capability and implementation discipline
+
+Read [the technical intent](specs/desired-intent.md) before proposing architecture
+or changing workflow behavior. Keep the authority verifier, deterministic orchestration and effectful transport separate. Reject designs that turn acknowledgement, timeout, cancellation request or replay into proof of an external outcome. Test durable semantics separately from in-memory state transitions.
+
+Tie each implementation change to a documented intent, existing contract and
+negative test. Preserve all existing permission and evidence boundaries.
+Optimization may change candidate behavior within approved interfaces; it must
+not change authority, conceal uncertainty or reinterpret approval scope.

@@ -1,6 +1,6 @@
 # core specification
 
-Status: planned contract, implementation and live acceptance not verified.
+Status: bounded Temporal development implementation; integrated/live acceptance not verified.
 
 An isolated [contract-model proposal](contracts.md) now has a dependency-free
 implementation candidate and synthetic tests. This is not a public wire protocol.
@@ -26,5 +26,20 @@ Preserve explicit authority and unknown outcomes. Distinguish request admission,
 3. Bounded live acceptance in an authorized target.
 4. Failure, restart, uncertain-effect reconciliation and rollback evidence.
 
-Isolated integration, live acceptance, restart and rollback gates have not run.
+The bounded real SDK/Temporal lane now separately exercises development persistence,
+fresh-process recovery and same-version history replay; see [runtime mapping](runtime.md).
+Native/browser/provider/delivery integration, live acceptance and production rollback remain blocked.
 The synthetic component test status is recorded separately in the evidence document.
+
+## Engineering direction
+
+[Desired intent](desired-intent.md) connects this component to scoped access,
+managed sessions, explicit human exceptions and evaluated maintained workflows.
+It adds design and verification obligations without changing runtime schemas,
+existing acceptance results or operational permissions.
+
+The separate [host library mapping](host-runtime.md) describes H02, its explicit
+integration version and retained native/live blockers.
+
+The [durable artifact store](durable-artifacts.md) adds immutable byte storage,
+validation and default-deny authorized acceptance. Delivery and live gates remain separate.
