@@ -49,8 +49,18 @@ credential injection or external submission as an unguarded side effect.
 
 ## Present scope
 
-The current Rust slice is an in-memory contract model with synthetic tests, not
-a durable runtime or authenticated authority service. The desired design must be
-mapped to the composition Runtime v1 contract without claiming native/JSON wire
-parity prematurely. See [current model contracts](contracts.md) and
-[evidence and gaps](../docs/IMPLEMENTATION_EVIDENCE.md).
+The default Rust models remain process-local. The optional `temporal-runtime`
+feature adds a bounded development runtime with a single Temporal admission
+registry authority per namespace, 1,024 retained delivery/revision records,
+deterministic child dispatch and operation reconciliation. Real pinned SDK/server
+tests exercise concurrent delivery, fresh worker/server recovery, cancellation
+races and same-version history replay with independently observed scripted effects.
+
+The [Runtime v1 mapping](runtime.md) documents its explicit semantic and Admission
+JSON scope. This does not qualify native/core-host wire compatibility, trusted
+native observation freshness, browser fencing or production authentication/expiry.
+Host effects are scripted; browser, delivery and provider adapters are not
+exercised. Production durability, competing registries, upgrade compatibility and
+full-system/live acceptance remain blocked or unqualified. See [model contracts](contracts.md),
+[runtime evidence](../docs/runtime-tests.json) and
+[preparation and remaining gaps](../docs/TEMPORAL_RUNTIME.md).
