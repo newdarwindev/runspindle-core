@@ -40,3 +40,6 @@ existing acceptance results or operational permissions.
 
 The separate [host library mapping](host-runtime.md) describes H02, its explicit
 integration version and retained native/live blockers.
+
+The [durable artifact store](durable-artifacts.md) adds immutable byte storage,
+validation and default-deny authorized acceptance. Delivery and live gates remain separate.

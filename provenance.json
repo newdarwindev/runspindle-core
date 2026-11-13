@@ -1,4 +1,11 @@
 {
+  "durable_artifact_source": {
+    "classification": "original_implementation_and_synthetic_fixtures",
+    "contract_commit": "96299842505ce7662178b7c7b00fd31f6c2754f0",
+    "dependencies": "docs/runtime-dependencies.json",
+    "legacy_source_import": "none",
+    "mapping": "specs/durable-artifacts.md"
+  },
   "host_library_dependency": {
     "boundary": "immutable Git library dependency",
     "inventory": "docs/runtime-dependencies.json",

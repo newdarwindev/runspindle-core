@@ -6,6 +6,8 @@
 #![forbid(unsafe_code)]
 
 pub mod artifact;
+#[cfg(feature = "artifact-store")]
+pub mod durable;
 pub mod identity;
 
 #[cfg(feature = "temporal-runtime")]

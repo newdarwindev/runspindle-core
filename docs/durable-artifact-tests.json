@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "evidence_class": "component",
+  "status": "passed",
+  "contract": "runspindle.integration.v1",
+  "contract_commit": "96299842505ce7662178b7c7b00fd31f6c2754f0",
+  "tests": {
+    "artifact_tests": 8,
+    "all_feature_tests": 35,
+    "strict_clippy": "passed",
+    "formatting": "passed",
+    "scaffold": "passed"
+  },
+  "environment": "pinned offline Linux arm64 Rust 1.94.1 builder; no native protoc execution",
+  "dependency_inventory": "docs/runtime-dependencies.json",
+  "mutations": {
+    "evidence_class": "component_mutation",
+    "status": "passed",
+    "results": [
+      {
+        "mutation": "skipped_validation",
+        "behavioral_failure_observed": true
+      },
+      {
+        "mutation": "changed_bytes",
+        "behavioral_failure_observed": true
+      }
+    ]
+  },
+  "fresh_process": "acceptance commit followed by exit95 and reopen of exact accepted BLOB",
+  "remaining_gaps": [
+    "delivery outbox not in this commit",
+    "power loss/filesystem corruption qualification",
+    "production authority",
+    "provider/native/Tether/live acceptance"
+  ]
+}
