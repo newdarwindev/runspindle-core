@@ -59,5 +59,24 @@
     "version": "runspindle.fixture.v1"
   },
   "stage": "temporal_development_candidate",
-  "temporal_integration": "locally_tested_pinned_development_server"
+  "temporal_integration": "locally_tested_pinned_development_server",
+  "runtime_envelope": {
+    "version": "runspindle.envelope.v1",
+    "scope": [
+      "admission_request",
+      "host_observation",
+      "delivery_request",
+      "delivery_receipt"
+    ],
+    "status": "implemented_candidate_under_final_qualification",
+    "evidence": "docs/VERIFIED_AUTHORITY.md"
+  },
+  "verified_admission": {
+    "version": "runspindle.authority.v1",
+    "status": "implemented_offline_candidate_under_final_qualification",
+    "issuer": "synthetic_ephemeral_only",
+    "store": "local_authoritative_SQLite",
+    "production_issuer": "not_implemented",
+    "independent_review": "user_waived_no_review_occurred"
+  }
 }

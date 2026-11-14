@@ -3,14 +3,18 @@ name = "runspindle-core"
 version = "0.0.0"
 edition = "2021"
 publish = false
+autobins = false
 
 [features]
+runtime-envelope = ["delivery-runtime"]
+verified-authority = ["runtime-envelope", "dep:ring"]
 delivery-runtime = ["host-runtime", "artifact-store"]
 artifact-store = ["temporal-runtime", "dep:rusqlite"]
 host-runtime = ["temporal-runtime", "dep:runspindle-host", "dep:rusqlite"]
 temporal-runtime = ["dep:temporalio-sdk", "dep:temporalio-client", "dep:temporalio-common", "dep:temporalio-macros", "dep:tokio", "dep:serde", "dep:serde_json", "dep:sha2", "dep:anyhow", "dep:temporalio-workflow", "dep:futures", "dep:url", "dep:async-trait"]
 
 [dependencies]
+ring = { version = "=0.17.14", optional = true }
 async-trait = { version = "=0.1.92", optional = true }
 runspindle-host = { git = "https://github.com/newdarwindev/runspindle-host.git", rev = "a56e5d7c18611b07c1c28da425db7c14227b3e76", optional = true }
 rusqlite = { version = "=0.32.1", features = ["bundled"], optional = true }

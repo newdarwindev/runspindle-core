@@ -52,5 +52,20 @@
     "reuse": "Crates.io dependency with exact version and checksums; original notice retained; no executable SDK source copied into repository.",
     "source_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
     "version": "1.2.0"
+  },
+  "runtime_envelope_contract": {
+    "repository": "newdarwindev/runspindle",
+    "source_commit": "6125dc932ef3663b4713d7a3686eca0726118490",
+    "version": "runspindle.envelope.v1",
+    "mapping": "specs/verified-authority-v1.md",
+    "vectors_sha256": "fcebde87ffb2273e430de1115e809b0c8bee4efb02497f6a5dbfde3ebed02941",
+    "implementation": "original_Rust_mapping_no_component_serializers_shared_with_Python"
+  },
+  "offline_authority_source": {
+    "classification": "original_verifier_and_workflow_seam_with_synthetic_issuer",
+    "dependency": "ring =0.17.14 (already locked)",
+    "notices": "licenses/authority",
+    "source_import": "none",
+    "independent_review": "user_waived_no_review_occurred"
   }
 }
