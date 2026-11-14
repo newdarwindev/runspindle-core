@@ -332,7 +332,10 @@ fn absent_helper_cannot_use_script_authorized_flag() {
     ports.helper = None;
     for action in [PortAction::ObserveHost, PortAction::Launch] {
         assert_eq!(
-            ports.invoke(&f.call(action, Action::Dispatch)).unwrap().status,
+            ports
+                .invoke(&f.call(action, Action::Dispatch))
+                .unwrap()
+                .status,
             PortStatus::Denied
         );
     }
