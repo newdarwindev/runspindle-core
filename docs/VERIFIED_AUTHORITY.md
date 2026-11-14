@@ -15,6 +15,10 @@ python3 tools/prepare_temporal_runtime.py --features verified-authority
 python3 tools/qualify_verified_authority.py --platform /path/to/pinned/platform --platform-prepared /path/to/temporal-prepared --composition /path/to/composition --report-dir /path/to/private/reports
 ```
 
+All three source checkouts must be clean committed revisions. The wire helper is
+tracked in core and reads the independent codec from the explicit composition
+checkout. Reports must be outside tracked source.
+
 The qualification command verifies the committed prepared artifact source/image
 binding, scaffold, Python/Rust suites, Rust formatting and strict Clippy, deliberate
 mutations, independent wire producer/consumer mappings and fresh Temporal/SQLite

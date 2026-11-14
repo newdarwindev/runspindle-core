@@ -47,6 +47,13 @@ The hygiene baseline is unchanged. New diagnostics are fixed with typed harness
 interfaces and formatting. Mandatory checks include the authority feature and all
 implemented runtime/artifact/outbox/authority mutation checkers. They require the
 pinned builder and cached dependencies; absent tools must fail, never skip.
+The qualifier requires clean core, composition and platform checkouts and records
+their exact revisions, prepared manifest digests and before/after fingerprints.
+The independent Python/Rust helper is now tracked in core, using the Python codec
+from the explicit composition checkout. Its original prepublication bytes were
+privately preserved; provenance.json records its hash and adaptations. Earlier
+commands depended on an untracked helper in a dirty composition worktree and are
+historical observations, not published exact-source qualification.
 Qualification compares source fingerprints before/after checks, including core,
 composition and platform tooling. This detects persistent source drift, not a
 malicious change restored between observations.

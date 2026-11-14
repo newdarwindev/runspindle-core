@@ -28,13 +28,36 @@
   },
   "license_status": "No blanket license is granted to imported material. See LEGAL.md.",
   "new_files": "Original bounded Temporal development workflows, scripted synthetic activity ports and tests, alongside prior process-local models and owner-directed fixture subset. No legacy executable source/history imported.",
+  "offline_authority_source": {
+    "classification": "original_verifier_and_workflow_seam_with_synthetic_issuer",
+    "dependency": "ring =0.17.14 (already locked)",
+    "independent_review": "user_waived_no_review_occurred",
+    "notices": "licenses/authority",
+    "source_import": "none"
+  },
   "provenance_policy": "Public IDs resolve to a privately retained source record containing repository, exact commit, path, source hash and review notes. Private repository names, URLs and operational details are omitted.",
+  "qualification_support_source": {
+    "classification": "original_Python_Rust_conformance_support",
+    "destination": "tools/test_envelope_conformance.py",
+    "modifications": "Explicit composition input and core-owned artifact validator; no shared Python/Rust serializers",
+    "rights_basis": "Owner-directed original qualification support; no legacy source/history imported",
+    "source_preservation": "prepublication_bytes_privately_preserved",
+    "source_sha256": "a5fe169e77232d87769f3a09725580fd15573bff4cceec3074bca0172ef89d5a"
+  },
   "runtime_contract": {
     "classification": "semantic_development_contract",
     "commit": "4b700269be9a4feab7b955faf0229fbdd77d8aa9",
     "mapping": "specs/runtime.md",
     "path": "specs/runtime-v1.md",
     "repository": "newdarwindev/runspindle"
+  },
+  "runtime_envelope_contract": {
+    "implementation": "original_Rust_mapping_no_component_serializers_shared_with_Python",
+    "mapping": "specs/verified-authority-v1.md",
+    "repository": "newdarwindev/runspindle",
+    "source_commit": "9201310df7982e7d52f4b9facd8d4caec8ab35dc",
+    "vectors_sha256": "fcebde87ffb2273e430de1115e809b0c8bee4efb02497f6a5dbfde3ebed02941",
+    "version": "runspindle.envelope.v1"
   },
   "runtime_integration_contract": {
     "commit": "96299842505ce7662178b7c7b00fd31f6c2754f0",
@@ -52,20 +75,5 @@
     "reuse": "Crates.io dependency with exact version and checksums; original notice retained; no executable SDK source copied into repository.",
     "source_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
     "version": "1.2.0"
-  },
-  "runtime_envelope_contract": {
-    "repository": "newdarwindev/runspindle",
-    "source_commit": "9201310df7982e7d52f4b9facd8d4caec8ab35dc",
-    "version": "runspindle.envelope.v1",
-    "mapping": "specs/verified-authority-v1.md",
-    "vectors_sha256": "fcebde87ffb2273e430de1115e809b0c8bee4efb02497f6a5dbfde3ebed02941",
-    "implementation": "original_Rust_mapping_no_component_serializers_shared_with_Python"
-  },
-  "offline_authority_source": {
-    "classification": "original_verifier_and_workflow_seam_with_synthetic_issuer",
-    "dependency": "ring =0.17.14 (already locked)",
-    "notices": "licenses/authority",
-    "source_import": "none",
-    "independent_review": "user_waived_no_review_occurred"
   }
 }
