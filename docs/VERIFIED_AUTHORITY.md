@@ -2,8 +2,8 @@
 
 Candidate scope: four Python/Rust wire mappings and an offline Ed25519 admission
 lane. Production, credentials, providers, paid evaluation, browser, console,
-source migration and H08/Langfuse remain deferred. Independent review was waived
-by the user; no independent review occurred. Required GitHub checks and merge
+source migration and H08/Langfuse remain deferred. Historical independent review
+was waived; foundation exact-head review is required. Required GitHub checks and merge
 qualification are recorded separately from local evidence.
 
 Prepare only the pinned dependencies described in temporal/toolchain.json and
@@ -15,6 +15,10 @@ python3 tools/prepare_temporal_runtime.py --features verified-authority
 python3 tools/qualify_verified_authority.py --platform /path/to/pinned/platform --platform-prepared /path/to/temporal-prepared --composition /path/to/composition --report-dir /path/to/private/reports
 ```
 
+All three source checkouts must be clean committed revisions. The wire helper is
+tracked in core and reads the independent codec from the explicit composition
+checkout. Reports must be outside tracked source.
+
 The qualification command verifies the committed prepared artifact source/image
 binding, scaffold, Python/Rust suites, Rust formatting and strict Clippy, deliberate
 mutations, independent wire producer/consumer mappings and fresh Temporal/SQLite
@@ -22,7 +26,9 @@ recovery. It fails on missing checks/tools. It creates disposable services and
 synthetic ephemeral credentials only; there is no deployed issuer or provider.
 Reports contain source/config/vector/toolchain hashes and bounded results.
 
-Historical regression commands (same pinned prepared image):
+Historical regression commands (same pinned prepared image), run after the
+qualification command returns because mutation checks temporarily change and
+restore source files:
 
 ```
 python3 tools/test_temporal_runtime.py --platform /path/to/platform --platform-prepared /path/to/temporal-prepared --core-prepared local/runtime-prepared --report /private/reports/runtime.json
@@ -39,3 +45,7 @@ authenticated_registry, authenticated_operation and cancel_authenticated (the
 same canonical wire). The replay command registers both versions. The explicit
 synthetic-issuer command only accepts a disposable /effects directory; it is a
 test fixture generator, never a credential provisioning or production tool.
+
+Foundation reconciliation, exact-scope gaps and repeat observations are recorded in
+[FOUNDATION_AUTHORITY.md](FOUNDATION_AUTHORITY.md). Core #16 remains open because
+exact delivery destination binding is outside the current admission envelope.

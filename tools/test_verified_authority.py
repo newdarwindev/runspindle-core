@@ -243,17 +243,29 @@ def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str,
                 "concurrent conflicting revision mutated identity",
             )
             winner = [conflict, other][[r["status"] for r in replies].index("admitted")]
+            retained = registry()["revisions"][job(winner)]
+            require(
+                retained
+                == {
+                    "version": "runspindle.runtime.v1",
+                    **winner["binding"],
+                    **winner["payload"],
+                },
+                "conflicting completion replaced the winning binding",
+            )
             request(
                 {"command": "revoke", "grant_ref": winner["payload"]["grant_ref"]}, True
             )
             pending = envelope("expired-pending")
             script(pending, True)
-            issue(pending, changes={"expires_at_ms": int(time.time() * 1000) + 3000})
+            pending_expires_ms = int(time.time() * 1000) + 30_000
+            issue(pending, changes={"expires_at_ms": pending_expires_ms})
             require(
                 admit(pending)["status"] == "admitted",
                 "valid pending admission rejected",
             )
-            time.sleep(3.1)
+            while int(time.time() * 1000) <= pending_expires_ms:
+                time.sleep(0.05)
             request(
                 {"command": "revoke", "grant_ref": held["payload"]["grant_ref"]}, True
             )
@@ -313,6 +325,14 @@ def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str,
             require(
                 not cancel(no_cancel)["accepted"],
                 "missing cancel scope expanded authority",
+            )
+            require(
+                not any(
+                    event["action"] == "cancel"
+                    and event["admission"]["task_id"] == no_cancel["binding"]["task_id"]
+                    for event in events()
+                ),
+                "missing cancel scope invoked effect adapter",
             )
             ns["terminal"] = "completed"
             save()

@@ -27,7 +27,8 @@
       "rust-clippy"
     ],
     "mutation_1": [
-      "check-model-mutations"
+      "check-model-mutations",
+      "check-authority-mutations"
     ],
     "mutation_2": [
       "artifact-mutations"
