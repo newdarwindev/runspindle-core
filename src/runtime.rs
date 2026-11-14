@@ -132,7 +132,7 @@ pub struct AdmissionReply {
     pub job_id: Option<String>,
 }
 impl AdmissionReply {
-    fn rejected(why: &str) -> Self {
+    pub(crate) fn rejected(why: &str) -> Self {
         Self {
             status: why.into(),
             job_id: None,
@@ -453,7 +453,7 @@ impl Ports {
         Ok(reply)
     }
 }
-fn single_attempt() -> ActivityOptions {
+pub(crate) fn single_attempt() -> ActivityOptions {
     single_attempt_with_timeout(2)
 }
 fn single_attempt_with_timeout(seconds: u64) -> ActivityOptions {
@@ -523,8 +523,8 @@ impl AdmissionRegistry {
 
 #[workflow]
 pub struct OperationWorkflow {
-    snapshot: OperationSnapshot,
-    admission: Admission,
+    pub(crate) snapshot: OperationSnapshot,
+    pub(crate) admission: Admission,
 }
 #[workflow_methods]
 impl OperationWorkflow {
@@ -542,155 +542,7 @@ impl OperationWorkflow {
     }
     #[run]
     pub async fn run(ctx: &mut WorkflowContext<Self>) -> WorkflowResult<OperationSnapshot> {
-        let a = ctx.state(|s| s.admission.clone());
-        let mut launched = false;
-        let mut cancel_sent = false;
-        loop {
-            let snapshot = ctx.state(|s| s.snapshot.clone());
-            if snapshot.state.terminal() {
-                return Ok(snapshot);
-            }
-            if snapshot.cancellation == CancellationState::Requested && !launched {
-                ctx.state_mut(|s| {
-                    s.snapshot.state = OperationState::ObservedCancelled;
-                    s.snapshot.cancellation = CancellationState::ObservedTerminal;
-                });
-                continue;
-            }
-            // Authority is rechecked in a read-only activity before each consequential
-            // command, including after worker restart; replayed grants are not fresh authority.
-            let call = |action, session| PortCall {
-                admission: a.clone(),
-                action,
-                native_session_id: session,
-            };
-            let verified = ctx
-                .execute_activity(
-                    Ports::invoke_port,
-                    call(PortAction::Verify, None),
-                    single_attempt(),
-                )
-                .await;
-            if !matches!(verified, Ok(ref r) if r.status == PortStatus::Verified && r.binding == a.binding)
-            {
-                ctx.state_mut(|s| {
-                    s.snapshot.state = if launched {
-                        OperationState::Unknown
-                    } else {
-                        OperationState::ObservedFailed
-                    }
-                });
-                if !launched {
-                    continue;
-                }
-                ctx.timer(Duration::from_millis(500)).await;
-                continue;
-            }
-            if !launched {
-                let online = ctx
-                    .execute_activity(
-                        Ports::invoke_port,
-                        call(PortAction::ObserveHost, None),
-                        single_attempt_with_timeout(25),
-                    )
-                    .await;
-                if !matches!(online, Ok(ref r) if r.status == PortStatus::Online && r.binding == a.binding)
-                {
-                    ctx.timer(Duration::from_millis(500)).await;
-                    continue;
-                }
-                // Exactly one effectful activity is ever scheduled for this workflow.
-                // Updates may have run while authority/host activities were pending.
-                if ctx.state(|s| s.snapshot.cancellation != CancellationState::NotRequested) {
-                    continue;
-                }
-                launched = true;
-                let launch = ctx
-                    .execute_activity(
-                        Ports::invoke_port,
-                        call(PortAction::Launch, None),
-                        single_attempt(),
-                    )
-                    .await;
-                match launch {
-                    Ok(r)
-                        if r.binding == a.binding
-                            && r.status == PortStatus::Acknowledged
-                            && r.native_session_id.as_deref().is_some_and(valid_id) =>
-                    {
-                        ctx.state_mut(|s| {
-                            s.snapshot.state = OperationState::Acknowledged;
-                            s.snapshot.native_session_id = r.native_session_id;
-                        });
-                    }
-                    _ => ctx.state_mut(|s| s.snapshot.state = OperationState::Unknown),
-                }
-            }
-            let snapshot = ctx.state(|s| s.snapshot.clone());
-            if snapshot.cancellation == CancellationState::Requested
-                && !cancel_sent
-                && snapshot.native_session_id.is_some()
-            {
-                cancel_sent = true;
-                let result = ctx
-                    .execute_activity(
-                        Ports::invoke_port,
-                        call(PortAction::Cancel, snapshot.native_session_id.clone()),
-                        single_attempt(),
-                    )
-                    .await;
-                if matches!(result, Ok(ref r) if r.binding == a.binding && r.native_session_id == snapshot.native_session_id && r.status == PortStatus::Acknowledged)
-                {
-                    ctx.state_mut(|s| s.snapshot.cancellation = CancellationState::Acknowledged);
-                }
-            }
-            let action = if snapshot.native_session_id.is_some() {
-                PortAction::Poll
-            } else {
-                PortAction::Discover
-            };
-            let observed = ctx
-                .execute_activity(
-                    Ports::invoke_port,
-                    call(action, snapshot.native_session_id.clone()),
-                    single_attempt(),
-                )
-                .await;
-            match observed {
-                Ok(r)
-                    if r.binding == a.binding
-                        && r.native_session_id.as_deref().is_some_and(valid_id)
-                        && snapshot
-                            .native_session_id
-                            .as_ref()
-                            .is_none_or(|id| Some(id) == r.native_session_id.as_ref()) =>
-                {
-                    ctx.state_mut(|s| {
-                        s.snapshot.native_session_id = r.native_session_id;
-                        match r.status {
-                            PortStatus::Completed => {
-                                s.snapshot.state = OperationState::ObservedCompleted
-                            }
-                            PortStatus::Failed => s.snapshot.state = OperationState::ObservedFailed,
-                            PortStatus::Cancelled => {
-                                s.snapshot.state = OperationState::ObservedCancelled
-                            }
-                            PortStatus::Running => s.snapshot.state = OperationState::Acknowledged,
-                            _ => s.snapshot.state = OperationState::Unknown,
-                        }
-                        if s.snapshot.state.terminal()
-                            && s.snapshot.cancellation != CancellationState::NotRequested
-                        {
-                            s.snapshot.cancellation = CancellationState::ObservedTerminal;
-                        }
-                    });
-                }
-                _ => ctx.state_mut(|s| s.snapshot.state = OperationState::Unknown),
-            }
-            if !ctx.state(|s| s.snapshot.state.terminal()) {
-                ctx.timer(Duration::from_millis(500)).await;
-            }
-        }
+        run_operation(ctx).await
     }
     #[update]
     pub fn request_cancel(
@@ -709,5 +561,227 @@ impl OperationWorkflow {
     #[query]
     pub fn snapshot(&self, _ctx: &WorkflowContextView) -> OperationSnapshot {
         self.snapshot.clone()
+    }
+}
+
+/// Shared deterministic loop; the historical workflow uses exactly its old port
+/// commands. The authenticated entrypoint selects guarded activities instead.
+pub(crate) trait OperationAccess {
+    fn operation(&self) -> &OperationWorkflow;
+    fn operation_mut(&mut self) -> &mut OperationWorkflow;
+    #[cfg(feature = "verified-authority")]
+    fn authority_wire(&self) -> Option<String> {
+        None
+    }
+}
+impl OperationAccess for OperationWorkflow {
+    fn operation(&self) -> &OperationWorkflow {
+        self
+    }
+    fn operation_mut(&mut self) -> &mut OperationWorkflow {
+        self
+    }
+}
+#[derive(Clone, Copy)]
+enum GuardAction {
+    Dispatch,
+    Reconcile,
+    Cancel,
+}
+async fn invoke_operation<W: OperationAccess>(
+    ctx: &mut WorkflowContext<W>,
+    call: PortCall,
+    options: ActivityOptions,
+    _authority_action: GuardAction,
+) -> anyhow::Result<PortReply> {
+    #[cfg(feature = "verified-authority")]
+    if let Some(wire) = ctx.state(|s| s.authority_wire()) {
+        use crate::authority::Action;
+        let action = match _authority_action {
+            GuardAction::Cancel => Action::Cancel,
+            GuardAction::Reconcile => Action::Reconcile,
+            GuardAction::Dispatch => Action::Dispatch,
+        };
+        return Ok(ctx
+            .execute_activity(
+                crate::authenticated::AuthenticatedPorts::invoke_authenticated,
+                crate::authenticated::AuthenticatedCall { wire, call, action },
+                options,
+            )
+            .await?);
+    }
+    Ok(ctx
+        .execute_activity(Ports::invoke_port, call, options)
+        .await?)
+}
+pub(crate) async fn run_operation<W: OperationAccess>(
+    ctx: &mut WorkflowContext<W>,
+) -> WorkflowResult<OperationSnapshot> {
+    let a = ctx.state(|s| s.operation().admission.clone());
+    let mut launched = false;
+    let mut cancel_sent = false;
+    loop {
+        let snapshot = ctx.state(|s| s.operation().snapshot.clone());
+        if snapshot.state.terminal() {
+            return Ok(snapshot);
+        }
+        if snapshot.cancellation == CancellationState::Requested && !launched {
+            ctx.state_mut(|s| {
+                s.operation_mut().snapshot.state = OperationState::ObservedCancelled;
+                s.operation_mut().snapshot.cancellation = CancellationState::ObservedTerminal;
+            });
+            continue;
+        }
+        // Authority is rechecked in a read-only activity before each consequential
+        // command, including after worker restart; replayed grants are not fresh authority.
+        let call = |action, session| PortCall {
+            admission: a.clone(),
+            action,
+            native_session_id: session,
+        };
+        let verified = invoke_operation(
+            ctx,
+            call(PortAction::Verify, None),
+            single_attempt(),
+            if !launched {
+                GuardAction::Dispatch
+            } else if snapshot.cancellation == CancellationState::Requested
+                && !cancel_sent
+                && snapshot.native_session_id.is_some()
+            {
+                GuardAction::Cancel
+            } else {
+                GuardAction::Reconcile
+            },
+        )
+        .await;
+        if !matches!(verified, Ok(ref r) if r.status == PortStatus::Verified && r.binding == a.binding)
+        {
+            ctx.state_mut(|s| {
+                s.operation_mut().snapshot.state = if launched {
+                    OperationState::Unknown
+                } else {
+                    OperationState::ObservedFailed
+                }
+            });
+            if !launched {
+                continue;
+            }
+            ctx.timer(Duration::from_millis(500)).await;
+            continue;
+        }
+        if !launched {
+            let online = invoke_operation(
+                ctx,
+                call(PortAction::ObserveHost, None),
+                single_attempt_with_timeout(25),
+                GuardAction::Dispatch,
+            )
+            .await;
+            if !matches!(online, Ok(ref r) if r.status == PortStatus::Online && r.binding == a.binding)
+            {
+                ctx.timer(Duration::from_millis(500)).await;
+                continue;
+            }
+            // Exactly one effectful activity is ever scheduled for this workflow.
+            // Updates may have run while authority/host activities were pending.
+            if ctx.state(|s| s.operation().snapshot.cancellation != CancellationState::NotRequested)
+            {
+                continue;
+            }
+            launched = true;
+            let launch = invoke_operation(
+                ctx,
+                call(PortAction::Launch, None),
+                single_attempt(),
+                GuardAction::Dispatch,
+            )
+            .await;
+            match launch {
+                Ok(r)
+                    if r.binding == a.binding
+                        && r.status == PortStatus::Acknowledged
+                        && r.native_session_id.as_deref().is_some_and(valid_id) =>
+                {
+                    ctx.state_mut(|s| {
+                        s.operation_mut().snapshot.state = OperationState::Acknowledged;
+                        s.operation_mut().snapshot.native_session_id = r.native_session_id;
+                    });
+                }
+                _ => ctx.state_mut(|s| s.operation_mut().snapshot.state = OperationState::Unknown),
+            }
+        }
+        let snapshot = ctx.state(|s| s.operation().snapshot.clone());
+        if snapshot.cancellation == CancellationState::Requested
+            && !cancel_sent
+            && snapshot.native_session_id.is_some()
+        {
+            cancel_sent = true;
+            let result = invoke_operation(
+                ctx,
+                call(PortAction::Cancel, snapshot.native_session_id.clone()),
+                single_attempt(),
+                GuardAction::Cancel,
+            )
+            .await;
+            if matches!(result, Ok(ref r) if r.binding == a.binding && r.native_session_id == snapshot.native_session_id && r.status == PortStatus::Acknowledged)
+            {
+                ctx.state_mut(|s| {
+                    s.operation_mut().snapshot.cancellation = CancellationState::Acknowledged
+                });
+            }
+        }
+        let action = if snapshot.native_session_id.is_some() {
+            PortAction::Poll
+        } else {
+            PortAction::Discover
+        };
+        let observed = invoke_operation(
+            ctx,
+            call(action, snapshot.native_session_id.clone()),
+            single_attempt(),
+            GuardAction::Reconcile,
+        )
+        .await;
+        match observed {
+            Ok(r)
+                if r.binding == a.binding
+                    && r.native_session_id.as_deref().is_some_and(valid_id)
+                    && snapshot
+                        .native_session_id
+                        .as_ref()
+                        .is_none_or(|id| Some(id) == r.native_session_id.as_ref()) =>
+            {
+                ctx.state_mut(|s| {
+                    s.operation_mut().snapshot.native_session_id = r.native_session_id;
+                    match r.status {
+                        PortStatus::Completed => {
+                            s.operation_mut().snapshot.state = OperationState::ObservedCompleted
+                        }
+                        PortStatus::Failed => {
+                            s.operation_mut().snapshot.state = OperationState::ObservedFailed
+                        }
+                        PortStatus::Cancelled => {
+                            s.operation_mut().snapshot.state = OperationState::ObservedCancelled
+                        }
+                        PortStatus::Running => {
+                            s.operation_mut().snapshot.state = OperationState::Acknowledged
+                        }
+                        _ => s.operation_mut().snapshot.state = OperationState::Unknown,
+                    }
+                    if s.operation_mut().snapshot.state.terminal()
+                        && s.operation_mut().snapshot.cancellation
+                            != CancellationState::NotRequested
+                    {
+                        s.operation_mut().snapshot.cancellation =
+                            CancellationState::ObservedTerminal;
+                    }
+                });
+            }
+            _ => ctx.state_mut(|s| s.operation_mut().snapshot.state = OperationState::Unknown),
+        }
+        if !ctx.state(|s| s.operation().snapshot.state.terminal()) {
+            ctx.timer(Duration::from_millis(500)).await;
+        }
     }
 }

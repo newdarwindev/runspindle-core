@@ -14,7 +14,7 @@ from runtime_artifact import validate
 from test_host_runtime import require,wait,admission
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 def run(platform,platform_prepared,core_prepared,seed,before,observer=None):
-    manifest=validate(ROOT,core_prepared);require(manifest.get('features')=='delivery-runtime','delivery-runtime not prepared')
+    manifest=validate(ROOT,core_prepared);require(manifest.get('features') in ('delivery-runtime','verified-authority'),'delivery-runtime not prepared')
     source=pathlib.Path(platform)/'tools/temporal_lane.py';module=types.ModuleType('verified_lane');module.__file__=str(source);exec(compile(source.read_bytes(),str(source),'exec'),module.__dict__)
     fixture=f'synthetic delivered artifact {seed}'.encode()+b'\x00\xff';expected=hashlib.sha256(fixture).hexdigest()
     a=admission(seed);binding={k:a[k] for k in ('task_id','revision','operation_id','policy_revision','host_id','workspace_id','lease_epoch')}

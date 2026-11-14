@@ -3,6 +3,9 @@ mod admission_checkpoints;
 #[cfg(feature = "artifact-store")]
 #[path = "smoke/mod.rs"]
 mod smoke;
+#[cfg(feature = "verified-authority")]
+#[path = "synthetic_authority.rs"]
+mod synthetic_authority;
 // Explicit synthetic development CLI; never resolves credentials or production configuration.
 #[cfg(feature = "host-runtime")]
 use runspindle_core::integration::*;
@@ -25,6 +28,28 @@ use temporalio_sdk::{
 #[derive(Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
+    #[cfg(feature = "verified-authority")]
+    StartAuthenticated {
+        registry_id: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    AdmitAuthenticated {
+        registry_id: String,
+        wire: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    AuthenticatedRegistry {
+        registry_id: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    AuthenticatedOperation {
+        job_id: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    CancelAuthenticated {
+        job_id: String,
+        wire: String,
+    },
     #[cfg(feature = "delivery-runtime")]
     Deliver {
         workflow_id: String,
@@ -80,6 +105,44 @@ enum Command {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    #[cfg(feature = "verified-authority")]
+    if args.get(1).map(String::as_str) == Some("synthetic-issuer") {
+        return synthetic_authority::run(
+            std::path::Path::new(args.get(2).map(String::as_str).unwrap_or("")),
+            std::path::Path::new(args.get(3).map(String::as_str).unwrap_or("")),
+        );
+    }
+    #[cfg(feature = "runtime-envelope")]
+    if args.get(1).map(String::as_str) == Some("envelope") {
+        use runspindle_core::envelope::{Envelope, Message};
+        let mut bytes = Vec::new();
+        std::io::stdin().take(1_048_577).read_to_end(&mut bytes)?;
+        let e = Envelope::decode(&bytes)?;
+        let (component, back) = match e.message()? {
+            Message::Admission(a) => (
+                serde_json::to_value(&a)?,
+                Envelope::admission(e.message_id.clone(), &a)?,
+            ),
+            Message::Observation(o) => (
+                serde_json::to_value(&o)?,
+                Envelope::observation(e.message_id.clone(), &o)?,
+            ),
+            Message::Delivery(r) => (
+                serde_json::to_value(&r)?,
+                Envelope::delivery(e.message_id.clone(), &r)?,
+            ),
+            Message::Receipt(r) => (
+                serde_json::to_value(&r)?,
+                Envelope::receipt(e.message_id.clone(), &r)?,
+            ),
+        };
+        println!(
+            "{}",
+            serde_json::json!({"component":component,"envelope":serde_json::from_slice::<serde_json::Value>(&back.encode()?)?})
+        );
+        return Ok(());
+    }
+
     #[cfg(feature = "artifact-store")]
     if args.get(1).map(String::as_str) == Some("offline-smoke") {
         anyhow::ensure!(
@@ -103,6 +166,10 @@ async fn main() -> anyhow::Result<()> {
             .register_workflow::<HostAdmissionRegistry>()?;
         #[cfg(feature = "delivery-runtime")]
         let replay_options = replay_options.register_workflow::<DeliveryWorkflow>()?;
+        #[cfg(feature = "verified-authority")]
+        let replay_options = replay_options
+            .register_workflow::<runspindle_core::authenticated::AuthenticatedRegistryV1>()?
+            .register_workflow::<runspindle_core::authenticated::AuthenticatedOperationV1>()?;
         let replayer = WorkflowReplayer::new(replay_options.build())?;
         replayer.replay_workflow(history).await?;
         println!("{{\"status\":\"passed\",\"evidence_class\":\"isolated_integration\",\"check\":\"history_replay\"}}");
@@ -125,7 +192,7 @@ async fn main() -> anyhow::Result<()> {
     }
     let mode = args.get(1).map(String::as_str).unwrap_or("");
     anyhow::ensure!(
-        matches!(mode, "worker" | "client"),
+        matches!(mode, "worker" | "client" | "authenticated-worker"),
         "expected worker, client or replay"
     );
     // Deliberately no environment profile/API key/credential discovery.
@@ -144,6 +211,28 @@ async fn main() -> anyhow::Result<()> {
     )
     .await?;
     let client = Client::new(conn, ClientOptions::new("default").build())?;
+    #[cfg(feature = "verified-authority")]
+    if mode == "authenticated-worker" {
+        use runspindle_core::authenticated::*;
+        let runtime = Runtime::from_current_tokio(Default::default())?;
+        // Missing/unreadable configuration yields a deny-only worker, never a
+        // fallback to development script authorization.
+        let helper = args
+            .get(4)
+            .and_then(|p| runspindle_core::authority::LocalHelper::read(p).ok());
+        let options = WorkerOptions::new(runspindle_core::authenticated::QUEUE)
+            .register_workflow::<AuthenticatedRegistryV1>()?
+            .register_workflow::<AuthenticatedOperationV1>()?
+            .register_activities(AuthenticatedPorts {
+                helper,
+                script_directory: args.get(3).map(PathBuf::from),
+            })
+            .build();
+        Worker::new(&runtime, client, options)?
+            .run_until(tokio::signal::ctrl_c())
+            .await?;
+        return Ok(());
+    }
     if mode == "worker" {
         let runtime = Runtime::from_current_tokio(Default::default())?;
         let script_directory = args.get(3).map(PathBuf::from);
@@ -193,6 +282,63 @@ async fn main() -> anyhow::Result<()> {
     anyhow::ensure!(input.len() <= 1_048_576, "oversized input");
     let command: Command = serde_json::from_str(&input)?;
     let result = match command {
+        #[cfg(feature = "verified-authority")]
+        Command::StartAuthenticated { registry_id } => {
+            use runspindle_core::authenticated::*;
+            anyhow::ensure!(valid_id(&registry_id), "invalid registry");
+            let h = client
+                .start_workflow(
+                    AuthenticatedRegistryV1::run,
+                    (),
+                    WorkflowStartOptions::new(runspindle_core::authenticated::QUEUE, registry_id)
+                        .build(),
+                )
+                .await?;
+            serde_json::json!({"status":"started","run_id":h.run_id()})
+        }
+        #[cfg(feature = "verified-authority")]
+        Command::AdmitAuthenticated { registry_id, wire } => serde_json::to_value(
+            client
+                .get_workflow_handle::<runspindle_core::authenticated::AuthenticatedRegistryV1>(
+                    registry_id,
+                )
+                .execute_update(
+                    runspindle_core::authenticated::AuthenticatedRegistryV1::admit,
+                    wire,
+                    Default::default(),
+                )
+                .await?,
+        )?,
+        #[cfg(feature = "verified-authority")]
+        Command::AuthenticatedRegistry { registry_id } => serde_json::to_value(
+            client
+                .get_workflow_handle::<runspindle_core::authenticated::AuthenticatedRegistryV1>(
+                    registry_id,
+                )
+                .query(
+                    runspindle_core::authenticated::AuthenticatedRegistryV1::snapshot,
+                    (),
+                    Default::default(),
+                )
+                .await?,
+        )?,
+        #[cfg(feature = "verified-authority")]
+        Command::AuthenticatedOperation { job_id } => serde_json::to_value(
+            client
+                .get_workflow_handle::<runspindle_core::authenticated::AuthenticatedOperationV1>(
+                    job_id,
+                )
+                .query(
+                    runspindle_core::authenticated::AuthenticatedOperationV1::snapshot,
+                    (),
+                    Default::default(),
+                )
+                .await?,
+        )?,
+        #[cfg(feature = "verified-authority")]
+        Command::CancelAuthenticated { job_id, wire } => {
+            serde_json::json!({"accepted":client.get_workflow_handle::<runspindle_core::authenticated::AuthenticatedOperationV1>(job_id).execute_update(runspindle_core::authenticated::AuthenticatedOperationV1::request_cancel,wire,Default::default()).await?})
+        }
         #[cfg(feature = "delivery-runtime")]
         Command::Deliver {
             workflow_id,
