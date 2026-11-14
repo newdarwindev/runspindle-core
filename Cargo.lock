@@ -1559,7 +1559,7 @@ dependencies = [
 [[package]]
 name = "runspindle-host"
 version = "0.0.0"
-source = "git+https://github.com/newdarwindev/runspindle-host.git?rev=6caf08d3f642691ceecffc76c5aa378fbdd7a352#6caf08d3f642691ceecffc76c5aa378fbdd7a352"
+source = "git+https://github.com/newdarwindev/runspindle-host.git?rev=a56e5d7c18611b07c1c28da425db7c14227b3e76#a56e5d7c18611b07c1c28da425db7c14227b3e76"
 dependencies = [
  "rusqlite",
  "serde",
