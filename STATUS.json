@@ -1,5 +1,10 @@
 {
   "additional_contract_test_evidence": "docs/local-isolation-tests.json",
+  "admission_boundary_checkpoints": {
+    "implementation": "explicit_synthetic_SDK_and_client_only",
+    "independent_review": "user_waived_no_review_performed",
+    "qualification": "in_progress"
+  },
   "admission_recovery": {
     "evidence": "docs/admission-recovery-tests.json",
     "production_authentication": "not_qualified",
@@ -27,7 +32,7 @@
   "github_ci": "not_run",
   "host_library_integration": {
     "evidence": "docs/host-runtime-tests.json",
-    "host_revision": "6caf08d3f642691ceecffc76c5aa378fbdd7a352",
+    "host_revision": "a56e5d7c18611b07c1c28da425db7c14227b3e76",
     "latest_combined_evidence": "docs/delivery-runtime-tests.json",
     "native_wire": "blocked",
     "status": "locally_tested_real_core_host_temporal_scripted_peer",

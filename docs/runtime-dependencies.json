@@ -2,7 +2,7 @@
   "sdk_source_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
   "sdk_release": "https://github.com/temporalio/sdk-rust/releases/tag/v1.2.0",
   "sdk_source_archive_sha256": "de6eb7e4ac0ab55310506b87baaccf02e0a03616ac3194fc562b433b1a19f3ae",
-  "cargo_lock_sha256": "df971ac2e789b5e6000731185485a32766eaec7b44f1055c872148f1e8698d68",
+  "cargo_lock_sha256": "30ef826145e0c36679d6075549302f0cd9e753b16393e7533e71a2d8ea0b2f45",
   "dependencies": [
     {
       "name": "adler2",
@@ -2727,7 +2727,7 @@
       "version": "0.0.0",
       "license": null,
       "license_file": null,
-      "source": "git+https://github.com/newdarwindev/runspindle-host.git?rev=6caf08d3f642691ceecffc76c5aa378fbdd7a352#6caf08d3f642691ceecffc76c5aa378fbdd7a352",
+      "source": "git+https://github.com/newdarwindev/runspindle-host.git?rev=a56e5d7c18611b07c1c28da425db7c14227b3e76#a56e5d7c18611b07c1c28da425db7c14227b3e76",
       "notice_files": []
     },
     {

@@ -1,4 +1,9 @@
-//! Explicit synthetic development CLI; never resolves credentials or production configuration.
+#[path = "checkpoints/mod.rs"]
+mod admission_checkpoints;
+#[cfg(feature = "artifact-store")]
+#[path = "smoke/mod.rs"]
+mod smoke;
+// Explicit synthetic development CLI; never resolves credentials or production configuration.
 #[cfg(feature = "host-runtime")]
 use runspindle_core::integration::*;
 use runspindle_core::runtime::*;
@@ -75,6 +80,15 @@ enum Command {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    #[cfg(feature = "artifact-store")]
+    if args.get(1).map(String::as_str) == Some("offline-smoke") {
+        anyhow::ensure!(
+            args.len() == 2,
+            "offline smoke accepts no target or configuration"
+        );
+        println!("{}", smoke::run()?);
+        return Ok(());
+    }
     if args.get(1).map(String::as_str) == Some("replay") {
         let path = args
             .get(2)
@@ -152,7 +166,15 @@ async fn main() -> anyhow::Result<()> {
             .register_activities(DeliveryPorts {
                 directory: args.get(3).map(PathBuf::from),
             });
-        let options = options.build();
+        let mut options = options.build();
+        if let Some(point) = args.get(4) {
+            options.worker_interceptor(admission_checkpoints::Checkpoint::new(
+                args.get(3)
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow::anyhow!("synthetic directory required"))?,
+                point.clone(),
+            )?);
+        }
         Worker::new(&runtime, client, options)?
             .run_until(tokio::signal::ctrl_c())
             .await?;
@@ -284,6 +306,17 @@ async fn main() -> anyhow::Result<()> {
             serde_json::from_slice(&bytes)?
         }
     };
+    if let Some(point) = args.get(4) {
+        anyhow::ensure!(
+            point == "before_reply" && args.get(3).is_some(),
+            "unsupported client checkpoint"
+        );
+        anyhow::ensure!(
+            result.get("status").and_then(|v| v.as_str()) == Some("admitted"),
+            "admitted reply required"
+        );
+        std::process::exit(96);
+    }
     println!("{}", serde_json::to_string(&result)?);
     Ok(())
 }

@@ -8,15 +8,16 @@ publish = false
 delivery-runtime = ["host-runtime", "artifact-store"]
 artifact-store = ["temporal-runtime", "dep:rusqlite"]
 host-runtime = ["temporal-runtime", "dep:runspindle-host", "dep:rusqlite"]
-temporal-runtime = ["dep:temporalio-sdk", "dep:temporalio-client", "dep:temporalio-common", "dep:temporalio-macros", "dep:tokio", "dep:serde", "dep:serde_json", "dep:sha2", "dep:anyhow", "dep:temporalio-workflow", "dep:futures", "dep:url"]
+temporal-runtime = ["dep:temporalio-sdk", "dep:temporalio-client", "dep:temporalio-common", "dep:temporalio-macros", "dep:tokio", "dep:serde", "dep:serde_json", "dep:sha2", "dep:anyhow", "dep:temporalio-workflow", "dep:futures", "dep:url", "dep:async-trait"]
 
 [dependencies]
+async-trait = { version = "=0.1.92", optional = true }
 runspindle-host = { git = "https://github.com/newdarwindev/runspindle-host.git", rev = "a56e5d7c18611b07c1c28da425db7c14227b3e76", optional = true }
 rusqlite = { version = "=0.32.1", features = ["bundled"], optional = true }
 url = { version = "2.5", optional = true }
 futures = { version = "0.3", optional = true }
 temporalio-workflow = { version = "=1.2.0", optional = true }
-temporalio-sdk = { version = "=1.2.0", default-features = false, optional = true }
+temporalio-sdk = { version = "=1.2.0", default-features = false, features = ["experimental"], optional = true }
 temporalio-client = { version = "=1.2.0", default-features = false, optional = true }
 temporalio-common = { version = "=1.2.0", default-features = false, optional = true }
 temporalio-macros = { version = "=1.2.0", optional = true }
