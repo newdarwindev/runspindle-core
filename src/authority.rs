@@ -112,6 +112,20 @@ impl LocalHelper {
         let tx = connection.transaction()?;
         let schema: u64 = tx.pragma_query_value(None, "user_version", |r| r.get(0))?;
         anyhow::ensure!(schema == 1, "unknown authority schema");
+        // A schema version alone does not establish that uniqueness constraints
+        // survived store preparation. Ambiguous local state must fail closed.
+        let state_rows: u64 = tx.query_row(
+            "SELECT count(*) FROM authority_state WHERE id=1",
+            [],
+            |r| r.get(0),
+        )?;
+        anyhow::ensure!(state_rows == 1, "ambiguous authority state");
+        let grant_rows: u64 = tx.query_row(
+            "SELECT count(*) FROM grants WHERE grant_id=?1",
+            [&admission.grant_ref],
+            |r| r.get(0),
+        )?;
+        anyhow::ensure!(grant_rows == 1, "ambiguous grant identity");
         let (issued, until): (u64, u64) = tx.query_row(
             "SELECT issued_at_ms,valid_until_ms FROM authority_state WHERE id=1",
             [],
@@ -142,6 +156,12 @@ impl LocalHelper {
                 && a.actions.contains(&action),
             "assertion actions"
         );
+        let key_rows: u64 = tx.query_row(
+            "SELECT count(*) FROM trust_roots WHERE issuer=?1 AND key_id=?2",
+            [&a.issuer, &a.key_id],
+            |r| r.get(0),
+        )?;
+        anyhow::ensure!(key_rows == 1, "ambiguous trust root identity");
         let (key,key_from,key_until,key_revoked):(Vec<u8>,u64,u64,bool)=tx.query_row("SELECT public_key,not_before_ms,expires_at_ms,revoked FROM trust_roots WHERE issuer=?1 AND key_id=?2",[&a.issuer,&a.key_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)))?;
         let revoked: bool = tx.query_row(
             "SELECT EXISTS(SELECT 1 FROM revocations WHERE grant_id=?1)",

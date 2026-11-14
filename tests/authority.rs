@@ -394,3 +394,30 @@ fn altered_assertion_and_missing_domain_are_not_valid_signatures() {
         f.assert_zero_calls();
     }
 }
+
+#[test]
+fn duplicate_authoritative_identities_deny_even_with_valid_first_row() {
+    for table in ["authority_state", "grants", "trust_roots"] {
+        let f = Fixture::new();
+        f.insert(&f.assertion(), false);
+        assert!(f.helper.verify(f.wire.as_bytes(), Action::Dispatch));
+        let c = Connection::open(&f.helper.database).unwrap();
+        // Simulate malformed store preparation that retains the version but
+        // loses a uniqueness constraint. Both copies are otherwise valid.
+        c.execute_batch(&format!(
+            "ALTER TABLE {table} RENAME TO original_{table};
+             CREATE TABLE {table} AS SELECT * FROM original_{table};
+             INSERT INTO {table} SELECT * FROM original_{table};"
+        ))
+        .unwrap();
+        assert!(!f.helper.verify(f.wire.as_bytes(), Action::Dispatch));
+        assert_eq!(
+            f.ports()
+                .invoke(&f.call(PortAction::Launch, Action::Dispatch))
+                .unwrap()
+                .status,
+            PortStatus::Denied
+        );
+        f.assert_zero_calls();
+    }
+}

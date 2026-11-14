@@ -192,8 +192,9 @@ async fn main() -> anyhow::Result<()> {
     }
     let mode = args.get(1).map(String::as_str).unwrap_or("");
     anyhow::ensure!(
-        matches!(mode, "worker" | "client" | "authenticated-worker"),
-        "expected worker, client or replay"
+        matches!(mode, "worker" | "client")
+            || (cfg!(feature = "verified-authority") && mode == "authenticated-worker"),
+        "expected worker, client or enabled authenticated-worker"
     );
     // Deliberately no environment profile/API key/credential discovery.
     let target = args
