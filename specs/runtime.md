@@ -100,3 +100,33 @@ not prove compatibility across SDK/workflow versions or production database fail
 Browser/delivery/provider ports are not exercised. Issues #1–3 remain open for
 production authority, actual sibling protocols, trusted freshness/fencing, durable
 accepted artifacts/delivery and wider store/concurrency/version qualification.
+
+## Synthetic admission boundary checkpoints
+
+The development CLI can explicitly attach SDK worker interceptors at admission
+completion commands, before a child-start command is sent, and after a successful
+child-start activation. A separate client checkpoint discards an actual admitted
+reply before printing it. Checkpoints require the synthetic `/effects` directory;
+requests and environment variables cannot enable them. They write only synthetic
+receipts and stop the test process outside deterministic workflow code. Workflow
+state transitions, input schemas and history command ordering are unchanged.
+
+An admission mutation, update completion and child-start intent can share one
+Temporal workflow-task transaction. Pre-server-commit SDK interruption is tested
+as such; it is not described as an independently durable mutation/child gap.
+Tests inspect real histories before/after server and worker reconstruction and
+count task/revision/child records separately from the independent native-peer
+SQLite effect ledger. Expired authority must reject new admission and cause zero
+host effects during recovery; fresh valid replay must preserve identity.
+
+`offline-smoke` invokes the actual development executable without a Temporal
+connection. It checks immutable artifact storage, conflicting byte/version denial,
+unverified acceptance denial and reopened bytes in a disposable directory. It
+accepts no target, credentials or configuration. The streaming bundle's offline
+smoke is limited to this development subset, not native/production activation.
+
+The original admission concurrency harness now recovers outstanding verifier
+replies after the injected prepare crash before checking their outcomes. A worker
+crash is allowed to leave RPCs pending; that uncertainty is not an admission
+failure or permission to manufacture new identities. The prior expired-authority
+and predecessor-ordering checks remain in the real Temporal lane.

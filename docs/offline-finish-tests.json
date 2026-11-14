@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "source_revision": "fd1a9fad4e95acad8fc7ca83f57731652fe8a156",
+  "runtime_build": "docs/runtime-build.json",
+  "source_and_artifact_binding": "actual_binary_source_inventory_and_image_labels_verified_before_Temporal_execution",
+  "checks": {
+    "Rust_delivery_runtime": "50 tests passed in pinned Linux arm64 builder; includes executable smoke",
+    "Python": "16 tests passed",
+    "Clippy": "strict all-targets passed with delivery-runtime",
+    "fmt": "passed",
+    "scaffold": "passed",
+    "admission": {
+      "status": "passed",
+      "evidence_class": "isolated_integration",
+      "repeat_runs": 2,
+      "normalized_outcome": {
+        "seed": 17,
+        "admission_callers": 4,
+        "child_workflows": 2,
+        "launch_revisions": [
+          1,
+          2
+        ],
+        "authority": "scripted_exact_request_default_deny_expiry",
+        "recovery": "fresh_server_worker_after_host_prepare_commit_before_activity_reply",
+        "replay": "registry_and_children_no_effects",
+        "native_wire": "blocked"
+      },
+      "live_acceptance": "not_run"
+    },
+    "checkpoints": {
+      "status": "passed",
+      "evidence_class": "isolated_integration",
+      "repeat_runs": 2,
+      "normalized_outcomes": [
+        {
+          "point": "admission_commit",
+          "before_restart_children": 0,
+          "recovered_tasks": 1,
+          "recovered_children": 1,
+          "host_launches": 1,
+          "expired_authority": "denied_no_effect",
+          "history_replay": "passed_no_effect",
+          "boundary": "pre_server_commit_commands",
+          "prior_worker": false
+        },
+        {
+          "point": "before_child_creation",
+          "before_restart_children": 0,
+          "recovered_tasks": 1,
+          "recovered_children": 1,
+          "host_launches": 1,
+          "expired_authority": "denied_no_effect",
+          "history_replay": "passed_no_effect",
+          "boundary": "pre_server_commit_commands",
+          "prior_worker": false
+        },
+        {
+          "point": "after_child_creation",
+          "before_restart_children": 1,
+          "recovered_tasks": 1,
+          "recovered_children": 1,
+          "host_launches": 1,
+          "expired_authority": "denied_no_effect",
+          "history_replay": "passed_no_effect",
+          "boundary": "durable_child_before_reply_or_activation",
+          "prior_worker": false
+        },
+        {
+          "point": "before_reply",
+          "before_restart_children": 1,
+          "recovered_tasks": 1,
+          "recovered_children": 1,
+          "host_launches": 1,
+          "expired_authority": "denied_no_effect",
+          "history_replay": "passed_no_effect",
+          "boundary": "durable_child_before_reply_or_activation",
+          "prior_worker": false
+        }
+      ],
+      "prior_history_compatibility": {
+        "outcome": {
+          "point": "before_reply",
+          "before_restart_children": 1,
+          "recovered_tasks": 1,
+          "recovered_children": 1,
+          "host_launches": 1,
+          "expired_authority": "denied_no_effect",
+          "history_replay": "passed_no_effect",
+          "boundary": "durable_child_before_reply_or_activation",
+          "prior_worker": true
+        },
+        "binding": {
+          "source_sha256": "64fbba35f95aa85b3733b3e3b6b13881610ad0a0f3418a80408714921f4a91a4",
+          "binary_sha256": "46c6d39c82ca2c2ad42ad7f03ec3b52b34c390ee1759ebe9135b606f1ecaf287",
+          "compatibility_image_id": "sha256:ea8cbef06049d8920f9e9324c1494e7cd1fbc09c3aa785a44d80426ce295d1bc",
+          "original_image_id": "sha256:ef578431b7553b0e1f19525af2e937cdf962fbaa4f3703b6731b58a2752204ee",
+          "scope": "retained_original_executable_repackaged_no_rebuild"
+        }
+      },
+      "native_wire": "blocked",
+      "live_acceptance": "not_run"
+    },
+    "H02": {
+      "lane": "H02",
+      "status": "passed",
+      "evidence_class": "isolated_integration",
+      "repeat_runs": 2,
+      "seed": 17,
+      "normalized_outcomes": [
+        {
+          "boundary": "after_peer_effect",
+          "launch_calls": 1,
+          "cancels": 1,
+          "session": "observed-peer-session",
+          "terminal": "completed",
+          "pre_dispatch_cancel": "durable_local_outcome",
+          "cancel_during_terminal_observation": "accepted_intent_preserved",
+          "replay": "passed"
+        },
+        {
+          "boundary": "before_peer_effect",
+          "launch_calls": 1,
+          "native_receipts": 0,
+          "unknown": true
+        }
+      ],
+      "scripted": [
+        "native_peer"
+      ],
+      "live_acceptance": "not_run"
+    },
+    "H07": {
+      "lane": "H07",
+      "status": "passed",
+      "evidence_class": "isolated_integration",
+      "repeat_runs": 2,
+      "seed": 17,
+      "normalized_outcomes": [
+        {
+          "boundary": "lost_ack_after_send",
+          "state": "delivered",
+          "send_calls": 1,
+          "receipt_count": 1,
+          "accepted_sha256": "acd3de62416a434e6d3628e738f497c6ffde196e6d23888a3f50e8c1f120c39a",
+          "duplicate": "same_receipt",
+          "conflicting_receipt": "durably_fenced",
+          "replay": "passed"
+        },
+        {
+          "boundary": "reservation_before_send",
+          "state": "unknown",
+          "send_calls": 0,
+          "receipt_count": 0,
+          "accepted_sha256": "acd3de62416a434e6d3628e738f497c6ffde196e6d23888a3f50e8c1f120c39a"
+        }
+      ],
+      "scripted": [
+        "destination_transport"
+      ],
+      "Tether": "blocked_source_and_transport_dependency",
+      "live_acceptance": "not_run"
+    },
+    "behavioral_mutations": {
+      "status": "passed",
+      "evidence_class": "component",
+      "mutations": [
+        {
+          "mutation": "capacity_disabled",
+          "test": "known_duplicates_reconcile_at_capacity_without_eviction_or_new_delivery",
+          "detected": true
+        },
+        {
+          "mutation": "delivery_conflict_ignored",
+          "test": "conflicts_revisions_and_malformed_inputs_preserve_state",
+          "detected": true
+        },
+        {
+          "mutation": "old_operation_reused",
+          "test": "any_prior_operation_id_reuse_is_rejected_after_terminal_revisions",
+          "detected": true
+        }
+      ]
+    }
+  },
+  "independent_review": "user_waived_no_review_performed",
+  "prior_history_scope": "retained original qualified executable repackaged under explicitly new compatibility image ID; no old-image-ID substitution",
+  "remaining": [
+    "production authentication",
+    "actual native/Tether transport",
+    "arbitrary version upgrade compatibility",
+    "browser/console/providers",
+    "full system and live acceptance"
+  ],
+  "discarded_attempts": [
+    "initial concurrent mutation run overlapped Clippy and was discarded; isolated rerun passed",
+    "old original image manifest had been discarded by Docker; retained exact binary/source were verified and repackaged before prior-history checks",
+    "injected prepare crash left some concurrent verifier RPCs pending; harness now recovers outstanding replies before asserting outcomes"
+  ]
+}

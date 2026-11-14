@@ -60,6 +60,8 @@ fn script() -> NativeScript {
         sequence_override: None,
         observed_at_override: None,
         reconcile_barrier: false,
+        authority_valid_until_ms: None,
+        crash_after_prepare: false,
     }
 }
 fn write(t: &Temp, s: &NativeScript) {
@@ -74,6 +76,35 @@ fn call(a: HostAction) -> HostCall {
         request: request(),
         action: a,
     }
+}
+#[test]
+fn expired_or_revoked_grant_cannot_prepare_dispatch_or_restore_authority() {
+    let t = Temp::new();
+    let mut s = script();
+    let ports = HostPorts {
+        directory: Some(t.0.clone()),
+    };
+    s.authority_valid_until_ms = Some(100);
+    assert!(s.authorized_at(99));
+    assert!(!s.authorized_at(100));
+    write(&t, &s);
+    assert!(ports.invoke(call(HostAction::Prepare)).is_err());
+    assert!(!t.0.join("native-peer.sqlite").exists());
+    s.authority_valid_until_ms = None;
+    write(&t, &s);
+    ports.invoke(call(HostAction::Prepare)).unwrap();
+    s.authority_valid_until_ms = Some(0);
+    write(&t, &s);
+    assert!(ports.invoke(call(HostAction::Dispatch)).is_err());
+    let db = rusqlite::Connection::open(t.0.join("native-peer.sqlite")).unwrap();
+    let calls: u64 = db
+        .query_row(
+            "SELECT count(*) FROM calls WHERE action='launch'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(calls, 0);
 }
 #[test]
 fn invalid_version_default_denial_and_complete_binding_mapping() {

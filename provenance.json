@@ -1,4 +1,11 @@
 {
+  "admission_boundary_checkpoints": {
+    "SDK": "same pinned 1.2.0 with experimental worker interceptor API; async-trait already locked at0.1.92",
+    "classification": "original_synthetic_test_instrumentation_outside_deterministic_workflows",
+    "contract": "runspindle.integration.v1",
+    "legacy_source_import": "none",
+    "mapping": "specs/runtime.md"
+  },
   "durable_artifact_source": {
     "classification": "original_implementation_and_synthetic_fixtures",
     "contract_commit": "96299842505ce7662178b7c7b00fd31f6c2754f0",
@@ -16,7 +23,7 @@
     "boundary": "immutable Git library dependency",
     "inventory": "docs/runtime-dependencies.json",
     "repository": "newdarwindev/runspindle-host",
-    "revision": "6caf08d3f642691ceecffc76c5aa378fbdd7a352",
+    "revision": "a56e5d7c18611b07c1c28da425db7c14227b3e76",
     "rights": "Owner-directed use of original component code; existing rights retained; no blanket relicensing"
   },
   "license_status": "No blanket license is granted to imported material. See LEGAL.md.",

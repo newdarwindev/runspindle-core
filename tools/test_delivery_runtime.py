@@ -5,6 +5,7 @@ import hashlib
 import json
 import pathlib
 import sqlite3
+from contextlib import closing
 import subprocess
 import tempfile
 import types
@@ -31,7 +32,9 @@ def run(platform,platform_prepared,core_prepared,seed,before,observer=None):
                 logs=subprocess.run(['docker','logs',name],text=True,capture_output=True,check=True).stdout
                 return json.loads(logs) if logs.strip() else None
             def db_rows(sql):
-                with sqlite3.connect(directory/'core.sqlite') as db:return db.execute(sql).fetchall()
+                with closing(sqlite3.connect('file:'+str(directory/'core.sqlite')+'?mode=rw',uri=True)) as db:
+                    db.execute('PRAGMA query_only=ON')
+                    return db.execute(sql).fetchall()
             artifact('stage',96)
             rows=db_rows('SELECT reference,bytes FROM artifacts');require(len(rows)==1 and rows[0][1]==fixture and hashlib.sha256(rows[0][1]).hexdigest()==expected,'actual staged bytes mismatch')
             validation=json.loads(db_rows('SELECT record FROM validations')[0][0]);require(validation['passed'] and validation['artifact']['sha256']==expected,'exact validation missing')
@@ -54,7 +57,9 @@ def run(platform,platform_prepared,core_prepared,seed,before,observer=None):
             def ledger():
                 path=directory/'destination.sqlite'
                 if not path.exists():return []
-                with sqlite3.connect(path) as db:return [(action,json.loads(r)) for action,r in db.execute('SELECT action,request FROM calls ORDER BY id')]
+                with closing(sqlite3.connect('file:'+str(path)+'?mode=rw',uri=True)) as db:
+                    db.execute('PRAGMA query_only=ON')
+                    return [(action,json.loads(r)) for action,r in db.execute('SELECT action,request FROM calls ORDER BY id')]
             w=worker();workflow=f'delivery-{seed}'
             client({'command':'deliver','workflow_id':workflow,'request':request})
             state=wait(lambda:json.loads(subprocess.check_output(['docker','inspect',w],text=True))[0]['State'],lambda s:not s['Running'])
@@ -66,12 +71,12 @@ def run(platform,platform_prepared,core_prepared,seed,before,observer=None):
             if before:
                 final=wait(query,lambda s:s and s['state']=='unknown')
                 require(not any(action=='send' for action,_ in ledger()),'uncertain reservation was resent')
-                with sqlite3.connect(directory/'destination.sqlite') as db:require(db.execute('SELECT count(*) FROM receipts').fetchone()[0]==0,'fabricated before-send receipt')
+                with closing(sqlite3.connect('file:'+str(directory/'destination.sqlite')+'?mode=rw',uri=True)) as db:require(db.execute('SELECT count(*) FROM receipts').fetchone()[0]==0,'fabricated before-send receipt')
                 result={'boundary':'reservation_before_send','state':'unknown','send_calls':0,'receipt_count':0,'accepted_sha256':expected}
             else:
                 final=wait(query,lambda s:s and s['state']=='delivered')
                 require(final['request']==request and final['receipt']['request']==request,'delivery binding changed')
-                with sqlite3.connect(directory/'destination.sqlite') as db:receipts=db.execute('SELECT receipt,bytes FROM receipts').fetchall()
+                with closing(sqlite3.connect('file:'+str(directory/'destination.sqlite')+'?mode=rw',uri=True)) as db:receipts=db.execute('SELECT receipt,bytes FROM receipts').fetchall()
                 require(len(receipts)==1 and json.loads(receipts[0][0])==final['receipt'] and receipts[0][1]==fixture and hashlib.sha256(receipts[0][1]).hexdigest()==expected,'independent destination bytes/receipt mismatch')
                 duplicate=workflow+'-duplicate';client({'command':'deliver','workflow_id':duplicate,'request':request})
                 duplicate_final=wait(lambda:client({'command':'delivery','workflow_id':duplicate}),lambda s:s and s['state']=='delivered')
