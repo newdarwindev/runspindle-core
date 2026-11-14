@@ -122,6 +122,39 @@
     {
       "id": "distributable-build",
       "not_applicable": "No distributable build command exists in this repository validation contract; this does not claim release acceptance."
+    },
+    {
+      "id": "artifact-mutations",
+      "command": [
+        "python3",
+        "tools/check_artifact_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_artifact_mutations.py"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "runtime-mutations",
+      "command": [
+        "python3",
+        "tools/check_runtime_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_runtime_mutations.py"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "outbox-mutations",
+      "command": [
+        "python3",
+        "tools/check_outbox_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_outbox_mutations.py"
+      ],
+      "timeout_seconds": 600
     }
   ],
   "lockfiles": [

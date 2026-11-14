@@ -25,8 +25,17 @@
       "rust-test",
       "rust-clippy"
     ],
-    "mutation": [
+    "mutation_1": [
       "check-model-mutations"
+    ],
+    "mutation_2": [
+      "artifact-mutations"
+    ],
+    "mutation_3": [
+      "runtime-mutations"
+    ],
+    "mutation_4": [
+      "outbox-mutations"
     ]
   }
 }
