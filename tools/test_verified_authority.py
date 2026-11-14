@@ -326,6 +326,14 @@ def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str,
                 not cancel(no_cancel)["accepted"],
                 "missing cancel scope expanded authority",
             )
+            require(
+                not any(
+                    event["action"] == "cancel"
+                    and event["admission"]["task_id"] == no_cancel["binding"]["task_id"]
+                    for event in events()
+                ),
+                "missing cancel scope invoked effect adapter",
+            )
             ns["terminal"] = "completed"
             save()
             poll(lambda: job(no_cancel) in registry()["terminal"])

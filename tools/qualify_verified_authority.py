@@ -18,6 +18,18 @@ from tools.runtime_artifact import validate
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def prepared_input_digests(paths: dict[str, Path]) -> dict[str, str]:
+    return {
+        name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for name, path in paths.items()
+    }
+
+
+def require_prepared_inputs(paths: dict[str, Path], expected: dict[str, str]) -> None:
+    if prepared_input_digests(paths) != expected:
+        raise RuntimeError("prepared manifest changed during qualification")
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--platform", required=True)
@@ -28,6 +40,11 @@ def main() -> None:
     a = p.parse_args()
     reports = Path(a.report_dir).resolve()
     reports.mkdir(parents=True, exist_ok=True)
+    prepared_paths = {
+        "core": Path(a.prepared) / "manifest.json",
+        "platform": Path(a.platform_prepared) / "prepared.json",
+    }
+    prepared_before = prepared_input_digests(prepared_paths)
     manifest = validate(ROOT, a.prepared)
     source_roots = {
         "core": ROOT,
@@ -112,6 +129,9 @@ def main() -> None:
             ],
         ),
     ]
+    authority_repeat = checks[-1][2].copy()
+    authority_repeat[-1] = str(reports / "authority-repeat.json")
+    checks.append(("authority-repeat", ROOT, authority_repeat))
     observed: list[dict[str, Any]] = []
     summary: dict[str, Any] = {
         "status": "running",
@@ -120,6 +140,7 @@ def main() -> None:
         "image_id": manifest["image_id"],
         "source_hashes": manifest["source_hashes"],
         "qualification_source_fingerprints": sources_before,
+        "prepared_manifest_sha256": prepared_before,
         "independent_review": "pending_exact_candidate_review",
         "live_acceptance": "not_run",
     }
@@ -145,6 +166,7 @@ def main() -> None:
             if result.returncode:
                 raise RuntimeError("required qualification failed: " + name)
         validate(ROOT, a.prepared)
+        require_prepared_inputs(prepared_paths, prepared_before)
         if sources_before != {
             name: source_fingerprint(root) for name, root in source_roots.items()
         }:
