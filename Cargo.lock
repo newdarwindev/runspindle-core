@@ -1543,6 +1543,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
+ "ring",
  "runspindle-host",
  "rusqlite",
  "serde",

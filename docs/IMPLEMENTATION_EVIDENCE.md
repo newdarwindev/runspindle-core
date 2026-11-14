@@ -124,3 +124,9 @@ and outcomes. Existing Rust model source/workflows/gates are unchanged.
 This is Python fixture consumer conformance, not Rust/runtime adapter mapping,
 authenticated authority, durable recovery or upstream qualification. Core #1 and
 its actual adapter work remain open; operational acceptance continues to fail closed.
+
+## 2026-11-14 prepared builder interface candidate
+
+The `ci/campaign-arch-builders-20261114` branch changes the prepared-toolchain interface for the approved x64 CI campaign. `temporal/toolchain.json` now holds distinct ARM64 and x64 builder pins. The existing ARM builder ID and tool hashes are preserved. The x64 Docker-loaded builder ID is `sha256:9045681d1e2443e55bffe0c86dd93ee262157ea807fbf55c4e58e82699c9a53e`; its staged archive is pinned by platform image manifest digest `9e872bae015df2787ef50be0a1fcd5d96b0f3f2a2f5b11414ef388f1dd61527c`.
+
+The selector checks the Docker engine target and exact image ID and architecture. Missing pins, unsupported engines, and wrong-architecture images fail closed. The runtime preparation and offline Rust/mutation entrypoints use the selected native builder. `python3 -m unittest tools/test_prepared_builder.py -q` passed 3 tests; `python3 -m compileall -q tools` and `python3 tools/check_scaffold.py` passed locally. This is source-level/component evidence only. A clean-source x64 Temporal/SQLite build and twice-run qualification, complete mutation inventory, GitHub CI, independent review, and integration acceptance remain pending. Historical ARM records in `docs/runtime-build.json` and `docs/runtime-tests.json` have not been reinterpreted as x64 evidence.
