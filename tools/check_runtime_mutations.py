@@ -61,7 +61,7 @@ def main():
     for name, old, new, test in mutations:
         with (
             isolated_target(ROOT, name) as target,
-            scratch(prefix=f"core-mutation-{name}-", dir=ROOT / "local") as tmp,
+            scratch(prefix=f"core-mutation-{name}-") as tmp,
         ):
             directory = pathlib.Path(tmp)
             for f in ["Cargo.toml", "Cargo.lock"]:
