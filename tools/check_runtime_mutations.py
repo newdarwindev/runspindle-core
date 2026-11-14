@@ -32,6 +32,8 @@ def scratch(**kwargs):
 
 def main():
     pins=json.loads((ROOT/'temporal/toolchain.json').read_text())
+    from prepared_builder import select
+    _, builder = select(pins)
     mutations=[
         ('capacity_disabled','if self.deliveries.len() >= CAPACITY {','if false {','known_duplicates_reconcile_at_capacity_without_eviction_or_new_delivery'),
         ('delivery_conflict_ignored','if old == &a {','if true {','conflicts_revisions_and_malformed_inputs_preserve_state'),
@@ -59,7 +61,7 @@ def main():
             command=['docker','run','--rm','--pull','never','--network','none',
                 '-v',f'{directory}:/source:ro','-v',f'{target}:/work/local/linux-target',
                 '-v',f'{pathlib.Path.home()}/.cargo/registry:/usr/local/cargo/registry:ro','-v',f'{pathlib.Path.home()}/.cargo/git:/usr/local/cargo/git:ro','-w','/source',
-                pins['builder_image_id'],'cargo','test','--locked','--offline','--features','temporal-runtime',
+                builder['builder_image_id'],'cargo','test','--locked','--offline','--features','temporal-runtime',
                 '--target-dir','/work/local/linux-target','--test','runtime',test,'--','--exact']
             prefix=command[:command.index('cargo')]
             subprocess.run(prefix+['cargo','clean','-p','runspindle-core','--target-dir','/work/local/linux-target'],check=True,capture_output=True,text=True,timeout=60)

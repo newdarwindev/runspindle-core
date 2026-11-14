@@ -14,7 +14,9 @@ mutations={
  'skipped_validation':(source[start:end],'        let stored = serde_json::to_string(validation)?;\n'),
  'changed_bytes':('&& digest(&bytes) == reference.sha256','&& true'),
 }
-pins=json.loads((ROOT/'temporal/toolchain.json').read_text());results=[]
+pins=json.loads((ROOT/'temporal/toolchain.json').read_text())
+from prepared_builder import select
+_, builder = select(pins);results=[]
 for name,(old,new) in mutations.items():
     assert source.count(old)==1,name
     with isolated_target(ROOT,name) as target, tempfile.TemporaryDirectory(prefix='core-artifact-mutation-') as directory:
@@ -23,7 +25,7 @@ for name,(old,new) in mutations.items():
             p=ROOT/name_or_path;q=root/name_or_path
             shutil.copytree(p,q) if p.is_dir() else shutil.copyfile(p,q)
         (root/'src/durable.rs').write_text(source.replace(old,new))
-        args=['docker','run','--rm','--pull','never','--network','none','-v',f'{root}:/source:ro','-v',f'{target}:/work/local/linux-target','-v',f'{pathlib.Path.home()}/.cargo/registry:/usr/local/cargo/registry:ro','-v',f'{pathlib.Path.home()}/.cargo/git:/usr/local/cargo/git:ro','-w','/source',pins['builder_image_id'],'cargo','test','--locked','--offline','--features','artifact-store','--test','durable_artifacts','--target-dir','/work/local/linux-target']
+        args=['docker','run','--rm','--pull','never','--network','none','-v',f'{root}:/source:ro','-v',f'{target}:/work/local/linux-target','-v',f'{pathlib.Path.home()}/.cargo/registry:/usr/local/cargo/registry:ro','-v',f'{pathlib.Path.home()}/.cargo/git:/usr/local/cargo/git:ro','-w','/source',builder['builder_image_id'],'cargo','test','--locked','--offline','--features','artifact-store','--test','durable_artifacts','--target-dir','/work/local/linux-target']
         prefix=args[:args.index('cargo')]
         subprocess.run(prefix+['cargo','clean','-p','runspindle-core','--target-dir','/work/local/linux-target'],check=True,capture_output=True,text=True,timeout=60)
         run=subprocess.run(args,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=300)

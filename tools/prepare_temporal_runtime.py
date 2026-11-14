@@ -6,6 +6,7 @@ import json
 import pathlib
 import re
 import subprocess
+from prepared_builder import select
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -44,9 +45,7 @@ def prepare(directory, acquire=False, features="temporal-runtime"):
     directory = pathlib.Path(directory).resolve()
     directory.mkdir(parents=True, exist_ok=True)
     pins = json.loads((ROOT/'temporal/toolchain.json').read_text())
-    engine = subprocess.check_output(['docker','info','--format','{{.OSType}} {{.Architecture}}'],text=True).strip()
-    if engine != f"{pins['engine_os']} {pins['engine_architecture']}":
-        raise RuntimeError('unsupported Docker engine target; no emulation/floating fallback')
+    architecture, selected = select(pins, require_image=False)
     deps = json.loads((ROOT/'docs/runtime-dependencies.json').read_text())
     if deps['cargo_lock_sha256'] != sha(ROOT/'Cargo.lock') or len(deps['dependencies']) < 200:
         raise RuntimeError('dependency lock/license inventory not qualified')
@@ -63,8 +62,11 @@ def prepare(directory, acquire=False, features="temporal-runtime"):
         raise RuntimeError('SDK license mismatch')
     builderfile = directory/'Dockerfile.builder'
     version = pins['protoc_debian_version']
-    builderfile.write_text(f"FROM {pins['rust_image']}\nRUN apt-get update && apt-get install -y --no-install-recommends protobuf-compiler={version} libprotobuf-dev={version} && rm -rf /var/lib/apt/lists/*\n\nRUN rustup component add clippy --toolchain {pins['rust_version']}-aarch64-unknown-linux-gnu\n")
-    if sha(builderfile) != pins['builder_recipe_sha256']:
+    if architecture == 'linux/x86_64':
+        builderfile.write_bytes((ROOT/'temporal/builder-x64.Containerfile').read_bytes())
+    else:
+        builderfile.write_text(f"FROM {pins['rust_image']}\nRUN apt-get update && apt-get install -y --no-install-recommends protobuf-compiler={version} libprotobuf-dev={version} && rm -rf /var/lib/apt/lists/*\n\nRUN rustup component add clippy --toolchain {pins['rust_version']}-aarch64-unknown-linux-gnu\n")
+    if sha(builderfile) != selected['builder_recipe_sha256']:
         raise RuntimeError('builder recipe does not match reviewed pins')
     if acquire:
         # The acquisition phase alone can use the network.
@@ -75,21 +77,24 @@ def prepare(directory, acquire=False, features="temporal-runtime"):
             run(['curl', '--fail', '--location', '--max-time', '600', '--retry', '2', pins['sdk']['archive'], '--output', archive])
         if sha(archive) != pins['sdk']['archive_sha256']:
             raise RuntimeError('SDK source archive mismatch')
-        present = subprocess.run(['docker','image','inspect',pins['builder_image_id']],capture_output=True).returncode == 0
+        present = subprocess.run(['docker','image','inspect',selected['builder_image_id']],capture_output=True).returncode == 0
+        if not present and architecture == 'linux/x86_64':
+            raise RuntimeError('x64 builder must come from verified platform image closure')
         if not present:
             run(['docker', 'build', '--pull=false', '-t', 'runspindle-core-builder:candidate', '-f', builderfile, directory])
             candidate = subprocess.check_output(['docker','image','inspect','runspindle-core-builder:candidate','--format','{{.Id}}'],text=True).strip()
-            if candidate != pins['builder_image_id']:
+            if candidate != selected['builder_image_id']:
                 raise RuntimeError('acquired builder differs from reviewed immutable ID; qualification blocked')
-    builder = subprocess.check_output(['docker','image','inspect',pins['builder_image_id'],'--format','{{.Id}}'],text=True).strip()
-    if builder != pins['builder_image_id']:
-        raise RuntimeError('builder image differs from reviewed immutable ID')
-    run(['docker','image','inspect',pins['rust_image']],stdout=subprocess.DEVNULL)
+    _, selected = select(pins)
+    builder = selected['builder_image_id']
+    if architecture == 'linux/aarch64':
+        run(['docker','image','inspect',pins['rust_image']],stdout=subprocess.DEVNULL)
     protoc = subprocess.check_output(['docker','run','--rm','--pull','never','--network','none',builder,'sha256sum','/usr/bin/protoc'],text=True).split()[0]
-    if protoc != pins['protoc_sha256']:
+    if protoc != selected['protoc_sha256']:
         raise RuntimeError('prepared protoc byte mismatch')
-    clippy = subprocess.check_output(['docker','run','--rm','--pull','never','--network','none',builder,'sha256sum','/usr/local/rustup/toolchains/1.94.1-aarch64-unknown-linux-gnu/bin/clippy-driver'],text=True).split()[0]
-    if clippy != pins['clippy_driver_sha256']:
+    clippy_path = f"/usr/local/rustup/toolchains/{pins['rust_version']}-{selected['clippy_target']}/bin/clippy-driver"
+    clippy = subprocess.check_output(['docker','run','--rm','--pull','never','--network','none',builder,'sha256sum',clippy_path],text=True).split()[0]
+    if clippy != selected['clippy_driver_sha256']:
         raise RuntimeError('prepared Clippy byte mismatch')
     archive = directory/'sdk-rust-1.2.0.tar.gz'
     if not archive.exists():
@@ -126,11 +131,12 @@ def prepare(directory, acquire=False, features="temporal-runtime"):
     fingerprint = hashlib.sha256(json.dumps(source_hashes(),sort_keys=True).encode()).hexdigest()
     labels = f'LABEL org.runspindle.source_sha256={fingerprint} org.runspindle.binary_sha256={sha(binary)} org.runspindle.cargo_lock_sha256={sha(ROOT/"Cargo.lock")}\n'
     dockerfile = directory/'Dockerfile'
-    dockerfile.write_text(f"FROM {pins['rust_image']}\n{labels}COPY temporal-runtime /usr/local/bin/temporal-runtime\nCOPY notices /third-party-notices\nCOPY runtime-dependencies.json /third-party-notices/inventory.json\nENTRYPOINT [\"/usr/local/bin/temporal-runtime\"]\n")
+    runtime_base = builder if architecture == 'linux/x86_64' else pins['rust_image']
+    dockerfile.write_text(f"FROM {runtime_base}\n{labels}COPY temporal-runtime /usr/local/bin/temporal-runtime\nCOPY notices /third-party-notices\nCOPY runtime-dependencies.json /third-party-notices/inventory.json\nENTRYPOINT [\"/usr/local/bin/temporal-runtime\"]\n")
     run(['docker','build','--network','none','--pull=false','-t','runspindle-core-runtime:prepared','-f',dockerfile,directory])
     image = subprocess.check_output(['docker','image','inspect','runspindle-core-runtime:prepared','--format','{{.Id}}'],text=True).strip()
     manifest = {'schema_version':1,'features':features,'evidence_class':'prepared_dependency_artifacts','image_id':image,
-                'builder_image_id':builder,'source_hashes':source_hashes(),'source_sha256':fingerprint,'binary_sha256':sha(binary),
+                'builder_image_id':builder,'builder_architecture':architecture,'source_hashes':source_hashes(),'source_sha256':fingerprint,'binary_sha256':sha(binary),
                 'cargo_lock_sha256':sha(ROOT/'Cargo.lock'),'sdk_revision':pins['sdk']['revision'],
                 'sdk_version':pins['sdk']['version'],'rust_version':pins['rust_version'],
                 'dependency_inventory_sha256':sha(ROOT/'docs/runtime-dependencies.json'),
