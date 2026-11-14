@@ -55,7 +55,7 @@
   },
   "runtime_envelope_contract": {
     "repository": "newdarwindev/runspindle",
-    "source_commit": "6125dc932ef3663b4713d7a3686eca0726118490",
+    "source_commit": "9201310df7982e7d52f4b9facd8d4caec8ab35dc",
     "version": "runspindle.envelope.v1",
     "mapping": "specs/verified-authority-v1.md",
     "vectors_sha256": "fcebde87ffb2273e430de1115e809b0c8bee4efb02497f6a5dbfde3ebed02941",

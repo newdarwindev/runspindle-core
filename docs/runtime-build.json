@@ -2,7 +2,7 @@
   "schema_version": 1,
   "features": "verified-authority",
   "evidence_class": "prepared_dependency_artifacts",
-  "image_id": "sha256:d4a1a3059ad29a1d3085bd5ba3e7812701a73a378370773219659ee4b916bf08",
+  "image_id": "sha256:202af35637b1e422382dbc3ca578d06915a813fc2725f3526ad1722cc86384b9",
   "builder_image_id": "sha256:061420d04a6f6ac173e3b1835b0594bcbe9d17044f5e015ca4fb767f9c57813e",
   "source_hashes": {
     "Cargo.toml": "78183bbfbbd041240f2750b078eee3786d735a78a0b77ecedc18e761fed37bc8",
@@ -14,7 +14,7 @@
     "src/bin/checkpoints/mod.rs": "f8f52b3724c66207fbf0156b0984da23bcb532d4cde9baf7ff10d2e48d22e208",
     "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
     "src/bin/synthetic_authority.rs": "4df8ac265595ea61d9bc3bb5bd43a7472e81a301ccbcedf8c526194cf4299eee",
-    "src/bin/temporal-runtime.rs": "62daa0dfb9d3292532840aeaa50c4ee8d625db7ff4719082ed585fa8d7918b75",
+    "src/bin/temporal-runtime.rs": "3d85f368e423eb537b71d9bee9246b98efc9aeaaae3e2890e79deb90a300317d",
     "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
     "src/durable.rs": "5d20503b0bbf3d7912264f510fed89585296ae09e2f88087effafacb0cfccd56",
     "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
@@ -24,8 +24,8 @@
     "src/outbox.rs": "685e7faac482247b8b99dce1d5404e7408f13d1712a1a6713a02a18fef1df122",
     "src/runtime.rs": "9fb29411e60a7e31a0eb259e36e23b3e189fff2e89096b7e3ac2641ae21aea96"
   },
-  "source_sha256": "2b3e487048900386ef6dabd20a7d9c79e29dc2e0ab0b749766b8c25b9372b775",
-  "binary_sha256": "67306b070c20b2a7c6d6b4f8a200003adf85f846a3094aea536f3186deb85450",
+  "source_sha256": "0460e00a952fb5e75b31b62019bdf98eae5a18a28e4d43badf3e59f905e4fd56",
+  "binary_sha256": "f1c4ff3d272f081a10f9bd42aeeeb96cf007c752897ac24e7bfe12fe4d0deff8",
   "cargo_lock_sha256": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
   "sdk_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
   "sdk_version": "1.2.0",

@@ -22,7 +22,9 @@ recovery. It fails on missing checks/tools. It creates disposable services and
 synthetic ephemeral credentials only; there is no deployed issuer or provider.
 Reports contain source/config/vector/toolchain hashes and bounded results.
 
-Historical regression commands (same pinned prepared image):
+Historical regression commands (same pinned prepared image), run after the
+qualification command returns because mutation checks temporarily change and
+restore source files:
 
 ```
 python3 tools/test_temporal_runtime.py --platform /path/to/platform --platform-prepared /path/to/temporal-prepared --core-prepared local/runtime-prepared --report /private/reports/runtime.json

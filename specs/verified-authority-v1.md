@@ -13,7 +13,8 @@ absolute SQLite path, issuer, actor, audience and allowed actions. Requests carr
 only the opaque grant reference inside the admission envelope. They cannot select
 helper paths, trust roots, actor identity or actions. Missing/unreadable helper
 configuration starts a deny-only authenticated worker. It never falls back to a
-script's authorized flag. The separate development worker preserves old behavior.
+script's authorized flag. The separate development worker preserves old behavior. Binaries compiled without
+verified-authority reject authenticated-worker before opening a connection.
 
 The helper opens the authoritative database read-only on every check, in a single
 read transaction. It never creates/rebuilds a missing store and never caches
