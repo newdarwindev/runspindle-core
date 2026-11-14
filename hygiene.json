@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "checks": [
+    {
+      "id": "scaffold",
+      "command": [
+        "python3",
+        "tools/check_scaffold.py"
+      ],
+      "required_files": [
+        "tools/check_scaffold.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "static-quality",
+      "command": [
+        "python3",
+        "tools/static_quality.py"
+      ],
+      "required_files": [
+        "tools/static_quality.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "repository-hygiene",
+      "command": [
+        "python3",
+        "tools/check_repo_hygiene.py"
+      ],
+      "required_files": [
+        "tools/check_repo_hygiene.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "check-shared-fixtures",
+      "command": [
+        "python3",
+        "tools/check_shared_fixtures.py"
+      ],
+      "required_files": [
+        "tools/check_shared_fixtures.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "check-model-mutations",
+      "command": [
+        "python3",
+        "tools/check_model_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_model_mutations.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "python-tests",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "required_files": [
+        "tests"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "rust-format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "required_files": [
+        "Cargo.toml",
+        "Cargo.lock"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "rust-test",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--features",
+        "verified-authority"
+      ],
+      "required_files": [
+        "Cargo.toml",
+        "Cargo.lock"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "rust-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--features",
+        "verified-authority",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "required_files": [
+        "Cargo.toml",
+        "Cargo.lock"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "distributable-build",
+      "not_applicable": "No distributable build command exists in this repository validation contract; this does not claim release acceptance."
+    },
+    {
+      "id": "artifact-mutations",
+      "command": [
+        "python3",
+        "tools/check_artifact_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_artifact_mutations.py"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "runtime-mutations",
+      "command": [
+        "python3",
+        "tools/check_runtime_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_runtime_mutations.py"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "outbox-mutations",
+      "command": [
+        "python3",
+        "tools/check_outbox_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_outbox_mutations.py"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "check-authority-mutations",
+      "command": [
+        "python3",
+        "tools/check_authority_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_authority_mutations.py",
+        "temporal/toolchain.json"
+      ],
+      "timeout_seconds": 1800
+    }
+  ],
+  "lockfiles": [
+    "requirements-quality.txt",
+    "tools/quality-baseline.json",
+    "Cargo.lock"
+  ],
+  "artifact_paths": [],
+  "profiling": {
+    "workloads": [
+      {
+        "id": "rust-offline-runtime-tests",
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked"
+        ],
+        "required_files": [
+          "Cargo.toml",
+          "Cargo.lock"
+        ],
+        "timeout_seconds": 600,
+        "kind": "validation"
+      }
+    ]
+  },
+  "limitations": [
+    "Profiling measures deterministic validation workloads, not native/provider performance.",
+    "No evidence upload or retention policy is enabled.",
+    "Native/live acceptance gates remain in their existing separate workflows.",
+    "Raw child output is not included in sanitized verification reports."
+  ]
+}
