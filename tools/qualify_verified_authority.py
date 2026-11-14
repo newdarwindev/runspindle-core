@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 """One bounded, fail-closed command for the prepared offline authority candidate."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
-from pathlib import Path
 import subprocess
 import sys
-from runtime_artifact import validate
+from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.hygiene import source_fingerprint
+from tools.runtime_artifact import validate
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--platform", required=True)
     p.add_argument("--platform-prepared", required=True)
@@ -23,6 +29,14 @@ def main():
     reports = Path(a.report_dir).resolve()
     reports.mkdir(parents=True, exist_ok=True)
     manifest = validate(ROOT, a.prepared)
+    source_roots = {
+        "core": ROOT,
+        "composition": Path(a.composition).resolve(),
+        "platform": Path(a.platform).resolve(),
+    }
+    sources_before = {
+        name: source_fingerprint(root) for name, root in source_roots.items()
+    }
     require = manifest.get("features") == "verified-authority"
     if not require:
         raise RuntimeError("exact verified-authority feature required")
@@ -98,14 +112,15 @@ def main():
             ],
         ),
     ]
-    observed = []
-    summary = {
+    observed: list[dict[str, Any]] = []
+    summary: dict[str, Any] = {
         "status": "running",
         "evidence_class": "bounded_offline_qualification",
         "checks": observed,
         "image_id": manifest["image_id"],
         "source_hashes": manifest["source_hashes"],
-        "independent_review": "user_waived_no_review_occurred",
+        "qualification_source_fingerprints": sources_before,
+        "independent_review": "pending_exact_candidate_review",
         "live_acceptance": "not_run",
     }
     try:
@@ -130,6 +145,10 @@ def main():
             if result.returncode:
                 raise RuntimeError("required qualification failed: " + name)
         validate(ROOT, a.prepared)
+        if sources_before != {
+            name: source_fingerprint(root) for name, root in source_roots.items()
+        }:
+            raise RuntimeError("qualification source changed during checks")
         summary["status"] = "passed"
     except BaseException:
         summary["status"] = "failed"

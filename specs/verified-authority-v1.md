@@ -1,6 +1,6 @@
 # Offline verified authority v1
 
-This optional `verified-authority` feature implements core #16 after composition
+This optional `verified-authority` feature partially addresses core #16 after composition
 #43's `runspindle.envelope.v1` contract. Its scope is synthetic offline admission
 and scripted host dispatch, with actual Ed25519 verification, Temporal and SQLite.
 It does not authenticate the historical development workflows, host H02, delivery
@@ -91,6 +91,7 @@ target, policy, time and unavailable-state tests assert zero forbidden calls.
 Real Temporal tests independently inspect child IDs, peer effects, cancellation,
 SQLite revocations across worker/server restart, and replay without assertions or
 fresh effects. Wire-sequence and dispatch-guard mutations must fail behavioral
-assertions. Independent review is user-waived; no independent review occurred.
+assertions. The original evidence had user-waived review; this foundation candidate
+requires independent exact-head review before merge.
 
 See docs/VERIFIED_AUTHORITY.md for reproducible commands and measured evidence.

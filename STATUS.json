@@ -49,6 +49,17 @@
   "production_deployment": "not_run",
   "runner_capacity": "unverified",
   "runtime_contract": "runspindle.runtime.v1",
+  "runtime_envelope": {
+    "evidence": "docs/VERIFIED_AUTHORITY.md",
+    "scope": [
+      "admission_request",
+      "host_observation",
+      "delivery_request",
+      "delivery_receipt"
+    ],
+    "status": "locally_tested_candidate_contract_merge_blocked",
+    "version": "runspindle.envelope.v1"
+  },
   "runtime_test_evidence": "docs/runtime-tests.json",
   "selected_source_migration": "partial",
   "shared_fixture_consumer": {
@@ -60,23 +71,15 @@
   },
   "stage": "temporal_development_candidate",
   "temporal_integration": "locally_tested_pinned_development_server",
-  "runtime_envelope": {
-    "version": "runspindle.envelope.v1",
-    "scope": [
-      "admission_request",
-      "host_observation",
-      "delivery_request",
-      "delivery_receipt"
-    ],
-    "status": "implemented_candidate_under_final_qualification",
-    "evidence": "docs/VERIFIED_AUTHORITY.md"
-  },
   "verified_admission": {
-    "version": "runspindle.authority.v1",
-    "status": "implemented_offline_candidate_under_final_qualification",
+    "evidence": "docs/FOUNDATION_AUTHORITY.md",
+    "exact_delivery_destination_binding": "not_implemented_requires_versioned_contract_extension",
+    "independent_review": "pending_exact_candidate_review",
+    "issue_16": "open_partial_host_workspace_scope_only",
     "issuer": "synthetic_ephemeral_only",
-    "store": "local_authoritative_SQLite",
     "production_issuer": "not_implemented",
-    "independent_review": "user_waived_no_review_occurred"
+    "status": "locally_tested_offline_candidate_dependency_qualification_blocked",
+    "store": "local_authoritative_SQLite",
+    "version": "runspindle.authority.v1"
   }
 }

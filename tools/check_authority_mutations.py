@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Behavioral mutations; restore exact source bytes after every failing test."""
 
+from __future__ import annotations
+
 import hashlib
 import json
-from pathlib import Path
-import subprocess
 import signal
+import subprocess
+from pathlib import Path
+from types import FrameType
 
 
-def cancelled(_signum, _frame):
+def cancelled(_signum: int, _frame: FrameType | None) -> None:
     raise KeyboardInterrupt("mutation run cancelled")
 
 
@@ -83,7 +86,7 @@ print(
             "evidence_class": "synthetic_contract",
             "mutations": results,
             "source_restoration": "passed",
-            "independent_review": "user_waived_no_review_occurred",
+            "independent_review": "pending_exact_candidate_review",
         }
     )
 )

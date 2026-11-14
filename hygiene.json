@@ -57,6 +57,54 @@
       "timeout_seconds": 300
     },
     {
+      "id": "check-authority-mutations",
+      "command": [
+        "python3",
+        "tools/check_authority_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_authority_mutations.py",
+        "temporal/toolchain.json"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "check-outbox-mutations",
+      "command": [
+        "python3",
+        "tools/check_outbox_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_outbox_mutations.py",
+        "temporal/toolchain.json"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "check-artifact-mutations",
+      "command": [
+        "python3",
+        "tools/check_artifact_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_artifact_mutations.py",
+        "temporal/toolchain.json"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "check-runtime-mutations",
+      "command": [
+        "python3",
+        "tools/check_runtime_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_runtime_mutations.py",
+        "temporal/toolchain.json"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
       "id": "python-tests",
       "command": [
         "python3",
@@ -93,7 +141,9 @@
         "cargo",
         "test",
         "--offline",
-        "--locked"
+        "--locked",
+        "--features",
+        "verified-authority"
       ],
       "required_files": [
         "Cargo.toml",
@@ -109,6 +159,8 @@
         "--offline",
         "--locked",
         "--all-targets",
+        "--features",
+        "verified-authority",
         "--",
         "-D",
         "warnings"

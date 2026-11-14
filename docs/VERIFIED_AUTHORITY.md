@@ -2,8 +2,8 @@
 
 Candidate scope: four Python/Rust wire mappings and an offline Ed25519 admission
 lane. Production, credentials, providers, paid evaluation, browser, console,
-source migration and H08/Langfuse remain deferred. Independent review was waived
-by the user; no independent review occurred. Required GitHub checks and merge
+source migration and H08/Langfuse remain deferred. Historical independent review
+was waived; foundation exact-head review is required. Required GitHub checks and merge
 qualification are recorded separately from local evidence.
 
 Prepare only the pinned dependencies described in temporal/toolchain.json and
@@ -41,3 +41,7 @@ authenticated_registry, authenticated_operation and cancel_authenticated (the
 same canonical wire). The replay command registers both versions. The explicit
 synthetic-issuer command only accepts a disposable /effects directory; it is a
 test fixture generator, never a credential provisioning or production tool.
+
+Foundation reconciliation, exact-scope gaps and repeat observations are recorded in
+[FOUNDATION_AUTHORITY.md](FOUNDATION_AUTHORITY.md). Core #16 remains open because
+exact delivery destination binding is outside the current admission envelope.

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Fresh-process Temporal + SQLite offline authority with an independent peer ledger."""
 
+from __future__ import annotations
+
 import argparse
 import base64
 import concurrent.futures
@@ -10,23 +12,28 @@ import importlib.util
 import json
 import pathlib
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
-from runtime_artifact import validate
+from typing import Any, Callable
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from tools.runtime_artifact import validate
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def require(condition, message):
+def require(condition: Any, message: str) -> None:
     if not condition:
         raise AssertionError(message)
 
 
-def test(platform, platform_prepared, core_prepared):
+def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str, Any]:
     spec = importlib.util.spec_from_file_location(
         "authority_temporal_lane", pathlib.Path(platform) / "tools/temporal_lane.py"
     )
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     manifest = validate(ROOT, core_prepared)
@@ -35,16 +42,16 @@ def test(platform, platform_prepared, core_prepared):
     with tempfile.TemporaryDirectory(prefix="runspindle-authority-") as tmp:
         directory = pathlib.Path(tmp)
         mounts = [{"source": tmp, "target": "/effects", "read_only": False}]
-        scripts = []
+        scripts: list[dict[str, Any]] = []
 
-        def save():
+        def save() -> None:
             p = directory / "script.next"
             p.write_text(json.dumps(scripts))
             p.replace(directory / "script.json")
 
         save()
 
-        def events():
+        def events() -> list[dict[str, Any]]:
             p = directory / "calls.jsonl"
             return (
                 [json.loads(line) for line in p.read_text().splitlines()]
@@ -52,7 +59,7 @@ def test(platform, platform_prepared, core_prepared):
                 else []
             )
 
-        def job(e):
+        def job(e: dict[str, Any]) -> str:
             return (
                 "job-"
                 + hashlib.sha256(
@@ -60,10 +67,10 @@ def test(platform, platform_prepared, core_prepared):
                 ).hexdigest()
             )
 
-        def wire(e):
+        def wire(e: dict[str, Any]) -> str:
             return json.dumps(e, sort_keys=True, separators=(",", ":"))
 
-        def envelope(name):
+        def envelope(name: str) -> dict[str, Any]:
             return {
                 "version": "runspindle.envelope.v1",
                 "message_type": "admission_request",
@@ -86,7 +93,9 @@ def test(platform, platform_prepared, core_prepared):
                 },
             }
 
-        def script(e, online=False, **kw):
+        def script(
+            e: dict[str, Any], online: bool = False, **kw: Any
+        ) -> dict[str, Any]:
             a = {"version": "runspindle.runtime.v1", **e["binding"], **e["payload"]}
             value = dict(
                 admission=a,
@@ -103,7 +112,7 @@ def test(platform, platform_prepared, core_prepared):
             save()
             return value
 
-        def poll(predicate, timeout=40):
+        def poll(predicate: Callable[[], Any], timeout: float = 40) -> Any:
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:
                 result = predicate()
@@ -114,7 +123,7 @@ def test(platform, platform_prepared, core_prepared):
 
         with module.Lane(platform_prepared) as lane:
 
-            def request(command, issuer=False):
+            def request(command: dict[str, Any], issuer: bool = False) -> Any:
                 name = "command-" + uuid.uuid4().hex + ".json"
                 (directory / name).write_text(json.dumps(command))
                 args = (
@@ -126,10 +135,10 @@ def test(platform, platform_prepared, core_prepared):
                     lane.run_client(image, args, mounts=mounts, deadline=40).stdout
                 )
 
-            def issue(e, **kwargs):
+            def issue(e: dict[str, Any], **kwargs: Any) -> Any:
                 return request(dict(command="issue", wire=wire(e), **kwargs), True)
 
-            def admit(e):
+            def admit(e: dict[str, Any]) -> Any:
                 return request(
                     dict(
                         command="admit_authenticated",
@@ -138,17 +147,17 @@ def test(platform, platform_prepared, core_prepared):
                     )
                 )
 
-            def registry():
+            def registry() -> Any:
                 return request(
                     dict(
                         command="authenticated_registry", registry_id="authenticated-v1"
                     )
                 )
 
-            def operation(e):
+            def operation(e: dict[str, Any]) -> Any:
                 return request(dict(command="authenticated_operation", job_id=job(e)))
 
-            def cancel(e):
+            def cancel(e: dict[str, Any]) -> Any:
                 return request(
                     dict(command="cancel_authenticated", job_id=job(e), wire=wire(e))
                 )
@@ -188,7 +197,7 @@ def test(platform, platform_prepared, core_prepared):
                 "offline_selected_host_zero_launch",
             ]
             invalid = []
-            cases = [
+            cases: list[dict[str, Any]] = [
                 dict(bad_signature=True),
                 dict(changes={"actor": "forged-actor"}),
                 dict(changes={"audience": "wrong-core"}),
@@ -405,7 +414,7 @@ def test(platform, platform_prepared, core_prepared):
             ]:
                 history = request({"command": "history", "workflow_id": workflow})
 
-                def inspect(value):
+                def inspect(value: Any) -> None:
                     if isinstance(value, dict):
                         if "payloads" in value:
                             for p in value["payloads"]:
@@ -509,7 +518,7 @@ def test(platform, platform_prepared, core_prepared):
                 for k, v in histories.items()
             },
             "cleanup": "passed",
-            "independent_review": "user_waived_no_review_occurred",
+            "independent_review": "pending_exact_candidate_review",
             "boundary_matrix": {
                 "core": "real",
                 "Temporal": "real_disposable_SQLite",
