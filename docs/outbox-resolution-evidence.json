@@ -1,0 +1,30 @@
+{
+  "base_sha": "48002b65868dc69fb7e35cc957d02e9a06c7208a",
+  "evidence_class": "uncompiled_Rust_source_candidate",
+  "source_sha256": {
+    "src/outbox.rs": "b1c64e6319dea10ef57407e7952e0d67a9fbe47c98da2f370ac59c1713a182a5",
+    "tests/outbox.rs": "ff5933dbce2b11ece7cc9bee1ef3de53ace402e9e348efcf770548dd52817d9d",
+    "tools/check_outbox_mutations.py": "c736d30be87b644ee112477520d3c16c9529248dc6824487e2ab307ee0e1c052",
+    "docs/OUTBOX_RESOLUTION.md": "c4fd0ff8096b21f19d0c3c83dc5284f590264b29a228f67c0d31351437c3fde7"
+  },
+  "python_tests": {
+    "passed": 70,
+    "skipped": 0
+  },
+  "python_static_new_diagnostics": 0,
+  "scaffold": "passed",
+  "rust_format": "not_run: cargo/rustfmt unavailable",
+  "rust_compile": "not_run",
+  "rust_tests": "not_run",
+  "native_mutations": "not_run: Docker unavailable",
+  "aggregate": "blocked_missing_required_tools",
+  "independent_review": "pending",
+  "remaining": [
+    "exact destination trust implementation",
+    "Tether bridge",
+    "native Rust/SQLite process test execution",
+    "Temporal qualification",
+    "live provider"
+  ],
+  "issue_17": "partial_not_closed"
+}

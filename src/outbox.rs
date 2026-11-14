@@ -54,6 +54,23 @@ pub struct DeliverySnapshot {
     pub acknowledgement: Option<DeliveryReceipt>,
     pub conflict: bool,
 }
+/// A separately authorized decision, bound to an exact quarantined generation.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ConflictResolution {
+    pub prior: DeliverySnapshot,
+    pub receipt: DeliveryReceipt,
+    pub authorization_ref: String,
+}
+/// Trusted application seam; ordinary delivery/admission grants do not implement it.
+pub trait ResolutionAuthority {
+    fn verify_resolution(&self, resolution: &ConflictResolution) -> bool;
+}
+impl ResolutionAuthority for durable::Deny {
+    fn verify_resolution(&self, _: &ConflictResolution) -> bool {
+        false
+    }
+}
 pub trait DeliveryAuthority {
     fn verify(&self, request: &DeliveryRequest) -> bool;
 }
@@ -90,6 +107,9 @@ impl Outbox {
                 r.get(0)
             })?;
         anyhow::ensure!(version == 1, "unsupported outbox version");
+        tx.execute_batch("CREATE TABLE IF NOT EXISTS outbox_evidence(operation TEXT NOT NULL,generation INTEGER NOT NULL,kind TEXT NOT NULL,record TEXT NOT NULL,PRIMARY KEY(operation,generation,kind));
+          CREATE TRIGGER IF NOT EXISTS outbox_evidence_immutable BEFORE UPDATE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'immutable delivery evidence');END;
+          CREATE TRIGGER IF NOT EXISTS outbox_evidence_retained BEFORE DELETE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'retained delivery evidence');END;")?;
         tx.commit()?;
         Ok(Self { store })
     }
@@ -149,10 +169,12 @@ impl Outbox {
             .iter()
             .filter(|r| r.matches(&old.request))
             .collect::<Vec<_>>();
+        // A separately resolved terminal receipt supersedes an old transport ack;
+        // both remain retained in the immutable resolution evidence.
         let first = old
-            .acknowledgement
+            .receipt
             .as_ref()
-            .or(old.receipt.as_ref())
+            .or(old.acknowledgement.as_ref())
             .or(valid.first().copied());
         first.is_some_and(|first| valid.iter().any(|receipt| *receipt != first))
     }
@@ -161,6 +183,7 @@ impl Outbox {
         request: &DeliveryRequest,
         acknowledgement: Option<DeliveryReceipt>,
         conflict: bool,
+        observed: &[DeliveryReceipt],
     ) -> anyhow::Result<DeliverySnapshot> {
         if let Some(ref ack) = acknowledgement {
             anyhow::ensure!(ack.matches(request), "acknowledgement binding conflict");
@@ -178,6 +201,17 @@ impl Outbox {
             || acknowledgement
                 .as_ref()
                 .is_some_and(|ack| Self::contradiction(&old, std::slice::from_ref(ack)));
+        // Audit capacity must not roll back an observed contradiction. The
+        // conflict flag itself is the durable fence when evidence is incomplete.
+        let mut incomplete_evidence = false;
+        if conflict {
+            let record = serde_json::to_string(&(&old, &acknowledgement, observed))?;
+            if Self::evidence_room(&tx, &record)? {
+                Self::evidence(&tx, request, old.generation, "conflict", &record)?;
+            } else {
+                incomplete_evidence = true;
+            }
+        }
         let acknowledgement = old.acknowledgement.or(acknowledgement);
         let next = old
             .generation
@@ -196,6 +230,7 @@ impl Outbox {
         };
         anyhow::ensure!(tx.execute("UPDATE outbox SET state=?1,acknowledgement=?2,conflict=?3,generation=?4 WHERE operation=?5 AND generation=?6",params![state_text,acknowledgement.as_ref().map(serde_json::to_string).transpose()?,conflict,next,request.delivery_operation_id,old.generation])?==1,"delivery ownership conflict");
         tx.commit()?;
+        anyhow::ensure!(!incomplete_evidence, "delivery conflict durably fenced; evidence capacity exhausted");
         Ok(DeliverySnapshot {
             request: request.clone(),
             state,
@@ -205,10 +240,11 @@ impl Outbox {
             conflict,
         })
     }
-    fn settle(
+    fn settle<A: DeliveryAuthority>(
         &mut self,
         old: &DeliverySnapshot,
         receipt: Option<DeliveryReceipt>,
+        authority: &A,
     ) -> anyhow::Result<DeliverySnapshot> {
         if let Some(ref receipt) = receipt {
             anyhow::ensure!(receipt.matches(&old.request), "receipt binding conflict");
@@ -219,6 +255,7 @@ impl Outbox {
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current =
             Self::read(&tx, &old.request)?.ok_or_else(|| anyhow::anyhow!("missing reservation"))?;
+        anyhow::ensure!(authority.verify(&old.request), "settlement authority unavailable");
         anyhow::ensure!(
             !current.conflict,
             "delivery receipt conflict is durably fenced"
@@ -228,7 +265,7 @@ impl Outbox {
             .is_some_and(|r| Self::contradiction(&current, std::slice::from_ref(r)))
         {
             drop(tx);
-            self.remember(&old.request, None, true)?;
+            self.remember(&old.request, None, true, receipt.as_slice())?;
             anyhow::bail!("contradictory delivery receipt")
         }
         if current.state == DeliveryState::Delivered {
@@ -268,6 +305,57 @@ impl Outbox {
             acknowledgement: current.acknowledgement,
             conflict: false,
         })
+    }
+    fn evidence_room(tx: &rusqlite::Transaction<'_>, record: &str) -> anyhow::Result<bool> {
+        if record.len() > durable::MAX_BYTES {
+            return Ok(false);
+        }
+        let count: u64 = tx.query_row("SELECT count(*) FROM outbox_evidence", [], |r| r.get(0))?;
+        Ok(count < durable::CAPACITY)
+    }
+    fn evidence(
+        tx: &rusqlite::Transaction<'_>,
+        request: &DeliveryRequest,
+        generation: u64,
+        kind: &str,
+        record: &str,
+    ) -> anyhow::Result<()> {
+        anyhow::ensure!(Self::evidence_room(tx, record)?, "delivery evidence capacity");
+        tx.execute("INSERT INTO outbox_evidence VALUES(?1,?2,?3,?4)", params![request.delivery_operation_id,generation,kind,record])?;
+        Ok(())
+    }
+    /// Resolve quarantine using independent readback only. Never calls send.
+    /// Authority callbacks must be fresh, bounded and non-reentrant; a remote
+    /// provider must enforce its own atomic authority/route fence.
+    pub fn resolve<A: DeliveryAuthority, R: ResolutionAuthority, T: Transport>(
+        &mut self,
+        resolution: &ConflictResolution,
+        authority: &A,
+        resolver: &R,
+        transport: &mut T,
+    ) -> anyhow::Result<DeliverySnapshot> {
+        let prior = &resolution.prior;
+        let request = &prior.request;
+        anyhow::ensure!(request.valid() && prior.conflict && resolution.receipt.matches(request)
+            && valid_id(&resolution.authorization_ref), "invalid conflict resolution");
+        anyhow::ensure!(authority.verify(request) && resolver.verify_resolution(resolution), "resolution denied");
+        self.store.accepted(&request.accepted)?;
+        anyhow::ensure!(self.snapshot(request)?.as_ref() == Some(prior), "stale resolution generation");
+        anyhow::ensure!(authority.verify(request) && resolver.verify_resolution(resolution), "resolution readback denied");
+        let observed = transport.lookup(request)?;
+        anyhow::ensure!(observed.as_slice() == std::slice::from_ref(&resolution.receipt), "resolution requires exact unique readback");
+        anyhow::ensure!(authority.verify(request) && resolver.verify_resolution(resolution), "resolution authority changed");
+        let tx = self.store.connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        anyhow::ensure!(Self::read(&tx, request)?.as_ref() == Some(prior), "stale resolution owner");
+        anyhow::ensure!(authority.verify(request) && resolver.verify_resolution(resolution), "resolution authority unavailable after lock");
+        let next = prior.generation.checked_add(1).filter(|n| *n <= i64::MAX as u64)
+            .ok_or_else(|| anyhow::anyhow!("delivery generation capacity"))?;
+        Self::evidence(&tx, request, prior.generation, "resolution", &serde_json::to_string(resolution)?)?;
+        anyhow::ensure!(tx.execute("UPDATE outbox SET state='delivered',receipt=?1,conflict=0,generation=?2 WHERE operation=?3 AND generation=?4 AND conflict=1",params![serde_json::to_string(&resolution.receipt)?,next,request.delivery_operation_id,prior.generation])? == 1, "resolution ownership conflict");
+        tx.commit()?;
+        Ok(DeliverySnapshot { request: request.clone(), state: DeliveryState::Delivered,
+            receipt: Some(resolution.receipt.clone()), generation: next,
+            acknowledgement: prior.acknowledgement.clone(), conflict: false })
     }
     pub fn deliver<A: DeliveryAuthority, T: Transport>(
         &mut self,
@@ -317,25 +405,27 @@ impl Outbox {
         let reply = transport.send(request, &bytes).ok().flatten();
         if let Some(reply) = reply {
             if !reply.matches(request) {
-                self.settle(&reserved, None)?;
+                self.settle(&reserved, None, authority)?;
                 anyhow::bail!("send receipt mismatch")
             }
-            reserved = self.remember(request, Some(reply.clone()), false)?;
+            reserved = self.remember(request, Some(reply.clone()), false, &[])?;
             anyhow::ensure!(
                 !reserved.conflict,
                 "acknowledgement contradicts retained receipt"
             );
+            anyhow::ensure!(authority.verify(request), "readback authority unavailable");
             let observed = transport.lookup(request).unwrap_or_default();
+            anyhow::ensure!(authority.verify(request), "readback authority changed");
             if Self::contradiction(&reserved, &observed) {
-                self.remember(request, None, true)?;
+                self.remember(request, None, true, &observed)?;
                 anyhow::bail!("send/readback receipt conflict")
             }
 
             if observed.len() == 1 && observed[0] == reply {
-                return self.settle(&reserved, Some(reply));
+                return self.settle(&reserved, Some(reply), authority);
             }
         }
-        self.settle(&reserved, None)
+        self.settle(&reserved, None, authority)
     }
     pub fn reconcile<A: DeliveryAuthority, T: Transport>(
         &mut self,
@@ -352,18 +442,20 @@ impl Outbox {
             .snapshot(request)?
             .ok_or_else(|| anyhow::anyhow!("missing reservation"))?;
         anyhow::ensure!(!old.conflict, "delivery receipt conflict is durably fenced");
+        anyhow::ensure!(authority.verify(request), "readback authority unavailable");
         let observed = transport.lookup(request).unwrap_or_default();
+        anyhow::ensure!(authority.verify(request), "readback authority changed");
         if Self::contradiction(&old, &observed) {
-            self.remember(request, None, true)?;
+            self.remember(request, None, true, &observed)?;
             anyhow::bail!("contradictory readback receipts")
         }
         if observed.len() != 1 || !observed[0].matches(request) {
             if old.state == DeliveryState::Delivered {
                 anyhow::bail!("retained delivery conflicts with readback")
             }
-            self.settle(&old, None)?;
+            self.settle(&old, None, authority)?;
             anyhow::bail!("delivery readback unknown or conflicting")
         }
-        self.settle(&old, observed.into_iter().next())
+        self.settle(&old, observed.into_iter().next(), authority)
     }
 }

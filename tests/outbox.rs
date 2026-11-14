@@ -4,7 +4,7 @@ use rusqlite::{params, Connection};
 use std::{
     path::{Path, PathBuf},
     process::Command,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
 };
 static ID: AtomicU64 = AtomicU64::new(0);
 const BYTES: &[u8] = b"exact accepted synthetic bytes\x00\xff";
@@ -287,6 +287,15 @@ fn child_process() {
     p.before = mode == "before";
     p.after = mode == "after";
     let mut o = Outbox::open(dir.join("core.sqlite")).unwrap();
+    if mode == "resolve" || mode == "resolve-crash" {
+        let resolution: ConflictResolution = serde_json::from_slice(
+            &std::fs::read(dir.join("resolution.json")).unwrap()).unwrap();
+        p.receipt_override = Some(resolution.receipt.receipt_id.clone());
+        let resolver = ResolveGrant { expected: resolution.clone(), calls: AtomicU64::new(0),
+            crash_after_lock: mode == "resolve-crash" };
+        let _ = o.resolve(&resolution, &Grant(r.clone()), &resolver, &mut p);
+        return;
+    }
     let _ = o.deliver(&r, &Grant(r.clone()), &mut p);
 }
 #[test]
@@ -427,4 +436,265 @@ fn contradictory_acknowledgement_and_readback_are_fenced_across_restart() {
         .reconcile(&r, &Grant(r.clone()), &mut Contradictory)
         .is_err());
     assert!(o.snapshot(&r).unwrap().unwrap().conflict);
+}
+
+struct ResolveGrant {
+    expected: ConflictResolution,
+    calls: AtomicU64,
+    crash_after_lock: bool,
+}
+impl ResolutionAuthority for ResolveGrant {
+    fn verify_resolution(&self, resolution: &ConflictResolution) -> bool {
+        let call = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
+        if self.crash_after_lock && call == 4 {
+            std::process::exit(97);
+        }
+        resolution == &self.expected
+    }
+}
+fn resolver(resolution: &ConflictResolution) -> ResolveGrant {
+    ResolveGrant { expected: resolution.clone(), calls: AtomicU64::new(0), crash_after_lock: false }
+}
+fn quarantine(t: &Temp) -> (DeliveryRequest, ConflictResolution, Peer) {
+    let r = request(t);
+    let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    outbox.deliver(&r, &Grant(r.clone()), &mut peer).unwrap();
+    peer.receipt_override = Some("receipt-resolved".into());
+    assert!(outbox.reconcile(&r, &Grant(r.clone()), &mut peer).is_err());
+    let resolution = ConflictResolution {
+        prior: outbox.snapshot(&r).unwrap().unwrap(),
+        receipt: DeliveryReceipt { request: r.clone(), receipt_id: "receipt-resolved".into() },
+        authorization_ref: "trusted-resolution-reference".into(),
+    };
+    assert!(resolution.prior.conflict);
+    (r, resolution, peer)
+}
+struct FreshGrant<'a>(&'a AtomicBool);
+impl DeliveryAuthority for FreshGrant<'_> {
+    fn verify(&self, _: &DeliveryRequest) -> bool { self.0.load(Ordering::SeqCst) }
+}
+struct RevokingPeer<'a> {
+    peer: Peer,
+    authorized: &'a AtomicBool,
+    after_send: bool,
+}
+impl Transport for RevokingPeer<'_> {
+    fn send(&mut self, request: &DeliveryRequest, bytes: &[u8]) -> anyhow::Result<Option<DeliveryReceipt>> {
+        let reply = self.peer.send(request, bytes)?;
+        if self.after_send { self.authorized.store(false, Ordering::SeqCst); }
+        Ok(reply)
+    }
+    fn lookup(&mut self, request: &DeliveryRequest) -> anyhow::Result<Vec<DeliveryReceipt>> {
+        let result = self.peer.lookup(request)?;
+        self.authorized.store(false, Ordering::SeqCst);
+        Ok(result)
+    }
+}
+#[test]
+fn revocation_during_readback_cannot_settle_delivery() {
+    for after_send in [false, true] {
+        let t = Temp::new();
+        let r = request(&t);
+        let authorized = AtomicBool::new(true);
+        let mut peer = RevokingPeer { peer: Peer::open(&t.0.join("peer.sqlite")), authorized: &authorized, after_send };
+        let mut outbox = Outbox::open(t.db()).unwrap();
+        assert!(outbox.deliver(&r, &FreshGrant(&authorized), &mut peer).is_err());
+        let pending = outbox.snapshot(&r).unwrap().unwrap();
+        assert_eq!(pending.state, DeliveryState::Unknown);
+        assert!(pending.receipt.is_none());
+        assert_eq!(peer.peer.count("send"), 1);
+        assert_eq!(peer.peer.count("lookup"), if after_send { 0 } else { 1 });
+        authorized.store(true, Ordering::SeqCst);
+        assert!(outbox.reconcile(&r, &FreshGrant(&authorized), &mut peer).is_err());
+        assert_eq!(outbox.snapshot(&r).unwrap().unwrap(), pending);
+        assert_eq!(peer.peer.count("send"), 1);
+    }
+}
+#[test]
+fn conflict_resolution_requires_separate_authority_and_exact_readback() {
+    let t = Temp::new();
+    let (r, resolution, mut peer) = quarantine(&t);
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    let before_lookup = peer.count("lookup");
+    assert!(outbox.resolve(&resolution, &Grant(r.clone()), &Deny, &mut peer).is_err());
+    assert_eq!(peer.count("lookup"), before_lookup);
+    let mut wrong = resolution.clone();
+    wrong.receipt.request.destination_id = "wrong-thread".into();
+    assert!(outbox.resolve(&wrong, &Grant(r.clone()), &resolver(&wrong), &mut peer).is_err());
+    wrong = resolution.clone();
+    wrong.prior.generation += 1;
+    assert!(outbox.resolve(&wrong, &Grant(r.clone()), &resolver(&wrong), &mut peer).is_err());
+    assert_eq!(peer.count("lookup"), before_lookup);
+    peer.ambiguous = true;
+    assert!(outbox.resolve(&resolution, &Grant(r.clone()), &resolver(&resolution), &mut peer).is_err());
+    peer.ambiguous = false;
+    peer.wrong = true;
+    assert!(outbox.resolve(&resolution, &Grant(r.clone()), &resolver(&resolution), &mut peer).is_err());
+    assert_eq!(outbox.snapshot(&r).unwrap().unwrap(), resolution.prior);
+    assert_eq!(peer.count("send"), 1);
+}
+#[test]
+fn resolution_retains_evidence_bytes_and_never_resends_after_restart() {
+    let t = Temp::new();
+    let (r, resolution, mut peer) = quarantine(&t);
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    let done = outbox.resolve(&resolution, &Grant(r.clone()), &resolver(&resolution), &mut peer).unwrap();
+    assert!(!done.conflict);
+    assert_eq!(done.generation, resolution.prior.generation + 1);
+    assert_eq!(done.receipt, Some(resolution.receipt.clone()));
+    assert_eq!(done.acknowledgement, resolution.prior.acknowledgement);
+    drop(outbox);
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    assert!(outbox.resolve(&resolution, &Grant(r.clone()), &resolver(&resolution), &mut peer).is_err());
+    assert_eq!(outbox.deliver(&r, &Grant(r.clone()), &mut peer).unwrap(), done);
+    assert_eq!(peer.count("send"), 1);
+    assert_eq!(Store::open(t.db()).unwrap().accepted(&r.accepted).unwrap(), BYTES);
+    let db = Connection::open(t.db()).unwrap();
+    let records: Vec<(String,String)> = db.prepare("SELECT kind,record FROM outbox_evidence ORDER BY generation").unwrap()
+        .query_map([], |row| Ok((row.get(0)?,row.get(1)?))).unwrap().map(Result::unwrap).collect();
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[0].0, "conflict");
+    assert!(records[0].1.contains("external-observed-receipt"));
+    assert!(records[0].1.contains("receipt-resolved"));
+    assert_eq!(serde_json::from_str::<ConflictResolution>(&records[1].1).unwrap(), resolution);
+    assert!(db.execute("DELETE FROM outbox_evidence", []).is_err());
+    assert!(db.execute("UPDATE outbox_evidence SET record='{}'", []).is_err());
+}
+#[test]
+fn resolution_revocation_during_readback_leaves_quarantine_unchanged() {
+    let t = Temp::new();
+    let (r, resolution, peer) = quarantine(&t);
+    let authorized = AtomicBool::new(true);
+    let mut peer = RevokingPeer { peer, authorized: &authorized, after_send: false };
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    assert!(outbox.resolve(&resolution, &FreshGrant(&authorized), &resolver(&resolution), &mut peer).is_err());
+    assert_eq!(outbox.snapshot(&r).unwrap().unwrap(), resolution.prior);
+    assert_eq!(peer.peer.count("send"), 1);
+}
+#[test]
+fn failed_resolution_commit_rolls_back_audit_and_state() {
+    let t = Temp::new();
+    let (r, resolution, mut peer) = quarantine(&t);
+    let db = Connection::open(t.db()).unwrap();
+    db.execute_batch("CREATE TRIGGER fail_resolution BEFORE UPDATE ON outbox WHEN NEW.conflict=0 BEGIN SELECT RAISE(ABORT,'synthetic commit failure'); END;").unwrap();
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    assert!(outbox.resolve(&resolution, &Grant(r.clone()), &resolver(&resolution), &mut peer).is_err());
+    assert_eq!(outbox.snapshot(&r).unwrap().unwrap(), resolution.prior);
+    assert_eq!(db.query_row("SELECT count(*) FROM outbox_evidence WHERE kind='resolution'", [], |r| r.get::<_,u64>(0)).unwrap(), 0);
+    assert_eq!(peer.count("send"), 1);
+}
+#[test]
+fn fresh_process_resolution_crash_and_racing_resolvers_never_send() {
+    let t = Temp::new();
+    let (r, resolution, peer) = quarantine(&t);
+    std::fs::write(t.0.join("request.json"), serde_json::to_vec(&r).unwrap()).unwrap();
+    std::fs::write(t.0.join("resolution.json"), serde_json::to_vec(&resolution).unwrap()).unwrap();
+    assert_eq!(child(&t.0, "resolve-crash").wait().unwrap().code(), Some(97));
+    assert_eq!(Outbox::open(t.db()).unwrap().snapshot(&r).unwrap().unwrap(), resolution.prior);
+    let mut children = (0..4).map(|_| child(&t.0, "resolve")).collect::<Vec<_>>();
+    for c in &mut children { assert!(c.wait().unwrap().success()); }
+    let done = Outbox::open(t.db()).unwrap().snapshot(&r).unwrap().unwrap();
+    assert!(!done.conflict);
+    assert_eq!(done.generation, resolution.prior.generation + 1);
+    let db = Connection::open(t.db()).unwrap();
+    assert_eq!(db.query_row("SELECT count(*) FROM outbox_evidence WHERE kind='resolution'", [], |row| row.get::<_,u64>(0)).unwrap(), 1);
+    assert_eq!(peer.count("send"), 1);
+}
+
+#[test]
+fn authority_rechecked_after_settlement_lock() {
+    struct CountingGrant(AtomicU64);
+    impl DeliveryAuthority for CountingGrant {
+        fn verify(&self, _: &DeliveryRequest) -> bool {
+            self.0.fetch_add(1, Ordering::SeqCst) < 4
+        }
+    }
+    let t = Temp::new();
+    let r = request(&t);
+    let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    assert!(outbox.deliver(&r, &CountingGrant(AtomicU64::new(0)), &mut peer).is_err());
+    let pending = outbox.snapshot(&r).unwrap().unwrap();
+    assert_eq!(pending.state, DeliveryState::Unknown);
+    assert!(pending.receipt.is_none());
+    assert_eq!(peer.count("send"), 1);
+}
+#[test]
+fn resolution_authority_rechecked_after_write_lock() {
+    struct UntilLock(AtomicU64);
+    impl ResolutionAuthority for UntilLock {
+        fn verify_resolution(&self, _: &ConflictResolution) -> bool {
+            self.0.fetch_add(1, Ordering::SeqCst) < 3
+        }
+    }
+    let t = Temp::new();
+    let (r, resolution, mut peer) = quarantine(&t);
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    assert!(outbox.resolve(&resolution, &Grant(r.clone()), &UntilLock(AtomicU64::new(0)), &mut peer).is_err());
+    assert_eq!(outbox.snapshot(&r).unwrap().unwrap(), resolution.prior);
+    let db = Connection::open(t.db()).unwrap();
+    assert_eq!(db.query_row("SELECT count(*) FROM outbox_evidence WHERE kind='resolution'", [], |row| row.get::<_,u64>(0)).unwrap(), 0);
+    assert_eq!(peer.count("send"), 1);
+}
+
+fn audit_rejection_retains_quarantine(full: bool) {
+    struct ManyReceipts(Peer);
+    impl Transport for ManyReceipts {
+        fn send(&mut self, r: &DeliveryRequest, b: &[u8]) -> anyhow::Result<Option<DeliveryReceipt>> {
+            self.0.send(r, b)
+        }
+        fn lookup(&mut self, r: &DeliveryRequest) -> anyhow::Result<Vec<DeliveryReceipt>> {
+            let receipt = self.0.lookup(r)?.remove(0);
+            let size = serde_json::to_string(&receipt)?.len();
+            Ok(vec![receipt; MAX_BYTES / size + 1])
+        }
+    }
+    let t = Temp::new();
+    let r = request(&t);
+    let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    let delivered = outbox.deliver(&r, &Grant(r.clone()), &mut peer).unwrap();
+    assert_eq!(delivered.state, DeliveryState::Delivered);
+    assert!(!delivered.conflict);
+    let db = Connection::open(t.db()).unwrap();
+    if full {
+        for generation in 0..CAPACITY {
+            db.execute("INSERT INTO outbox_evidence VALUES('capacity-fixture',?1,'conflict','{}')", [generation]).unwrap();
+        }
+    }
+    peer.receipt_override = Some("contradictory-receipt".into());
+    let error = if full {
+        outbox.reconcile(&r, &Grant(r.clone()), &mut peer).unwrap_err()
+    } else {
+        let mut many = ManyReceipts(peer);
+        let error = outbox.reconcile(&r, &Grant(r.clone()), &mut many).unwrap_err();
+        peer = many.0;
+        error
+    };
+    assert!(error.to_string().contains("durably fenced; evidence capacity exhausted"));
+    let fenced = outbox.snapshot(&r).unwrap().unwrap();
+    assert!(fenced.conflict);
+    assert_eq!(fenced.generation, delivered.generation + 1);
+    assert_eq!(fenced.receipt, delivered.receipt);
+    assert_eq!(fenced.acknowledgement, delivered.acknowledgement);
+    assert_eq!(db.query_row("SELECT count(*) FROM outbox_evidence", [], |row| row.get::<_, u64>(0)).unwrap(), if full { CAPACITY } else { 0 });
+    drop(outbox);
+    peer.receipt_override = None;
+    let before_lookup = peer.count("lookup");
+    let mut reopened = Outbox::open(t.db()).unwrap();
+    assert!(reopened.reconcile(&r, &Grant(r.clone()), &mut peer).is_err());
+    assert!(reopened.deliver(&r, &Grant(r.clone()), &mut peer).is_err());
+    assert_eq!(reopened.snapshot(&r).unwrap().unwrap(), fenced);
+    assert_eq!(peer.count("lookup"), before_lookup);
+    assert_eq!(peer.count("send"), 1);
+    assert_eq!(Store::open(t.db()).unwrap().accepted(&r.accepted).unwrap(), BYTES);
+}
+#[test]
+fn full_evidence_table_cannot_erase_observed_conflict() {
+    audit_rejection_retains_quarantine(true);
+}
+#[test]
+fn oversized_evidence_cannot_erase_observed_conflict() {
+    audit_rejection_retains_quarantine(false);
 }
