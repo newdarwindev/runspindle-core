@@ -1,9 +1,10 @@
 {
   "additional_contract_test_evidence": "docs/local-isolation-tests.json",
   "admission_boundary_checkpoints": {
+    "evidence": "docs/offline-finish-tests.json",
     "implementation": "explicit_synthetic_SDK_and_client_only",
     "independent_review": "user_waived_no_review_performed",
-    "qualification": "in_progress"
+    "qualification": "passed_four_boundaries_twice_plus_prior_binary_histories"
   },
   "admission_recovery": {
     "evidence": "docs/admission-recovery-tests.json",
