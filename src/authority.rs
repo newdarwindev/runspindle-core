@@ -114,11 +114,10 @@ impl LocalHelper {
         anyhow::ensure!(schema == 1, "unknown authority schema");
         // A schema version alone does not establish that uniqueness constraints
         // survived store preparation. Ambiguous local state must fail closed.
-        let state_rows: u64 = tx.query_row(
-            "SELECT count(*) FROM authority_state WHERE id=1",
-            [],
-            |r| r.get(0),
-        )?;
+        let state_rows: u64 =
+            tx.query_row("SELECT count(*) FROM authority_state WHERE id=1", [], |r| {
+                r.get(0)
+            })?;
         anyhow::ensure!(state_rows == 1, "ambiguous authority state");
         let grant_rows: u64 = tx.query_row(
             "SELECT count(*) FROM grants WHERE grant_id=?1",
