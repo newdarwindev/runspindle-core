@@ -7,10 +7,13 @@ import json
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 from mutation_target import isolated_target
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.prepared_builder import select  # noqa: E402
 
 
 @contextlib.contextmanager
@@ -33,6 +36,7 @@ def scratch(**kwargs):
 
 def main():
     pins = json.loads((ROOT / "temporal/toolchain.json").read_text())
+    _, builder = select(pins)
     mutations = [
         (
             "capacity_disabled",
@@ -98,7 +102,7 @@ def main():
                 f"{pathlib.Path.home()}/.cargo/git:/usr/local/cargo/git:ro",
                 "-w",
                 "/source",
-                pins["builder_image_id"],
+                builder["builder_image_id"],
                 "cargo",
                 "test",
                 "--locked",

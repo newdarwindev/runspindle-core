@@ -9,9 +9,12 @@ import json
 import pathlib
 import re
 import subprocess
+import sys
 from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.prepared_builder import select  # noqa: E402
 
 
 def run(args: list[Any], **kw: Any) -> subprocess.CompletedProcess[str]:
@@ -66,13 +69,7 @@ def prepare(
     directory = pathlib.Path(directory).resolve()
     directory.mkdir(parents=True, exist_ok=True)
     pins = json.loads((ROOT / "temporal/toolchain.json").read_text())
-    engine = subprocess.check_output(
-        ["docker", "info", "--format", "{{.OSType}} {{.Architecture}}"], text=True
-    ).strip()
-    if engine != f"{pins['engine_os']} {pins['engine_architecture']}":
-        raise RuntimeError(
-            "unsupported Docker engine target; no emulation/floating fallback"
-        )
+    architecture, selected = select(pins, require_image=False)
     deps = json.loads((ROOT / "docs/runtime-dependencies.json").read_text())
     if (
         deps["cargo_lock_sha256"] != sha(ROOT / "Cargo.lock")
@@ -115,10 +112,15 @@ def prepare(
         raise RuntimeError("SDK license mismatch")
     builderfile = directory / "Dockerfile.builder"
     version = pins["protoc_debian_version"]
-    builderfile.write_text(
-        f"FROM {pins['rust_image']}\nRUN apt-get update && apt-get install -y --no-install-recommends protobuf-compiler={version} libprotobuf-dev={version} && rm -rf /var/lib/apt/lists/*\n\nRUN rustup component add clippy --toolchain {pins['rust_version']}-aarch64-unknown-linux-gnu\n"
-    )
-    if sha(builderfile) != pins["builder_recipe_sha256"]:
+    if architecture == "linux/x86_64":
+        builderfile.write_bytes(
+            (ROOT / "temporal/builder-x64.Containerfile").read_bytes()
+        )
+    else:
+        builderfile.write_text(
+            f"FROM {pins['rust_image']}\nRUN apt-get update && apt-get install -y --no-install-recommends protobuf-compiler={version} libprotobuf-dev={version} && rm -rf /var/lib/apt/lists/*\n\nRUN rustup component add clippy --toolchain {pins['rust_version']}-aarch64-unknown-linux-gnu\n"
+        )
+    if sha(builderfile) != selected["builder_recipe_sha256"]:
         raise RuntimeError("builder recipe does not match reviewed pins")
     if acquire:
         # The acquisition phase alone can use the network.
@@ -144,11 +146,15 @@ def prepare(
             raise RuntimeError("SDK source archive mismatch")
         present = (
             subprocess.run(
-                ["docker", "image", "inspect", pins["builder_image_id"]],
+                ["docker", "image", "inspect", selected["builder_image_id"]],
                 capture_output=True,
             ).returncode
             == 0
         )
+        if not present and architecture == "linux/x86_64":
+            raise RuntimeError(
+                "x64 builder must come from verified platform image closure"
+            )
         if not present:
             run(
                 [
@@ -173,17 +179,17 @@ def prepare(
                 ],
                 text=True,
             ).strip()
-            if candidate != pins["builder_image_id"]:
+            if candidate != selected["builder_image_id"]:
                 raise RuntimeError(
                     "acquired builder differs from reviewed immutable ID; qualification blocked"
                 )
-    builder = subprocess.check_output(
-        ["docker", "image", "inspect", pins["builder_image_id"], "--format", "{{.Id}}"],
-        text=True,
-    ).strip()
-    if builder != pins["builder_image_id"]:
-        raise RuntimeError("builder image differs from reviewed immutable ID")
-    run(["docker", "image", "inspect", pins["rust_image"]], stdout=subprocess.DEVNULL)
+    _, selected = select(pins)
+    builder = selected["builder_image_id"]
+    if architecture == "linux/aarch64":
+        run(
+            ["docker", "image", "inspect", pins["rust_image"]],
+            stdout=subprocess.DEVNULL,
+        )
     protoc = subprocess.check_output(
         [
             "docker",
@@ -199,7 +205,7 @@ def prepare(
         ],
         text=True,
     ).split()[0]
-    if protoc != pins["protoc_sha256"]:
+    if protoc != selected["protoc_sha256"]:
         raise RuntimeError("prepared protoc byte mismatch")
     clippy = subprocess.check_output(
         [
@@ -212,11 +218,11 @@ def prepare(
             "none",
             builder,
             "sha256sum",
-            "/usr/local/rustup/toolchains/1.94.1-aarch64-unknown-linux-gnu/bin/clippy-driver",
+            f"/usr/local/rustup/toolchains/{pins['rust_version']}-{selected['clippy_target']}/bin/clippy-driver",
         ],
         text=True,
     ).split()[0]
-    if clippy != pins["clippy_driver_sha256"]:
+    if clippy != selected["clippy_driver_sha256"]:
         raise RuntimeError("prepared Clippy byte mismatch")
     archive = directory / "sdk-rust-1.2.0.tar.gz"
     if not archive.exists():
@@ -304,8 +310,9 @@ def prepare(
     ).hexdigest()
     labels = f"LABEL org.runspindle.source_sha256={fingerprint} org.runspindle.binary_sha256={sha(binary)} org.runspindle.cargo_lock_sha256={sha(ROOT / 'Cargo.lock')}\n"
     dockerfile = directory / "Dockerfile"
+    runtime_base = builder if architecture == "linux/x86_64" else pins["rust_image"]
     dockerfile.write_text(
-        f'FROM {pins["rust_image"]}\n{labels}COPY temporal-runtime /usr/local/bin/temporal-runtime\nCOPY notices /third-party-notices\nCOPY runtime-dependencies.json /third-party-notices/inventory.json\nENTRYPOINT ["/usr/local/bin/temporal-runtime"]\n'
+        f'FROM {runtime_base}\n{labels}COPY temporal-runtime /usr/local/bin/temporal-runtime\nCOPY notices /third-party-notices\nCOPY runtime-dependencies.json /third-party-notices/inventory.json\nENTRYPOINT ["/usr/local/bin/temporal-runtime"]\n'
     )
     run(
         [
@@ -338,6 +345,7 @@ def prepare(
         "evidence_class": "prepared_dependency_artifacts",
         "image_id": image,
         "builder_image_id": builder,
+        "builder_architecture": architecture,
         "source_hashes": source_hashes(),
         "source_sha256": fingerprint,
         "binary_sha256": sha(binary),

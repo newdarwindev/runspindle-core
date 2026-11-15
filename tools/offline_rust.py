@@ -5,14 +5,19 @@ import argparse
 import json
 import pathlib
 import subprocess
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.prepared_builder import select  # noqa: E402
+
 p = argparse.ArgumentParser()
 p.add_argument("command", choices=["test", "clippy", "clean"])
 p.add_argument("--features", default="host-runtime")
 p.add_argument("--test")
 a = p.parse_args()
 pins = json.loads((ROOT / "temporal/toolchain.json").read_text())
+_, builder = select(pins)
 args = [
     "docker",
     "run",
@@ -33,7 +38,7 @@ args = [
     f"{pathlib.Path.home()}/.cargo/git:/usr/local/cargo/git:ro",
     "-w",
     "/work",
-    pins["builder_image_id"],
+    builder["builder_image_id"],
     "cargo",
     a.command,
     "--locked",
