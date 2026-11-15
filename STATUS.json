@@ -11,6 +11,17 @@
     "production_authentication": "not_qualified",
     "status": "locally_tested_scripted_authority_real_Temporal_host_library"
   },
+  "authenticated_artifacts": {
+    "delivery_authority": "not_granted",
+    "evidence": "docs/authenticated-artifacts-evidence.json",
+    "feature": "authenticated-artifacts",
+    "issue_18": "open_partial_offline_evidence_component",
+    "mapping": "docs/AUTHENTICATED_ARTIFACTS.md",
+    "native_producer_custody": "not_implemented",
+    "production_trust_source": "not_implemented",
+    "status": "source_candidate_runtime_not_run",
+    "version": "runspindle.artifact-evidence.v1"
+  },
   "contract_test_evidence": "docs/local-contract-tests.json",
   "contract_tests": "passed",
   "delivery_outbox": {

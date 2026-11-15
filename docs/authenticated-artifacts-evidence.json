@@ -1,0 +1,172 @@
+{
+  "base_revision": "263a00442f10096ae691be9b479f59a90e53d1ca",
+  "commands": [
+    "cargo fmt --all -- --check",
+    "python3 tools/check_scaffold.py",
+    "python3 tools/offline_rust.py test --features verified-authority,authenticated-artifacts --test authenticated_artifacts",
+    "python3 tools/offline_rust.py test --features verified-authority,authenticated-artifacts",
+    "python3 tools/offline_rust.py clippy --features verified-authority,authenticated-artifacts",
+    "python3 tools/check_authenticated_artifact_mutations.py",
+    "python3 tools/validate.py"
+  ],
+  "core_26_dependency": "No dependency on held schema patch. Only crate visibility of 3 key helpers changes in durable.rs. Exact combined-tree qualification remains pending.",
+  "core_27_dependency": "Concurrent formatting-only PR27 is not incorporated; preserve and requalify the exact combined tree after integration.",
+  "effect_boundary": "No native or provider adapter invoked; authenticated result provides no delivery authority. Opt-in test observes actual Outbox Deny with independent zero call counts.",
+  "evidence_class": "source_and_static_only",
+  "inputs_sha256": {
+    ".github/workflows/validation.yml": "14301af28e81ce144333b20691efe9b7fc041df7583a7e69ffa745c9d87b7fd7",
+    "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+    "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+    "STATUS.json": "58c98661788d86fe9470c1ee95ad2f9abf40f3ef419039bdebc385ed31e959b7",
+    "docs/AUTHENTICATED_ARTIFACTS.md": "58224b0925370b50ccc40f92ef8975066c2283e3e1614f56e31d3065216b91bb",
+    "fixtures/authenticated-artifact-v1.json": "0d9d1ed8fbf4060515f8016b4ab7b46404531a65f594540fef32ba892f023c53",
+    "hygiene.json": "e0b1e2707f227ff6c03941c0a42a1a27b5ea87c4bd10bbc988c66fa1d783356e",
+    "provenance.json": "c1fe305f3635d01f828511a2835592ea15ae8c41348f46288f2fa380dee8e5cf",
+    "specs/README.md": "485e5d8f283ca2ac5aade9218660dceb95ee952e313fd4606cfc97ba6aa59483",
+    "src/authenticated_artifacts.rs": "5af4369f35a3f4eb297eee1174b834a94e0ab8acbf0faf5a5debc03a8f034893",
+    "src/authority.rs": "a2cd754f0c59139b1e770477d0597c5ebe5f6c40a74932e3dc07537e3bd7cfda",
+    "src/durable.rs": "87d1ac4be3808bd8e088ea2d43ee043ee0b9e4273f9f1ccc6e19b5356cbbb145",
+    "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+    "src/lib.rs": "7610ee529780ceab4d27989b4d0af8f8b313aa8f491cb059405ecd915e9363f2",
+    "temporal/toolchain.json": "325e936d34587984f4382877841a8f4bb7c9cabc13873917132e8c0f0bb1d80e",
+    "tests/authenticated_artifacts.rs": "f521ce55b3b31874aad0fc92ecd82b500b333887d8546b41588f85371f3d6e42",
+    "tools/check_authenticated_artifact_mutations.py": "0b035f62c5ecc3d0a98baec87de163e5e80f21c12544366c940c26cea0dc401f",
+    "validation-partitions.json": "60b08204f849766f85b56b99d0d365c11ef7f3bbe8914609bfa800e243da1381"
+  },
+  "issue": "https://github.com/newdarwindev/runspindle-core/issues/18",
+  "mutation_cases": [
+    {
+      "mutation": "forged-validator",
+      "test": "forged_same_revision_validator_and_producer_signatures_are_rejected"
+    },
+    {
+      "mutation": "forged-producer",
+      "test": "forged_same_revision_validator_and_producer_signatures_are_rejected"
+    },
+    {
+      "mutation": "native-scope",
+      "test": "signed_native_identity_policy_principal_and_epoch_need_exact_authority"
+    },
+    {
+      "mutation": "commit-authority",
+      "test": "revocation_at_final_commit_check_rolls_back_all_new_rows"
+    },
+    {
+      "mutation": "byte-length",
+      "test": "byte_replacement_length_mismatch_and_failed_validation_never_accept"
+    },
+    {
+      "mutation": "retained-validation",
+      "test": "duplicate_acceptance_denies_missing_or_corrupt_validation_without_repair"
+    },
+    {
+      "mutation": "canonical-order",
+      "test": "independent_literal_canonical_and_signature_vector"
+    }
+  ],
+  "parent": "https://github.com/newdarwindev/runspindle-core/issues/4",
+  "results": {
+    "aggregate_validation": "not_run_requires_approved_runtime",
+    "behavioral_mutations": "not_run_approved_Docker_boundary_unavailable",
+    "deployment": "not_run",
+    "git_diff_check": "passed",
+    "independent_literal_fixture": "passed_Python_JSON_Ed25519_and_digest_consistency_only_not_Rust",
+    "independent_review": "approved_source_static_only",
+    "legacy_wire_lockfile_and_admission_unchanged": "passed_static_comparison",
+    "live_acceptance": "not_run",
+    "mutation_anchors_and_named_cases": "passed_static_only",
+    "native_producer_custody": "not_implemented",
+    "pinned_python_lint_format_type_checks": "not_run_pinned_tools_unavailable",
+    "preserve_order_feature_build": "not_run_existing_offline_lockfile_preserved",
+    "production_trust_source": "not_implemented",
+    "python_mutation_script_syntax": "passed_not_executed",
+    "rust_compile_tests_clippy": "not_run_approved_Docker_boundary_unavailable",
+    "rust_formatting": "not_run_rustfmt_unavailable",
+    "scaffold_structure": "passed",
+    "validation_manifest_exact_once": "passed_static_only",
+    "workflow_runner_trigger_permissions_and_image_pins": "unchanged_static_comparison_only_existing_job_timeout_extended"
+  },
+  "review_fixes": {
+    "bounded_race": "preopened_stores_and_5_second_start_channel_receive",
+    "canonical_encoding": "explicit_recursive_key_sorting_and_independent_literal_signature_vector",
+    "duplicate_retained_validation": "guard_before_duplicate_return_with_no_repair_regressions",
+    "freshness_conflict_regressions": "within_check_expiry_rollback_and_post_read_trust_clock_denial_for_accept_and_read_plus_valid_changed_evidence_control",
+    "mutation_harness": "baseline_first_same_offline_context_seven_mutants_owned_container_cleanup_15s_plus_15s",
+    "validation_integration": "existing_rust_feature_sets_and_mutation_2_exact_once"
+  },
+  "review_history": [
+    {
+      "decision": "changes_requested",
+      "evidence_sha256": "8f9a1fc495217e969d9d3812be736a4d2fa51bc9c8eafb8bbf9654a4f228b8ef",
+      "findings": [
+        "Duplicate acceptance must verify retained validation and must not repair corrupt/missing rows.",
+        "Canonical signing bytes must explicitly sort recursively, independent of serde_json Map features, with an independent literal vector.",
+        "Normal Rust validation must enable authenticated-artifacts and the existing partition manifest must include the mutation check.",
+        "Mutation detection requires a clean baseline and bounded owned-container cleanup after CLI timeouts.",
+        "Race setup must not strand workers on an unbounded barrier after an open/spawn failure.",
+        "Authored regressions must cover within-verify expiry/rollback, post-read trust/clock denial and valid changed-evidence duplicate conflict."
+      ],
+      "inputs_sha256": {
+        "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+        "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+        "docs/AUTHENTICATED_ARTIFACTS.md": "8c063ef01b87a97d4c7e0a9323eff5bec06b3f33c82e7557e4c2c2f77eb4bb2f",
+        "src/authenticated_artifacts.rs": "f6263ca2e25827bd9a6ddf8267c1ce6e175cf632b01f2b1cc7c33101d4d53add",
+        "src/durable.rs": "87d1ac4be3808bd8e088ea2d43ee043ee0b9e4273f9f1ccc6e19b5356cbbb145",
+        "src/lib.rs": "7610ee529780ceab4d27989b4d0af8f8b313aa8f491cb059405ecd915e9363f2",
+        "temporal/toolchain.json": "325e936d34587984f4382877841a8f4bb7c9cabc13873917132e8c0f0bb1d80e",
+        "tests/authenticated_artifacts.rs": "1f6e50a4464fa2e5a475d7e0e6fba32bdf9c6b0183f4744b9a1b1c50ac11d421",
+        "tools/check_authenticated_artifact_mutations.py": "131015572580ee238cb0de16c97ebec73f51f93cb379de1ffa45881334d00d42"
+      },
+      "phase": "initial_source_static_review",
+      "results": {
+        "aggregate_validation": "not_run_requires_approved_runtime",
+        "behavioral_mutations": "not_run_approved_Docker_boundary_unavailable",
+        "deployment": "not_run",
+        "git_diff_check": "passed",
+        "independent_review": "pending",
+        "legacy_wire_lockfile_and_admission_unchanged": "passed_static_comparison",
+        "live_acceptance": "not_run",
+        "mutation_anchors_and_named_cases": "passed_static_only",
+        "native_producer_custody": "not_implemented",
+        "production_trust_source": "not_implemented",
+        "python_mutation_script_syntax": "passed_not_executed",
+        "rust_compile_tests_clippy": "not_run_approved_Docker_boundary_unavailable",
+        "rust_formatting": "not_run_rustfmt_unavailable",
+        "scaffold_structure": "passed"
+      }
+    }
+  ],
+  "runtime_boundary": "No Core/Rust/Docker execution, fallback, installation or denied operation retry occurred.",
+  "schema_version": 1,
+  "synthetic_fixture_sha256": "1abd9939eb2ecfd5ea047c060e93e4b7bcfe6abf948d877247894d6dbac01594",
+  "test_cases": [
+    "signatures_bind_real_bytes_and_preserve_exact_acceptance",
+    "forged_same_revision_validator_and_producer_signatures_are_rejected",
+    "signed_native_identity_policy_principal_and_epoch_need_exact_authority",
+    "roles_epochs_revocation_audience_and_lifetimes_fail_closed",
+    "byte_replacement_length_mismatch_and_failed_validation_never_accept",
+    "legacy_acceptance_cannot_be_upgraded_or_inherit_authenticated_read",
+    "evidence_failure_rolls_back_validation_and_acceptance_together",
+    "revocation_at_final_commit_check_rolls_back_all_new_rows",
+    "conflicting_authenticated_acceptances_race_without_mixed_evidence",
+    "authenticated_artifact_child",
+    "fresh_process_reopens_exact_evidence_and_rechecks_revocation",
+    "evidence_wire_and_missing_journal_fail_closed",
+    "authenticated_acceptance_is_not_a_delivery_grant",
+    "conflicting_prior_validation_and_corrupt_retained_evidence_are_denied",
+    "independent_literal_canonical_and_signature_vector",
+    "duplicate_acceptance_denies_missing_or_corrupt_validation_without_repair",
+    "valid_changed_evidence_cannot_replace_an_existing_acceptance",
+    "expiry_clock_rollback_and_post_read_authority_loss_fail_closed",
+    "retained_read_rechecks_authority_and_clock_after_byte_read"
+  ],
+  "trust_boundary": "Injected role/epoch/lifetime/exact-scope public-key state and clock are trusted. No issuer/configuration installed; fixed test seeds are public synthetic fixtures.",
+  "validation_plan": {
+    "check_timeout_seconds": 3600,
+    "clean_baseline_required": true,
+    "existing_mutation_2_job_timeout_minutes": 75,
+    "features": "verified-authority,authenticated-artifacts",
+    "mutation_count": 7,
+    "runtime_execution": "not_run"
+  }
+}

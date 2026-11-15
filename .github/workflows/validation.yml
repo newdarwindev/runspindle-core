@@ -66,7 +66,8 @@ jobs:
   mutation_2:
     name: validation / mutation_2
     runs-on: [self-hosted, linux, x64, runspindle-isolated, strix]
-    timeout-minutes: 15
+    # 600s artifact check + 3600s bounded evidence harness + setup margin.
+    timeout-minutes: 75
     outputs:
       receipt: ${{ steps.partition.outputs.receipt }}
     steps:

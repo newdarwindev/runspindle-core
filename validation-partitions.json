@@ -31,7 +31,8 @@
       "check-authority-mutations"
     ],
     "mutation_2": [
-      "artifact-mutations"
+      "artifact-mutations",
+      "authenticated-artifact-mutations"
     ],
     "mutation_3": [
       "runtime-mutations"

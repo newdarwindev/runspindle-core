@@ -47,3 +47,6 @@ pub mod envelope;
 
 #[cfg(feature = "verified-authority")]
 pub mod authenticated;
+
+#[cfg(feature = "authenticated-artifacts")]
+pub mod authenticated_artifacts;

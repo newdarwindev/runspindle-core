@@ -6,6 +6,14 @@
     "legacy_source_import": "none",
     "mapping": "specs/runtime.md"
   },
+  "authenticated_artifact_source": {
+    "classification": "original_closed_attestation_verifier_and_synthetic_tests",
+    "dependency": "ring =0.17.14 already locked",
+    "fixture": "Public synthetic literal vector generated independently with Python stdlib and cryptography 50.0.0; no Core imports or production keys",
+    "mapping": "docs/AUTHENTICATED_ARTIFACTS.md",
+    "runtime_qualification": "not_run",
+    "source_import": "none"
+  },
   "durable_artifact_source": {
     "classification": "original_implementation_and_synthetic_fixtures",
     "contract_commit": "96299842505ce7662178b7c7b00fd31f6c2754f0",
