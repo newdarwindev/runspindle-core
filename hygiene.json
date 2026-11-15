@@ -93,7 +93,9 @@
         "cargo",
         "test",
         "--offline",
-        "--locked"
+        "--locked",
+        "--features",
+        "verified-authority"
       ],
       "required_files": [
         "Cargo.toml",
@@ -109,6 +111,8 @@
         "--offline",
         "--locked",
         "--all-targets",
+        "--features",
+        "verified-authority",
         "--",
         "-D",
         "warnings"
@@ -155,6 +159,18 @@
         "tools/check_outbox_mutations.py"
       ],
       "timeout_seconds": 600
+    },
+    {
+      "id": "check-authority-mutations",
+      "command": [
+        "python3",
+        "tools/check_authority_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_authority_mutations.py",
+        "temporal/toolchain.json"
+      ],
+      "timeout_seconds": 1800
     }
   ],
   "lockfiles": [

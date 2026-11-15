@@ -325,6 +325,24 @@ fn assertion_is_immutable_and_revocation_is_retained() {
 }
 
 #[test]
+fn absent_helper_cannot_use_script_authorized_flag() {
+    let f = Fixture::new();
+    f.insert(&f.assertion(), false);
+    let mut ports = f.ports();
+    ports.helper = None;
+    for action in [PortAction::ObserveHost, PortAction::Launch] {
+        assert_eq!(
+            ports
+                .invoke(&f.call(action, Action::Dispatch))
+                .unwrap()
+                .status,
+            PortStatus::Denied
+        );
+    }
+    f.assert_zero_calls();
+}
+
+#[test]
 fn cancellation_permission_does_not_require_reconciliation_permission() {
     let f = Fixture::new();
     let mut a = f.assertion();
