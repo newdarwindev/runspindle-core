@@ -35,6 +35,12 @@
     "notices": "licenses/authority",
     "source_import": "none"
   },
+  "outbox_resolution_source": {
+    "classification": "original_extension_of_existing_outbox_with_synthetic_tests",
+    "mapping": "docs/OUTBOX_RESOLUTION.md",
+    "runtime_qualification": "not_run",
+    "source_import": "none"
+  },
   "provenance_policy": "Public IDs resolve to a privately retained source record containing repository, exact commit, path, source hash and review notes. Private repository names, URLs and operational details are omitted.",
   "qualification_support_source": {
     "classification": "original_Python_Rust_conformance_support",

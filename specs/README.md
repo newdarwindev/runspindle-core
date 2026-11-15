@@ -51,3 +51,5 @@ full-system/live acceptance remain blocked.
 [Verified authority v1](verified-authority-v1.md) adds a separate optional offline
 Ed25519 admission lane and four explicit envelope mappings. It preserves the
 historical development workflows and their separate evidence boundaries.
+
+Bounded unqualified core17 candidate: [authorized outbox conflict resolution](../docs/OUTBOX_RESOLUTION.md). Rust/native checks remain pending.
