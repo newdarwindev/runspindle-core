@@ -107,6 +107,81 @@ pub(crate) fn room(tx: &Transaction<'_>, table: &str) -> anyhow::Result<()> {
     anyhow::ensure!(count < CAPACITY, "store capacity");
     Ok(())
 }
+// Known Core-authored schema layouts. Extra unrelated objects are left alone.
+// SQLite drops IF NOT EXISTS from sqlite_schema. Runs of whitespace outside
+// literals collapse to one separator, preserving token boundaries. Equivalent
+// layouts with other punctuation spacing fail closed rather than being guessed.
+// We do not repair missing tables or safety triggers.
+pub(crate) type SchemaObject = (&'static str, &'static str, &'static str);
+pub(crate) const ARTIFACT_SCHEMA: &[SchemaObject] = &[
+    ("table", "artifacts", "CREATE TABLE IF NOT EXISTS artifacts(identity TEXT PRIMARY KEY,reference TEXT NOT NULL,bytes BLOB NOT NULL CHECK(length(bytes)<=1048576));"),
+    ("table", "validations", "CREATE TABLE IF NOT EXISTS validations(identity TEXT PRIMARY KEY,record TEXT NOT NULL,artifact_identity TEXT NOT NULL REFERENCES artifacts(identity));"),
+    ("table", "acceptances", "CREATE TABLE IF NOT EXISTS acceptances(identity TEXT PRIMARY KEY,record TEXT NOT NULL,artifact_identity TEXT NOT NULL REFERENCES artifacts(identity));"),
+    ("trigger", "artifacts_immutable", "CREATE TRIGGER IF NOT EXISTS artifacts_immutable BEFORE UPDATE ON artifacts BEGIN SELECT RAISE(ABORT,'immutable artifact');END;"),
+    ("trigger", "artifacts_retained", "CREATE TRIGGER IF NOT EXISTS artifacts_retained BEFORE DELETE ON artifacts BEGIN SELECT RAISE(ABORT,'retained artifact');END;"),
+    ("trigger", "validations_immutable", "CREATE TRIGGER IF NOT EXISTS validations_immutable BEFORE UPDATE ON validations BEGIN SELECT RAISE(ABORT,'immutable validation');END;"),
+    ("trigger", "validations_retained", "CREATE TRIGGER IF NOT EXISTS validations_retained BEFORE DELETE ON validations BEGIN SELECT RAISE(ABORT,'retained validation');END;"),
+    ("trigger", "acceptances_immutable", "CREATE TRIGGER IF NOT EXISTS acceptances_immutable BEFORE UPDATE ON acceptances BEGIN SELECT RAISE(ABORT,'immutable acceptance');END;"),
+    ("trigger", "acceptances_retained", "CREATE TRIGGER IF NOT EXISTS acceptances_retained BEFORE DELETE ON acceptances BEGIN SELECT RAISE(ABORT,'retained acceptance');END;"),
+];
+pub(crate) fn schema_object_exists(connection: &Connection, name: &str) -> anyhow::Result<bool> {
+    Ok(connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name=?1)",
+        [name],
+        |row| row.get(0),
+    )?)
+}
+fn normalized_schema(sql: &str) -> String {
+    // Only remove the bootstrap clause at a known CREATE prefix, never inside
+    // a quoted literal. SQLite omits this clause from its stored definition.
+    let sql = if let Some(rest) = sql.strip_prefix("CREATE TABLE IF NOT EXISTS ") {
+        format!("CREATE TABLE {rest}")
+    } else if let Some(rest) = sql.strip_prefix("CREATE TRIGGER IF NOT EXISTS ") {
+        format!("CREATE TRIGGER {rest}")
+    } else {
+        sql.to_owned()
+    };
+    let mut normalized = String::new();
+    let mut quoted = false;
+    let mut pending_space = false;
+    for c in sql.chars() {
+        if !quoted && c.is_ascii_whitespace() {
+            pending_space = !normalized.is_empty();
+            continue;
+        }
+        if pending_space {
+            // Preserve a token separator: PRIMARYKEY is an SQLite type name,
+            // not the PRIMARY KEY constraint. Never concatenate SQL tokens.
+            normalized.push(' ');
+            pending_space = false;
+        }
+        if c == '\'' {
+            quoted = !quoted;
+        }
+        normalized.push(if quoted { c } else { c.to_ascii_lowercase() });
+    }
+    normalized.trim_end_matches(';').to_owned()
+}
+pub(crate) fn require_schema(connection: &Connection, objects: &[SchemaObject]) -> anyhow::Result<()> {
+    for (kind, name, sql) in objects {
+        let mut statement = connection.prepare("SELECT type,sql FROM sqlite_master WHERE name=?1")?;
+        let rows = statement.query_map([name], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?.collect::<rusqlite::Result<Vec<_>>>()?;
+        anyhow::ensure!(
+            rows.len() == 1 && rows[0].0 == *kind
+                && normalized_schema(&rows[0].1) == normalized_schema(sql),
+            "missing or incompatible core schema object: {name}"
+        );
+    }
+    Ok(())
+}
+pub(crate) fn create_schema(connection: &Connection, objects: &[SchemaObject]) -> anyhow::Result<()> {
+    for (_, _, sql) in objects {
+        connection.execute_batch(sql)?;
+    }
+    Ok(())
+}
 impl Store {
     pub fn open(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let mut connection = Connection::open(path)?;
@@ -117,32 +192,22 @@ impl Store {
             "unsupported core store schema"
         );
         connection.execute_batch("PRAGMA journal_mode=WAL;PRAGMA synchronous=FULL;PRAGMA foreign_keys=ON;PRAGMA max_page_count=524288;")?;
-        if version == 0 {
-            let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-            let current: u64 = tx.pragma_query_value(None, "user_version", |r| r.get(0))?;
-            anyhow::ensure!(
-                current == 0 || current == 1,
-                "unsupported concurrent core schema"
-            );
-            if current == 0 {
-                let existing:u64=tx.query_row("SELECT count(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",[],|r|r.get(0))?;
-                anyhow::ensure!(
-                    existing == 0,
-                    "unversioned nonempty database is not a core store"
-                );
-                tx.execute_batch("CREATE TABLE IF NOT EXISTS artifacts(identity TEXT PRIMARY KEY,reference TEXT NOT NULL,bytes BLOB NOT NULL CHECK(length(bytes)<=1048576));
-        CREATE TABLE IF NOT EXISTS validations(identity TEXT PRIMARY KEY,record TEXT NOT NULL,artifact_identity TEXT NOT NULL REFERENCES artifacts(identity));
-        CREATE TABLE IF NOT EXISTS acceptances(identity TEXT PRIMARY KEY,record TEXT NOT NULL,artifact_identity TEXT NOT NULL REFERENCES artifacts(identity));
-        CREATE TRIGGER IF NOT EXISTS artifacts_immutable BEFORE UPDATE ON artifacts BEGIN SELECT RAISE(ABORT,'immutable artifact');END;
-        CREATE TRIGGER IF NOT EXISTS artifacts_retained BEFORE DELETE ON artifacts BEGIN SELECT RAISE(ABORT,'retained artifact');END;
-        CREATE TRIGGER IF NOT EXISTS validations_immutable BEFORE UPDATE ON validations BEGIN SELECT RAISE(ABORT,'immutable validation');END;
-        CREATE TRIGGER IF NOT EXISTS validations_retained BEFORE DELETE ON validations BEGIN SELECT RAISE(ABORT,'retained validation');END;
-        CREATE TRIGGER IF NOT EXISTS acceptances_immutable BEFORE UPDATE ON acceptances BEGIN SELECT RAISE(ABORT,'immutable acceptance');END;
-        CREATE TRIGGER IF NOT EXISTS acceptances_retained BEFORE DELETE ON acceptances BEGIN SELECT RAISE(ABORT,'retained acceptance');END;
-        PRAGMA user_version=1;")?;
-            }
-            tx.commit()?;
+        // Validate and initialize under one write lock. A version marker alone
+        // must never turn an incomplete journal into a new empty store.
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let current: u64 = tx.pragma_query_value(None, "user_version", |r| r.get(0))?;
+        anyhow::ensure!(current == 0 || current == 1, "unsupported concurrent core schema");
+        if current == 0 {
+            let existing: u64 = tx.query_row(
+                "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'",
+                [], |r| r.get(0),
+            )?;
+            anyhow::ensure!(existing == 0, "unversioned nonempty database is not a core store");
+            create_schema(&tx, ARTIFACT_SCHEMA)?;
+            tx.pragma_update(None, "user_version", 1)?;
         }
+        require_schema(&tx, ARTIFACT_SCHEMA)?;
+        tx.commit()?;
         Ok(Self { connection })
     }
     pub fn put(

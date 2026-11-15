@@ -19,6 +19,11 @@ pins = json.loads((ROOT / "temporal/toolchain.json").read_text())
 _, builder = select(pins)
 mutations = [
     (
+        "missing-journal-recreated",
+        "missing_journal_blocks_fresh_process_without_resend",
+        {"durable::require_schema(&tx, OUTBOX_SCHEMA)?;": "durable::create_schema(&tx, OUTBOX_SCHEMA)?;"},
+    ),
+    (
         "fabricated-receipt",
         "fabricated_delivery_receipts_do_not_pass_readback",
         {"if observed.len() == 1 && observed[0] == reply {": "if true {"},
@@ -35,6 +40,7 @@ mutations = [
     ),
 ]
 expected_anchors = {
+    "durable::require_schema(&tx, OUTBOX_SCHEMA)?;": 1,
     "if observed.len() == 1 && observed[0] == reply {": 1,
     "resolver.verify_resolution(resolution)": 4,
     "authority.verify(request)": 11,

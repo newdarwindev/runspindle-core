@@ -1,0 +1,69 @@
+{
+  "base_revision": "263a00442f10096ae691be9b479f59a90e53d1ca",
+  "bounded_subprocess_timeout_seconds": 15,
+  "commands": [
+    "cargo fmt --all -- --check",
+    "python3 tools/check_scaffold.py",
+    "python3 tools/offline_rust.py test --features artifact-store --test durable_artifacts",
+    "python3 tools/offline_rust.py test --features delivery-runtime --test outbox",
+    "python3 tools/offline_rust.py clippy --features delivery-runtime",
+    "python3 tools/check_outbox_mutations.py",
+    "python3 tools/check_artifact_mutations.py",
+    "python3 tools/validate.py"
+  ],
+  "deliberate_mutation": "missing-journal-recreated",
+  "effect_observer": "independent synthetic SQLite peer records attempted sends and read-only lookups",
+  "evidence_class": "source_and_static_only",
+  "fixture_identity": "synthetic strings and bytes only; legacy v1 schema independently authored in tests/outbox.rs",
+  "inputs_sha256": {
+    "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+    "Cargo.toml": "78183bbfbbd041240f2750b078eee3786d735a78a0b77ecedc18e761fed37bc8",
+    "src/durable.rs": "847c54acd4ae41250bdae14fbad93e140ce5d297e06e8343d0b0c4bf5e7b80a4",
+    "src/outbox.rs": "5ccf019cfc53a1855378bee5d752ed912761954d6843d3e460fa3685e9f39cb9",
+    "temporal/toolchain.json": "325e936d34587984f4382877841a8f4bb7c9cabc13873917132e8c0f0bb1d80e",
+    "tests/durable_artifacts.rs": "75a1597a2d055b0b08ed8ff2892010c403cd222b82de01106441ae0297e02429",
+    "tests/outbox.rs": "12e7c75de29c006219ad6c334b4ef7ed8ecf8e55ee2edfdbf8a72365a73cc127",
+    "tools/check_artifact_mutations.py": "ee1891f22a40aa2945a8dcce86bcaaa46a7d529acc6bde022ce63dd53846dbcc",
+    "tools/check_outbox_mutations.py": "a4e60bc23b471d1f7aab9c020531ccd115121e5e94553ad79ec0ca907883d628"
+  },
+  "issue": "https://github.com/newdarwindev/runspindle-core/issues/19",
+  "parent": "https://github.com/newdarwindev/runspindle-core/issues/1",
+  "qualification_limits": [
+    "schema_reopen_only",
+    "no_admission_store_changes",
+    "no_power_loss_or_filesystem_qualification",
+    "no_hostile_writer_defense",
+    "complete_metadata_loss_not_detectable",
+    "legacy_v1_absent_audit_indistinguishable_from_pre_audit_layout"
+  ],
+  "randomness": "none",
+  "results": {
+    "aggregate_validation": "not_run_requires_approved_runtime",
+    "behavioral_mutations": "not_run_approved_Docker_boundary_unavailable",
+    "deployment": "not_run",
+    "git_diff_check": "passed",
+    "independent_review": "approved_source_static_only",
+    "mutation_anchor_and_named_test_validation": "passed_static_only",
+    "native_temporal_and_live_acceptance": "not_run",
+    "python_mutation_script_syntax": "passed_not_executed",
+    "rust_clippy": "not_run_approved_Docker_boundary_unavailable",
+    "rust_compile_and_component_tests": "not_run_approved_Docker_boundary_unavailable",
+    "rust_formatting": "not_run_rustfmt_unavailable",
+    "scaffold_structure": "passed",
+    "source_ddl_comparison": "passed_16_existing_definitions_identical"
+  },
+  "runtime_boundary": "No Core executable, Rust test, Docker invocation, native fallback or replacement runtime was executed.",
+  "scenario_ids": [
+    "missing_journal_blocks_fresh_process_without_resend",
+    "legacy_migration_preserves_reservation_across_concurrent_processes",
+    "failed_schema_upgrade_rolls_back_before_fresh_process_retry",
+    "incomplete_or_incompatible_outbox_schemas_are_never_repaired",
+    "existing_v1_evidence_is_retained_but_partial_audit_schema_is_denied",
+    "versioned_artifact_store_requires_original_tables_and_safety_triggers",
+    "corrupt_file_and_unversioned_schema_block_without_initialization",
+    "missing_primary_key_token_boundary_blocks_artifact_reopen",
+    "missing_primary_key_token_boundary_blocks_outbox_reopen"
+  ],
+  "schema_token_mutation": "schema_token_boundary",
+  "schema_version": 1
+}
