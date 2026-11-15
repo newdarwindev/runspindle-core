@@ -20,3 +20,16 @@ fn installed_entrypoint_checks_storage_and_rejects_configuration() {
         .unwrap();
     assert!(!denied.status.success());
 }
+
+#[cfg(not(feature = "verified-authority"))]
+#[test]
+fn disabled_authenticated_worker_rejects_before_parsing_connection_target() {
+    let denied = std::process::Command::new(env!("CARGO_BIN_EXE_temporal-runtime"))
+        .args(["authenticated-worker", "invalid-target", "/effects"])
+        .output()
+        .unwrap();
+    assert!(!denied.status.success());
+    let error = String::from_utf8_lossy(&denied.stderr);
+    assert!(error.contains("expected worker, client or enabled authenticated-worker"));
+    assert!(!error.contains("pinned local temporal endpoint required"));
+}

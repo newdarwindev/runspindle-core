@@ -39,3 +39,11 @@ mod tests {
         assert_eq!(activate(), Err(ReadinessError::NotImplemented));
     }
 }
+
+#[cfg(feature = "verified-authority")]
+pub mod authority;
+#[cfg(feature = "runtime-envelope")]
+pub mod envelope;
+
+#[cfg(feature = "verified-authority")]
+pub mod authenticated;

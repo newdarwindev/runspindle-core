@@ -2,7 +2,7 @@
   "sdk_source_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
   "sdk_release": "https://github.com/temporalio/sdk-rust/releases/tag/v1.2.0",
   "sdk_source_archive_sha256": "de6eb7e4ac0ab55310506b87baaccf02e0a03616ac3194fc562b433b1a19f3ae",
-  "cargo_lock_sha256": "30ef826145e0c36679d6075549302f0cd9e753b16393e7533e71a2d8ea0b2f45",
+  "cargo_lock_sha256": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
   "dependencies": [
     {
       "name": "adler2",
@@ -4954,5 +4954,12 @@
     "version": "clippy 0.1.94 (e408947bfd 2026-03-25)",
     "distribution_manifest_sha256": "732a93639b6e29fc909fa249c2af0464723cb859170a18e8c3908557e28114fb",
     "license": "MIT OR Apache-2.0; notices retained in official toolchain image share/doc/clippy"
+  },
+  "direct_authority_dependency": {
+    "name": "ring",
+    "version": "0.17.14",
+    "source": "already_locked_crate_promoted_to_explicit_optional_dependency",
+    "notice_directory": "licenses/authority",
+    "new_transitive_packages": 0
   }
 }

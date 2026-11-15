@@ -56,3 +56,8 @@ validation and default-deny authorized acceptance. Delivery and live gates remai
 The [durable delivery mapping](specs/durable-delivery.md) adds a single-send outbox and
 real Temporal H07 workflow with a scripted destination ledger. Actual Tether and
 full-system/live acceptance remain blocked.
+
+The optional `verified-authority` feature adds an offline signed-assertion
+admission lane; see [scope and reproducible checks](docs/VERIFIED_AUTHORITY.md).
+It does not enable production authentication or change the historical development
+workflows. Runtime envelopes are separate from existing library/history formats.

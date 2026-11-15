@@ -1,0 +1,224 @@
+[
+  {
+    "envelope": {
+      "version": "runspindle.envelope.v1",
+      "message_type": "admission_request",
+      "message_id": "message-1",
+      "binding": {
+        "task_id": "task-1",
+        "revision": 1,
+        "operation_id": "operation-1",
+        "policy_revision": "policy-1",
+        "host_id": "host-1",
+        "workspace_id": "workspace-1",
+        "lease_epoch": 1
+      },
+      "payload": {
+        "delivery_namespace": "synthetic",
+        "delivery_id": "delivery-1",
+        "predecessor_revision": null,
+        "normalized_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "grant_ref": "grant-1"
+      }
+    },
+    "component": {
+      "version": "runspindle.runtime.v1",
+      "task_id": "task-1",
+      "revision": 1,
+      "operation_id": "operation-1",
+      "policy_revision": "policy-1",
+      "host_id": "host-1",
+      "workspace_id": "workspace-1",
+      "lease_epoch": 1,
+      "delivery_namespace": "synthetic",
+      "delivery_id": "delivery-1",
+      "predecessor_revision": null,
+      "normalized_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "grant_ref": "grant-1"
+    }
+  },
+  {
+    "envelope": {
+      "version": "runspindle.envelope.v1",
+      "message_type": "host_observation",
+      "message_id": "message-2",
+      "binding": {
+        "task_id": "task-1",
+        "revision": 1,
+        "operation_id": "operation-1",
+        "policy_revision": "policy-1",
+        "host_id": "host-1",
+        "workspace_id": "workspace-1",
+        "lease_epoch": 1
+      },
+      "payload": {
+        "native_session_id": "session-1",
+        "sequence": 1,
+        "observed_at_ms": 0,
+        "state": "completed"
+      }
+    },
+    "component": {
+      "binding": {
+        "task_id": "task-1",
+        "revision": 1,
+        "operation_id": "operation-1",
+        "policy_revision": "policy-1",
+        "host_id": "host-1",
+        "workspace_id": "workspace-1",
+        "lease_epoch": 1
+      },
+      "native_session_id": "session-1",
+      "sequence": 1,
+      "observed_at_ms": 0,
+      "terminal": "Completed"
+    }
+  },
+  {
+    "envelope": {
+      "version": "runspindle.envelope.v1",
+      "message_type": "delivery_request",
+      "message_id": "message-3",
+      "binding": {
+        "task_id": "task-1",
+        "revision": 1,
+        "operation_id": "operation-1",
+        "policy_revision": "policy-1",
+        "host_id": "host-1",
+        "workspace_id": "workspace-1",
+        "lease_epoch": 1
+      },
+      "payload": {
+        "artifact_id": "artifact-1",
+        "artifact_revision": 1,
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "validator_revision": "validator-1",
+        "account_id": "account-1",
+        "destination_id": "destination-1",
+        "delivery_operation_id": "delivery-op-1"
+      }
+    },
+    "component": {
+      "version": "runspindle.integration.v1",
+      "accepted": {
+        "validation": {
+          "artifact": {
+            "artifact_id": "artifact-1",
+            "artifact_revision": 1,
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "binding": {
+              "task_id": "task-1",
+              "revision": 1,
+              "operation_id": "operation-1",
+              "policy_revision": "policy-1",
+              "host_id": "host-1",
+              "workspace_id": "workspace-1",
+              "lease_epoch": 1
+            }
+          },
+          "validator_revision": "validator-1",
+          "policy_revision": "policy-1",
+          "passed": true
+        }
+      },
+      "account_id": "account-1",
+      "destination_id": "destination-1",
+      "delivery_operation_id": "delivery-op-1"
+    }
+  },
+  {
+    "envelope": {
+      "version": "runspindle.envelope.v1",
+      "message_type": "delivery_receipt",
+      "message_id": "message-4",
+      "binding": {
+        "task_id": "task-1",
+        "revision": 1,
+        "operation_id": "operation-1",
+        "policy_revision": "policy-1",
+        "host_id": "host-1",
+        "workspace_id": "workspace-1",
+        "lease_epoch": 1
+      },
+      "payload": {
+        "request": {
+          "artifact_id": "artifact-1",
+          "artifact_revision": 1,
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "validator_revision": "validator-1",
+          "account_id": "account-1",
+          "destination_id": "destination-1",
+          "delivery_operation_id": "delivery-op-1"
+        },
+        "receipt_id": "receipt-1"
+      }
+    },
+    "component": {
+      "request": {
+        "version": "runspindle.integration.v1",
+        "accepted": {
+          "validation": {
+            "artifact": {
+              "artifact_id": "artifact-1",
+              "artifact_revision": 1,
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "binding": {
+                "task_id": "task-1",
+                "revision": 1,
+                "operation_id": "operation-1",
+                "policy_revision": "policy-1",
+                "host_id": "host-1",
+                "workspace_id": "workspace-1",
+                "lease_epoch": 1
+              }
+            },
+            "validator_revision": "validator-1",
+            "policy_revision": "policy-1",
+            "passed": true
+          }
+        },
+        "account_id": "account-1",
+        "destination_id": "destination-1",
+        "delivery_operation_id": "delivery-op-1"
+      },
+      "receipt_id": "receipt-1"
+    }
+  },
+  {
+    "envelope": {
+      "version": "runspindle.envelope.v1",
+      "message_type": "host_observation",
+      "message_id": "message-2",
+      "binding": {
+        "task_id": "task-1",
+        "revision": 1,
+        "operation_id": "operation-1",
+        "policy_revision": "policy-1",
+        "host_id": "host-1",
+        "workspace_id": "workspace-1",
+        "lease_epoch": 18446744073709551615
+      },
+      "payload": {
+        "native_session_id": "session-1",
+        "sequence": 18446744073709551615,
+        "observed_at_ms": 18446744073709551615,
+        "state": "completed"
+      }
+    },
+    "component": {
+      "binding": {
+        "task_id": "task-1",
+        "revision": 1,
+        "operation_id": "operation-1",
+        "policy_revision": "policy-1",
+        "host_id": "host-1",
+        "workspace_id": "workspace-1",
+        "lease_epoch": 18446744073709551615
+      },
+      "native_session_id": "session-1",
+      "sequence": 18446744073709551615,
+      "observed_at_ms": 18446744073709551615,
+      "terminal": "Completed"
+    }
+  }
+]
