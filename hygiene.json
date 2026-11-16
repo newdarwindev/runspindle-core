@@ -95,7 +95,7 @@
         "--offline",
         "--locked",
         "--features",
-        "verified-authority"
+        "verified-authority,authenticated-artifacts"
       ],
       "required_files": [
         "Cargo.toml",
@@ -112,7 +112,7 @@
         "--locked",
         "--all-targets",
         "--features",
-        "verified-authority",
+        "verified-authority,authenticated-artifacts",
         "--",
         "-D",
         "warnings"
@@ -171,6 +171,21 @@
         "temporal/toolchain.json"
       ],
       "timeout_seconds": 1800
+    },
+    {
+      "id": "authenticated-artifact-mutations",
+      "command": [
+        "python3",
+        "tools/check_authenticated_artifact_mutations.py"
+      ],
+      "required_files": [
+        "tools/check_authenticated_artifact_mutations.py",
+        "src/authenticated_artifacts.rs",
+        "tests/authenticated_artifacts.rs",
+        "fixtures/authenticated-artifact-v1.json",
+        "temporal/toolchain.json"
+      ],
+      "timeout_seconds": 3600
     }
   ],
   "lockfiles": [

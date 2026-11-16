@@ -26,7 +26,7 @@ impl ArtifactRef {
                 .bytes()
                 .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
     }
-    fn key(&self) -> anyhow::Result<String> {
+    pub(crate) fn key(&self) -> anyhow::Result<String> {
         Ok(serde_json::to_string(&(
             &self.binding,
             &self.artifact_id,
@@ -48,7 +48,7 @@ impl Validation {
             && valid_id(&self.validator_revision)
             && self.policy_revision == self.artifact.binding.policy_revision
     }
-    fn key(&self) -> anyhow::Result<String> {
+    pub(crate) fn key(&self) -> anyhow::Result<String> {
         Ok(serde_json::to_string(&(
             &self.artifact,
             &self.validator_revision,
@@ -78,7 +78,7 @@ impl Accepted {
     pub fn artifact(&self) -> &ArtifactRef {
         &self.validation.artifact
     }
-    fn key(&self) -> anyhow::Result<String> {
+    pub(crate) fn key(&self) -> anyhow::Result<String> {
         Ok(serde_json::to_string(&(
             &self.artifact().binding.task_id,
             self.artifact().binding.revision,

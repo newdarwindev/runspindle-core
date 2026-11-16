@@ -6,6 +6,7 @@ publish = false
 autobins = false
 
 [features]
+authenticated-artifacts = ["artifact-store", "dep:ring"]
 runtime-envelope = ["delivery-runtime"]
 verified-authority = ["runtime-envelope", "dep:ring"]
 delivery-runtime = ["host-runtime", "artifact-store"]

@@ -54,4 +54,6 @@ historical development workflows and their separate evidence boundaries.
 
 Bounded unqualified core17 candidate: [authorized outbox conflict resolution](../docs/OUTBOX_RESOLUTION.md). Rust/native checks remain pending.
 
+Bounded unqualified Core #18 candidate: [authenticated artifact evidence](../docs/AUTHENTICATED_ARTIFACTS.md). This separate opt-in path preserves existing references and envelope v1; Rust/native checks remain pending.
+
 Bounded unqualified Core #19 candidate: [fail-closed store reopening](../docs/STORE_SCHEMA_RECOVERY.md). Required schema validation and atomic outbox v2 migration are authored; Rust/native checks remain pending.
