@@ -18,6 +18,7 @@ source = (ROOT / "src/durable.rs").read_text()
 start = source.index("        let stored: String = tx.query_row(")
 end = source.index("        anyhow::ensure!(", start)
 mutations = {
+    "schema_token_boundary": ("normalized.push(' ');", ""),
     "skipped_validation": (
         source[start:end],
         "        let stored = serde_json::to_string(validation)?;\n",

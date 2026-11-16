@@ -92,24 +92,61 @@ type StoredDelivery = (String, String, Option<String>, u64, Option<String>, bool
 pub struct Outbox {
     store: Store,
 }
+// v2 records that the additive audit schema committed. v1 remains readable
+// only through this atomic migration; v2 never recreates a missing journal.
+const OUTBOX_VERSION_SCHEMA: &[durable::SchemaObject] = &[
+    ("table", "outbox_schema", "CREATE TABLE IF NOT EXISTS outbox_schema(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL);"),
+];
+const OUTBOX_SCHEMA: &[durable::SchemaObject] = &[
+    ("table", "outbox", "CREATE TABLE IF NOT EXISTS outbox(operation TEXT PRIMARY KEY,request TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('reserved','unknown','delivered')),receipt TEXT,generation INTEGER NOT NULL,acknowledgement TEXT,conflict INTEGER NOT NULL CHECK(conflict IN (0,1)));"),
+    ("trigger", "outbox_binding_immutable", "CREATE TRIGGER IF NOT EXISTS outbox_binding_immutable BEFORE UPDATE OF operation,request ON outbox BEGIN SELECT RAISE(ABORT,'immutable delivery binding');END;"),
+    ("trigger", "outbox_retained", "CREATE TRIGGER IF NOT EXISTS outbox_retained BEFORE DELETE ON outbox BEGIN SELECT RAISE(ABORT,'retained delivery');END;"),
+];
+const EVIDENCE_SCHEMA: &[durable::SchemaObject] = &[
+    ("table", "outbox_evidence", "CREATE TABLE IF NOT EXISTS outbox_evidence(operation TEXT NOT NULL,generation INTEGER NOT NULL,kind TEXT NOT NULL,record TEXT NOT NULL,PRIMARY KEY(operation,generation,kind));"),
+    ("trigger", "outbox_evidence_immutable", "CREATE TRIGGER IF NOT EXISTS outbox_evidence_immutable BEFORE UPDATE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'immutable delivery evidence');END;"),
+    ("trigger", "outbox_evidence_retained", "CREATE TRIGGER IF NOT EXISTS outbox_evidence_retained BEFORE DELETE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'retained delivery evidence');END;"),
+];
 impl Outbox {
     pub fn open(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
         let mut store = Store::open(path)?;
         let tx = store
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        tx.execute_batch("CREATE TABLE IF NOT EXISTS outbox_schema(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL);INSERT OR IGNORE INTO outbox_schema VALUES(1,1);
-      CREATE TABLE IF NOT EXISTS outbox(operation TEXT PRIMARY KEY,request TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('reserved','unknown','delivered')),receipt TEXT,generation INTEGER NOT NULL,acknowledgement TEXT,conflict INTEGER NOT NULL CHECK(conflict IN (0,1)));
-      CREATE TRIGGER IF NOT EXISTS outbox_binding_immutable BEFORE UPDATE OF operation,request ON outbox BEGIN SELECT RAISE(ABORT,'immutable delivery binding');END;
-      CREATE TRIGGER IF NOT EXISTS outbox_retained BEFORE DELETE ON outbox BEGIN SELECT RAISE(ABORT,'retained delivery');END;")?;
-        let version: u64 =
-            tx.query_row("SELECT version FROM outbox_schema WHERE id=1", [], |r| {
-                r.get(0)
-            })?;
-        anyhow::ensure!(version == 1, "unsupported outbox version");
-        tx.execute_batch("CREATE TABLE IF NOT EXISTS outbox_evidence(operation TEXT NOT NULL,generation INTEGER NOT NULL,kind TEXT NOT NULL,record TEXT NOT NULL,PRIMARY KEY(operation,generation,kind));
-          CREATE TRIGGER IF NOT EXISTS outbox_evidence_immutable BEFORE UPDATE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'immutable delivery evidence');END;
-          CREATE TRIGGER IF NOT EXISTS outbox_evidence_retained BEFORE DELETE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'retained delivery evidence');END;")?;
+        if durable::schema_object_exists(&tx, "outbox_schema")? {
+            durable::require_schema(&tx, OUTBOX_VERSION_SCHEMA)?;
+            let version: u64 = tx.query_row(
+                "SELECT version FROM outbox_schema WHERE id=1", [], |r| r.get(0),
+            )?;
+            anyhow::ensure!(version == 1 || version == 2, "unsupported outbox version");
+            durable::require_schema(&tx, OUTBOX_SCHEMA)?;
+            if version == 1 {
+                // Historical v1 may have no audit schema at all. A partial
+                // schema is corruption, not permission to discard evidence.
+                let mut existing = false;
+                for (_, name, _) in EVIDENCE_SCHEMA {
+                    existing |= durable::schema_object_exists(&tx, name)?;
+                }
+                if !existing {
+                    durable::create_schema(&tx, EVIDENCE_SCHEMA)?;
+                }
+                durable::require_schema(&tx, EVIDENCE_SCHEMA)?;
+                anyhow::ensure!(tx.execute(
+                    "UPDATE outbox_schema SET version=2 WHERE id=1 AND version=1", [],
+                )? == 1, "outbox migration conflict");
+            } else {
+                durable::require_schema(&tx, EVIDENCE_SCHEMA)?;
+            }
+        } else {
+            // Only a genuinely artifact-only store may acquire a first outbox.
+            for (_, name, _) in OUTBOX_SCHEMA.iter().chain(EVIDENCE_SCHEMA) {
+                anyhow::ensure!(!durable::schema_object_exists(&tx, name)?, "unversioned outbox schema");
+            }
+            durable::create_schema(&tx, OUTBOX_VERSION_SCHEMA)?;
+            durable::create_schema(&tx, OUTBOX_SCHEMA)?;
+            durable::create_schema(&tx, EVIDENCE_SCHEMA)?;
+            tx.execute("INSERT INTO outbox_schema VALUES(1,2)", [])?;
+        }
         tx.commit()?;
         Ok(Self { store })
     }
@@ -230,7 +267,10 @@ impl Outbox {
         };
         anyhow::ensure!(tx.execute("UPDATE outbox SET state=?1,acknowledgement=?2,conflict=?3,generation=?4 WHERE operation=?5 AND generation=?6",params![state_text,acknowledgement.as_ref().map(serde_json::to_string).transpose()?,conflict,next,request.delivery_operation_id,old.generation])?==1,"delivery ownership conflict");
         tx.commit()?;
-        anyhow::ensure!(!incomplete_evidence, "delivery conflict durably fenced; evidence capacity exhausted");
+        anyhow::ensure!(
+            !incomplete_evidence,
+            "delivery conflict durably fenced; evidence capacity exhausted"
+        );
         Ok(DeliverySnapshot {
             request: request.clone(),
             state,
@@ -255,7 +295,10 @@ impl Outbox {
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current =
             Self::read(&tx, &old.request)?.ok_or_else(|| anyhow::anyhow!("missing reservation"))?;
-        anyhow::ensure!(authority.verify(&old.request), "settlement authority unavailable");
+        anyhow::ensure!(
+            authority.verify(&old.request),
+            "settlement authority unavailable"
+        );
         anyhow::ensure!(
             !current.conflict,
             "delivery receipt conflict is durably fenced"
@@ -320,8 +363,14 @@ impl Outbox {
         kind: &str,
         record: &str,
     ) -> anyhow::Result<()> {
-        anyhow::ensure!(Self::evidence_room(tx, record)?, "delivery evidence capacity");
-        tx.execute("INSERT INTO outbox_evidence VALUES(?1,?2,?3,?4)", params![request.delivery_operation_id,generation,kind,record])?;
+        anyhow::ensure!(
+            Self::evidence_room(tx, record)?,
+            "delivery evidence capacity"
+        );
+        tx.execute(
+            "INSERT INTO outbox_evidence VALUES(?1,?2,?3,?4)",
+            params![request.delivery_operation_id, generation, kind, record],
+        )?;
         Ok(())
     }
     /// Resolve quarantine using independent readback only. Never calls send.
@@ -336,26 +385,69 @@ impl Outbox {
     ) -> anyhow::Result<DeliverySnapshot> {
         let prior = &resolution.prior;
         let request = &prior.request;
-        anyhow::ensure!(request.valid() && prior.conflict && resolution.receipt.matches(request)
-            && valid_id(&resolution.authorization_ref), "invalid conflict resolution");
-        anyhow::ensure!(authority.verify(request) && resolver.verify_resolution(resolution), "resolution denied");
+        anyhow::ensure!(
+            request.valid()
+                && prior.conflict
+                && resolution.receipt.matches(request)
+                && valid_id(&resolution.authorization_ref),
+            "invalid conflict resolution"
+        );
+        anyhow::ensure!(
+            authority.verify(request) && resolver.verify_resolution(resolution),
+            "resolution denied"
+        );
         self.store.accepted(&request.accepted)?;
-        anyhow::ensure!(self.snapshot(request)?.as_ref() == Some(prior), "stale resolution generation");
-        anyhow::ensure!(authority.verify(request) && resolver.verify_resolution(resolution), "resolution readback denied");
+        anyhow::ensure!(
+            self.snapshot(request)?.as_ref() == Some(prior),
+            "stale resolution generation"
+        );
+        anyhow::ensure!(
+            authority.verify(request) && resolver.verify_resolution(resolution),
+            "resolution readback denied"
+        );
         let observed = transport.lookup(request)?;
-        anyhow::ensure!(observed.as_slice() == std::slice::from_ref(&resolution.receipt), "resolution requires exact unique readback");
-        anyhow::ensure!(authority.verify(request) && resolver.verify_resolution(resolution), "resolution authority changed");
-        let tx = self.store.connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        anyhow::ensure!(Self::read(&tx, request)?.as_ref() == Some(prior), "stale resolution owner");
-        anyhow::ensure!(authority.verify(request) && resolver.verify_resolution(resolution), "resolution authority unavailable after lock");
-        let next = prior.generation.checked_add(1).filter(|n| *n <= i64::MAX as u64)
+        anyhow::ensure!(
+            observed.as_slice() == std::slice::from_ref(&resolution.receipt),
+            "resolution requires exact unique readback"
+        );
+        anyhow::ensure!(
+            authority.verify(request) && resolver.verify_resolution(resolution),
+            "resolution authority changed"
+        );
+        let tx = self
+            .store
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        anyhow::ensure!(
+            Self::read(&tx, request)?.as_ref() == Some(prior),
+            "stale resolution owner"
+        );
+        anyhow::ensure!(
+            authority.verify(request) && resolver.verify_resolution(resolution),
+            "resolution authority unavailable after lock"
+        );
+        let next = prior
+            .generation
+            .checked_add(1)
+            .filter(|n| *n <= i64::MAX as u64)
             .ok_or_else(|| anyhow::anyhow!("delivery generation capacity"))?;
-        Self::evidence(&tx, request, prior.generation, "resolution", &serde_json::to_string(resolution)?)?;
+        Self::evidence(
+            &tx,
+            request,
+            prior.generation,
+            "resolution",
+            &serde_json::to_string(resolution)?,
+        )?;
         anyhow::ensure!(tx.execute("UPDATE outbox SET state='delivered',receipt=?1,conflict=0,generation=?2 WHERE operation=?3 AND generation=?4 AND conflict=1",params![serde_json::to_string(&resolution.receipt)?,next,request.delivery_operation_id,prior.generation])? == 1, "resolution ownership conflict");
         tx.commit()?;
-        Ok(DeliverySnapshot { request: request.clone(), state: DeliveryState::Delivered,
-            receipt: Some(resolution.receipt.clone()), generation: next,
-            acknowledgement: prior.acknowledgement.clone(), conflict: false })
+        Ok(DeliverySnapshot {
+            request: request.clone(),
+            state: DeliveryState::Delivered,
+            receipt: Some(resolution.receipt.clone()),
+            generation: next,
+            acknowledgement: prior.acknowledgement.clone(),
+            conflict: false,
+        })
     }
     pub fn deliver<A: DeliveryAuthority, T: Transport>(
         &mut self,

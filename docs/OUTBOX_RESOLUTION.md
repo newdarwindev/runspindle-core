@@ -30,7 +30,7 @@ contradiction checks, rather than the superseded transport acknowledgement.
 
 An additive outbox_evidence table retains first conflict observations and each
 resolution proposal. UPDATE/DELETE triggers prevent normal mutation. Existing
-outbox state values/version remain readable; no destructive migration occurs.
+outbox state values remain unchanged. The subsequent [schema recovery candidate](STORE_SCHEMA_RECOVERY.md) atomically marks complete audit schemas as outbox version 2; historical version 1 layouts migrate without deleting rows. Older version-1-only binaries reject version 2.
 Records are limited to 1 MiB and the table to the existing 1024-record capacity.
 Conflict evidence exhaustion or oversize commits the quarantine flag and advances
 generation, then returns an explicit incomplete-evidence error. No oversized row
