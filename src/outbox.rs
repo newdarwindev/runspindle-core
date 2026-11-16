@@ -92,24 +92,61 @@ type StoredDelivery = (String, String, Option<String>, u64, Option<String>, bool
 pub struct Outbox {
     store: Store,
 }
+// v2 records that the additive audit schema committed. v1 remains readable
+// only through this atomic migration; v2 never recreates a missing journal.
+const OUTBOX_VERSION_SCHEMA: &[durable::SchemaObject] = &[
+    ("table", "outbox_schema", "CREATE TABLE IF NOT EXISTS outbox_schema(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL);"),
+];
+const OUTBOX_SCHEMA: &[durable::SchemaObject] = &[
+    ("table", "outbox", "CREATE TABLE IF NOT EXISTS outbox(operation TEXT PRIMARY KEY,request TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('reserved','unknown','delivered')),receipt TEXT,generation INTEGER NOT NULL,acknowledgement TEXT,conflict INTEGER NOT NULL CHECK(conflict IN (0,1)));"),
+    ("trigger", "outbox_binding_immutable", "CREATE TRIGGER IF NOT EXISTS outbox_binding_immutable BEFORE UPDATE OF operation,request ON outbox BEGIN SELECT RAISE(ABORT,'immutable delivery binding');END;"),
+    ("trigger", "outbox_retained", "CREATE TRIGGER IF NOT EXISTS outbox_retained BEFORE DELETE ON outbox BEGIN SELECT RAISE(ABORT,'retained delivery');END;"),
+];
+const EVIDENCE_SCHEMA: &[durable::SchemaObject] = &[
+    ("table", "outbox_evidence", "CREATE TABLE IF NOT EXISTS outbox_evidence(operation TEXT NOT NULL,generation INTEGER NOT NULL,kind TEXT NOT NULL,record TEXT NOT NULL,PRIMARY KEY(operation,generation,kind));"),
+    ("trigger", "outbox_evidence_immutable", "CREATE TRIGGER IF NOT EXISTS outbox_evidence_immutable BEFORE UPDATE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'immutable delivery evidence');END;"),
+    ("trigger", "outbox_evidence_retained", "CREATE TRIGGER IF NOT EXISTS outbox_evidence_retained BEFORE DELETE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'retained delivery evidence');END;"),
+];
 impl Outbox {
     pub fn open(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
         let mut store = Store::open(path)?;
         let tx = store
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        tx.execute_batch("CREATE TABLE IF NOT EXISTS outbox_schema(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL);INSERT OR IGNORE INTO outbox_schema VALUES(1,1);
-      CREATE TABLE IF NOT EXISTS outbox(operation TEXT PRIMARY KEY,request TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('reserved','unknown','delivered')),receipt TEXT,generation INTEGER NOT NULL,acknowledgement TEXT,conflict INTEGER NOT NULL CHECK(conflict IN (0,1)));
-      CREATE TRIGGER IF NOT EXISTS outbox_binding_immutable BEFORE UPDATE OF operation,request ON outbox BEGIN SELECT RAISE(ABORT,'immutable delivery binding');END;
-      CREATE TRIGGER IF NOT EXISTS outbox_retained BEFORE DELETE ON outbox BEGIN SELECT RAISE(ABORT,'retained delivery');END;")?;
-        let version: u64 =
-            tx.query_row("SELECT version FROM outbox_schema WHERE id=1", [], |r| {
-                r.get(0)
-            })?;
-        anyhow::ensure!(version == 1, "unsupported outbox version");
-        tx.execute_batch("CREATE TABLE IF NOT EXISTS outbox_evidence(operation TEXT NOT NULL,generation INTEGER NOT NULL,kind TEXT NOT NULL,record TEXT NOT NULL,PRIMARY KEY(operation,generation,kind));
-          CREATE TRIGGER IF NOT EXISTS outbox_evidence_immutable BEFORE UPDATE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'immutable delivery evidence');END;
-          CREATE TRIGGER IF NOT EXISTS outbox_evidence_retained BEFORE DELETE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'retained delivery evidence');END;")?;
+        if durable::schema_object_exists(&tx, "outbox_schema")? {
+            durable::require_schema(&tx, OUTBOX_VERSION_SCHEMA)?;
+            let version: u64 = tx.query_row(
+                "SELECT version FROM outbox_schema WHERE id=1", [], |r| r.get(0),
+            )?;
+            anyhow::ensure!(version == 1 || version == 2, "unsupported outbox version");
+            durable::require_schema(&tx, OUTBOX_SCHEMA)?;
+            if version == 1 {
+                // Historical v1 may have no audit schema at all. A partial
+                // schema is corruption, not permission to discard evidence.
+                let mut existing = false;
+                for (_, name, _) in EVIDENCE_SCHEMA {
+                    existing |= durable::schema_object_exists(&tx, name)?;
+                }
+                if !existing {
+                    durable::create_schema(&tx, EVIDENCE_SCHEMA)?;
+                }
+                durable::require_schema(&tx, EVIDENCE_SCHEMA)?;
+                anyhow::ensure!(tx.execute(
+                    "UPDATE outbox_schema SET version=2 WHERE id=1 AND version=1", [],
+                )? == 1, "outbox migration conflict");
+            } else {
+                durable::require_schema(&tx, EVIDENCE_SCHEMA)?;
+            }
+        } else {
+            // Only a genuinely artifact-only store may acquire a first outbox.
+            for (_, name, _) in OUTBOX_SCHEMA.iter().chain(EVIDENCE_SCHEMA) {
+                anyhow::ensure!(!durable::schema_object_exists(&tx, name)?, "unversioned outbox schema");
+            }
+            durable::create_schema(&tx, OUTBOX_VERSION_SCHEMA)?;
+            durable::create_schema(&tx, OUTBOX_SCHEMA)?;
+            durable::create_schema(&tx, EVIDENCE_SCHEMA)?;
+            tx.execute("INSERT INTO outbox_schema VALUES(1,2)", [])?;
+        }
         tx.commit()?;
         Ok(Self { store })
     }

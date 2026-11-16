@@ -73,6 +73,12 @@
   },
   "schema_version": 1,
   "sources": [],
+  "store_schema_recovery_source": {
+    "classification": "original_schema_guards_and_synthetic_regressions",
+    "mapping": "docs/STORE_SCHEMA_RECOVERY.md",
+    "runtime_qualification": "not_run",
+    "source_import": "none"
+  },
   "temporal_dependency": {
     "crate": "temporalio-sdk",
     "inventory": "docs/runtime-dependencies.json",

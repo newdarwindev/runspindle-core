@@ -70,6 +70,15 @@
     "version": "runspindle.fixture.v1"
   },
   "stage": "temporal_development_candidate",
+  "store_schema_recovery": {
+    "behavioral_qualification": "blocked_approved_Docker_boundary_unavailable",
+    "core_schema": 1,
+    "evidence": "docs/store-schema-recovery.json",
+    "issue_19": "open_partial_schema_reopen_only",
+    "mapping": "docs/STORE_SCHEMA_RECOVERY.md",
+    "outbox_schema": 2,
+    "status": "source_candidate_runtime_not_run"
+  },
   "temporal_integration": "locally_tested_pinned_development_server",
   "verified_admission": {
     "evidence": "docs/FOUNDATION_AUTHORITY.md",

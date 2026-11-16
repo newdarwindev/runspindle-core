@@ -325,3 +325,63 @@ fn stored_byte_tampering_cannot_inherit_acceptance() {
     assert!(s.accepted(&accepted).is_err());
     assert!(s.accept(VERSION, &v, &Grant).is_err());
 }
+
+#[test]
+fn versioned_artifact_store_requires_original_tables_and_safety_triggers() {
+    for corruption in [
+        "DROP TABLE acceptances;",
+        "DROP TRIGGER artifacts_immutable;",
+        "DROP TRIGGER validations_retained;",
+        "DROP TRIGGER acceptances_immutable;CREATE TRIGGER acceptances_immutable BEFORE UPDATE ON acceptances BEGIN SELECT 1;END;",
+        "ALTER TABLE artifacts ADD COLUMN unknown TEXT;",
+        "PRAGMA user_version=99;",
+    ] {
+        let t = Temp::new();
+        let mut store = Store::open(t.db()).unwrap();
+        let (_, validation) = prepare(&mut store, "artifact");
+        store.accept(VERSION, &validation, &Grant).unwrap();
+        drop(store);
+        let db = rusqlite::Connection::open(t.db()).unwrap();
+        db.execute_batch(corruption).unwrap();
+        assert!(Store::open(t.db()).is_err(), "accepted corruption: {corruption}");
+        let bytes: Vec<u8> = db.query_row("SELECT bytes FROM artifacts", [], |r| r.get(0)).unwrap();
+        assert_eq!(bytes, BYTES);
+    }
+}
+#[test]
+fn corrupt_file_and_unversioned_schema_block_without_initialization() {
+    let t = Temp::new();
+    let corrupt = b"synthetic non-SQLite corruption fixture";
+    std::fs::write(t.db(), corrupt).unwrap();
+    assert!(Store::open(t.db()).is_err());
+    assert_eq!(std::fs::read(t.db()).unwrap(), corrupt);
+    let t = Temp::new();
+    let db = rusqlite::Connection::open(t.db()).unwrap();
+    db.execute_batch("CREATE VIEW artifacts AS SELECT 1;").unwrap();
+    assert!(Store::open(t.db()).is_err());
+    assert_eq!(db.query_row("PRAGMA user_version", [], |r| r.get::<_, u64>(0)).unwrap(), 0);
+    assert_eq!(db.query_row("SELECT count(*) FROM sqlite_master WHERE type='table'", [], |r| r.get::<_, u64>(0)).unwrap(), 0);
+}
+
+#[test]
+fn missing_primary_key_token_boundary_blocks_artifact_reopen() {
+    // Both spellings are valid declared SQLite types, not PRIMARY KEY. They
+    // previously collided with the required DDL when whitespace was deleted.
+    for declared_type in ["TEXT PRIMARYKEY", "TEXTPRIMARYKEY"] {
+        let t = Temp::new();
+        Store::open(t.db()).unwrap();
+        let db = rusqlite::Connection::open(t.db()).unwrap();
+        db.execute_batch(&format!("DROP TABLE artifacts;
+          CREATE TABLE artifacts(identity {declared_type},reference TEXT NOT NULL,bytes BLOB NOT NULL CHECK(length(bytes)<=1048576));
+          CREATE TRIGGER artifacts_immutable BEFORE UPDATE ON artifacts BEGIN SELECT RAISE(ABORT,'immutable artifact');END;
+          CREATE TRIGGER artifacts_retained BEFORE DELETE ON artifacts BEGIN SELECT RAISE(ABORT,'retained artifact');END;")).unwrap();
+        let pk: u64 = db.query_row("SELECT pk FROM pragma_table_info('artifacts') WHERE name='identity'", [], |r| r.get(0)).unwrap();
+        assert_eq!(pk, 0, "fixture must actually lack a primary key");
+        for _ in 0..2 {
+            db.execute("INSERT INTO artifacts VALUES('duplicate','{}',x'00')", []).unwrap();
+        }
+        assert_eq!(db.query_row("SELECT count(*) FROM artifacts WHERE identity='duplicate'", [], |r| r.get::<_, u64>(0)).unwrap(), 2);
+        assert!(Store::open(t.db()).is_err(), "accepted missing identity constraint: {declared_type}");
+        assert_eq!(db.query_row("SELECT count(*) FROM artifacts WHERE identity='duplicate'", [], |r| r.get::<_, u64>(0)).unwrap(), 2);
+    }
+}
