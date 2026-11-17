@@ -77,3 +77,35 @@ in the receipt. This local lane is not the required GitHub isolated-runner check
 full composition qualification, OS-level network isolation, power-loss testing,
 or completion of Core #4/#18. Existing signed-artifact mutation suite coverage
 must not be inferred from the new guard-bypass mutation.
+
+## Exact local result
+
+Tested source: `e28019f542ad0b60ab16934078b296eecda1d0b0`.
+[Qualification receipt](evidence/authenticated-delivery-20261117/qualification.json)
+records 144 top-level Rust tests in each run, including 29 authenticated-artifact
+and 41 outbox tests, zero ignored, plus strict Clippy, formatting and scaffold.
+The second run enables optimized Python in the pinned cross-process fixture; Rust
+remains an unoptimized debug build. Ten added authenticated-delivery test functions
+include one child-process entrypoint and nine behavioral tests.
+
+The deliberate guard-bypass mutant was detected. A subsequent aggregate initially
+reused a mutant build artifact and failed eight guard tests; that failed log and
+binary digest remain separately identified. Cleaning only this package's owned
+build outputs and rebuilding the unchanged frozen source produced the final
+passing results. No source/expectation relaxation or retry policy change was used.
+
+### Core #4 criterion mapping
+
+| Criterion | Existing or added behavior | Boundary |
+| --- | --- | --- |
+| Actual-byte hashing / no URL-only integrity | Store BLOB SHA-256 plus authenticated retained-byte verification | No mutable URL fetch is used |
+| Changed bytes or validation revision | Immutable exact reference, validation and signed scope checks | No inferred new validation policy |
+| Unauthorized acceptance | Existing signed producer/validator trust checks | Native producer custody remains Host #8 |
+| Concurrent/crash-safe acceptance | Existing transactional acceptance/race/fresh-process tests | Process crash, not power loss |
+| Current evidence before delivery | New facade and transaction-aware guard | Separate delivery/resolution permission still required |
+| Forbidden effects / mutation | Independent spy counts, SQL quarantine, guard-bypass mutant | Synthetic peers; original seven signed-evidence mutants not rerun |
+| Cross-process durability | Actual retained SQLite after child post-effect denial | No exactly-once external-effect claim |
+
+The parent issue remains open for complete dependency/criterion reconciliation,
+required CI and composition qualification. This is a concrete integration slice,
+not a new signature implementation or a production activation claim.

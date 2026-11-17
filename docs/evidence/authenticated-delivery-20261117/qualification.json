@@ -1,0 +1,136 @@
+{
+  "schema": "runspindle.authenticated-delivery-qualification.v1",
+  "status": "passed",
+  "core_commit": "e28019f542ad0b60ab16934078b296eecda1d0b0",
+  "tether_commit": "0393a700957bcb7dfe67754cebaf8fd98f3f05ac",
+  "binary_sha256": {
+    "authenticated_artifacts-a2ea2416a8ca50a7": "efe74609e170b9424e854aef9da85444fb0c429451ed71584e37af2c2e991405",
+    "outbox-41b308e7abd3de47": "5a619b9063a167367ac5613923b87cdc5a36422639309f087d64e568544648b9"
+  },
+  "source_sha256": {
+    "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+    "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+    "src/authenticated_artifacts.rs": "60a0fedc873742a9210a1bf5bf4b50b8b80e2c408b127345ad85fa82ad5619f1",
+    "src/authenticated_delivery.rs": "8c833fce7cca5486104233c6d57f60ab736b158300a47eeb695117fb91b3759e",
+    "src/authority.rs": "1743074ff355bcf2018119d1682f16b05d8973227c1e763e4659589be6002f78",
+    "src/bin/checkpoints/mod.rs": "a3078621891e89ad3514d456db345d4b232945c352141d14ca5c924a04652f14",
+    "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+    "src/bin/synthetic_authority.rs": "2139b832b71b7d90136d7ed40de3db3232ee28775964242d36d4be781fc51e15",
+    "src/bin/temporal-runtime.rs": "038c3a1f6ded54875bae1df7c40d1ceab6e9fb1bfa0508e78bc0e1ca21b4ea5a",
+    "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+    "src/durable.rs": "1e8333ba9df96bf1b65032e3c1afbf076b28c8921ff65c53e35c41758c3ae214",
+    "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+    "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+    "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+    "src/intent.rs": "b23db4e239ab97d0bf15b77aac0b64581918e1a42a95b34c7abb1166bc67ca71",
+    "src/intent_runtime.rs": "cfa44be310daa141cd21afe83722c3d5c83857243b2d9d89f8902c3983396a34",
+    "src/lib.rs": "7a80d3780a18ca48cdaba1ed52284f97c2c8275011419a4b7a3a0f0942f9b2e0",
+    "src/outbox.rs": "aa177b4ff700ee7319d0e532380df7faadb4c30ff1a6d599ec87c7fc31af2eb3",
+    "src/runtime.rs": "264126aa0b25d35f20c6c6c0eeee7df06dbbacc1e398215b47d8fd367afc7257",
+    "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+    "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97",
+    "src/tether_wire.rs": "f57b8a1d724ffd3a2f2ce641cd45d8d67dcf404efe911b024376141729910a70",
+    "tests/authenticated_artifacts.rs": "cd5bbcb4f9ce36430921c336724d15a397cd604cbb196435cdb6f81c3e1f2da7",
+    "tests/authority.rs": "d1540a36dd11257137be0f7057a28fba1fa685bbefef6c12454e55b4fcae8e89",
+    "tests/contracts.rs": "1a192f9ae3ab7083d36133d199ffac7eeee46ceb5ceb3b0b5a2acd8f77762433",
+    "tests/durable_artifacts.rs": "499f508e792dbce2de2491ab3705d388178daadd340c58bff562ae52321d247e",
+    "tests/envelopes.rs": "d32971a076f1c2445d8196b8a2ff057cfb9cba1ef31ff2dbbdfa7ee6f605905a",
+    "tests/executable_smoke.rs": "0e6b1074136da1ecd1bb7e0ed697d7e83517e7166e3b764c5b7818cb1b186577",
+    "tests/host_runtime.rs": "469e7bd794f1030ff17a2c3347f15c1ae810cb5bf23614dafb9189d66ed7ef10",
+    "tests/intent.rs": "8f12dd14c936adccffa98d9f7bfe05297a8bc9ae3fa09f2a49da164aee937291",
+    "tests/outbox.rs": "87d4fd0b25dff29d58f8c63da2d76b91875754b6e3714f889343a74bf996fb31",
+    "tests/runtime.rs": "f9a57603fac5ed516797ea615e7c8bc9d78a20f3787af32c1c5231501cbba51c",
+    "tests/sequence_contracts.rs": "d8dfbab21fc0edd9a6aef30eaf5a5c243a76b2fe5ee8076569f5bcfa2e3808dd",
+    "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+    "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+    "tests/fixtures/tether_wire_peer.py": "0b5dcc5b69c9e218a8a3b658cd29110665b6fca9062721695a1b447b6a930824",
+    "tests/test_tether_wire_fixture.py": "f7d097f27f865c5c698f6cfb42791398af8f4a4ac6c60c566c796b8db4359bca"
+  },
+  "logs": {
+    "allfeatures-normal": {
+      "path": "core4-qualified-allfeatures-normal.log",
+      "sha256": "6dbfd33ff1f50b6432c103022ff07d9cf9d013e510a8cee2679f0e02050486d0"
+    },
+    "allfeatures-python-optimized": {
+      "path": "core4-qualified-allfeatures-python-optimized.log",
+      "sha256": "bf6ab6e42cbf6ff1af0598277079a14fa6f3940d149ff9545aeff4483674088b"
+    },
+    "clippy": {
+      "path": "core4-qualified-clippy.log",
+      "sha256": "49a5d000ed079b92616ff61008ae8d6164b1a09eeac19ec0bc8d953d3779389c"
+    },
+    "format": {
+      "path": "core4-qualified-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "scaffold": {
+      "path": "core4-qualified-scaffold.log",
+      "sha256": "c52bbd42355fd2567cf441cccec70fdabb47ce1aad2f1c6533d0a6779dd06cf2"
+    }
+  },
+  "mutation": {
+    "mutation": "bypass-authenticated-delivery-guard",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--all-features",
+      "--test",
+      "authenticated_artifacts",
+      "delivery::authenticated_delivery_rechecks_each_callback_and_commit_without_nested_lock",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "returncode": 101,
+    "status": "detected_by_named_behavior_assertion",
+    "original_sha256": "aa177b4ff700ee7319d0e532380df7faadb4c30ff1a6d599ec87c7fc31af2eb3",
+    "mutant_sha256": "c50b9433577c2b0f7ab066302bfb0ec139e66e813189e23bc02af6142f789aa5",
+    "log_sha256": "cecdb17f2ffea3804a5e54155d2fcf0325a2b886a3f32e9602dd3fc5bda528f2",
+    "log": "core4-mutation.log"
+  },
+  "build": {
+    "offline": true,
+    "all_features": true,
+    "jobs": 2,
+    "debug_symbols": false,
+    "incremental": false,
+    "rust_optimized": false
+  },
+  "exclusions": [
+    "live provider",
+    "native producer custody",
+    "production authority wiring",
+    "OS network isolation",
+    "power-loss durability",
+    "required GitHub runner check",
+    "composition qualification"
+  ],
+  "source_unchanged_before_after": true,
+  "failed_attempt": {
+    "status": "failed_not_qualification",
+    "log": "core4-failed-cache-aggregate.log",
+    "log_sha256": "2c37e343ed434b7b876f632cf6b8ca67840ee6dfe7fad86450265bc414ce1ced",
+    "binary_sha256": "67be5638a6df8753fceec42ff6dcda0cdb8e093a901cec2049e930f232cbdc3d",
+    "diagnosis": "Guard-bypass mutant reused owned Cargo target; subsequent aggregate reused mutated artifact. Cleaning only runspindle-core package outputs then rebuilding unchanged source restored all tests. Final logs supersede only this failed attempt, which remains retained."
+  },
+  "counts": {
+    "normal": {
+      "top_level_tests": 144,
+      "authenticated_artifact_tests": 29,
+      "outbox_tests": 41,
+      "ignored": 0
+    },
+    "python-optimized": {
+      "top_level_tests": 144,
+      "authenticated_artifact_tests": 29,
+      "outbox_tests": 41,
+      "ignored": 0
+    }
+  },
+  "toolchain": {
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "python": "Python 3.14.8"
+  }
+}
