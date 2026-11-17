@@ -62,32 +62,57 @@ remain explicitly synthetic and are not promoted to this lane.
 
 ## Verification and remaining acceptance
 
-Targeted checks use Rust 1.94.1, locked crate sources and Debian protoc
-3.21.12-3+deb12u1, whose executable hash matches the repository pin. The native
-Strix build is **not** the pinned prepared image and is not a substitute for the
-full qualifier. Tests cover both versions' forged/expired signature matrix,
-wrong account/destination/operation, no forbidden sends/lookups or journal rows,
-actual SQLite outbox delivery/readback, revocation, and fresh-process trust reads.
-A removed-account-binding mutant fails the independent outbox/transport assertion.
-The default mutation runner includes that case, with original source restored.
+The earlier component-only report in `docs/scoped-authority-evidence.json` is
+historical. The current bounded offline qualification is recorded in
+`docs/scoped-authority-qualification.json`, at the exact source revision named
+there. All 13 phases passed: scaffold checks, Core and composition Python tests,
+Rust formatting and verified-authority tests, strict Clippy, three deliberate
+behavioral mutations, Python/Rust v1 wire conformance, and two runs each of the
+legacy and new scoped Temporal integration. The composition suite has three
+explicit skips; those are not acceptance evidence. Static quality has zero new
+diagnostics without baseline changes.
 
-Bounded targeted command after acquiring the already pinned dependencies:
+Both scoped runs use actual Temporal/SQLite and fresh worker/server processes.
+They check conflicting revisions, replay, signature and destination tampering,
+unavailable trust, expiry and revocation at dispatch, separate cancellation
+authority, independent child histories and an fsynced scripted effect ledger.
+Each observes four child IDs, three authorized launches, one cancellation, and
+successful container/network/volume cleanup. No unauthorized launch is observed.
+The issuer and host remain synthetic. Real Tether, providers and production
+identity provisioning are not exercised. Revocation checks are not an atomic
+transaction with external effects. Independent scoped producer interoperability
+beyond the synthetic Python harness is not claimed.
 
+### Reproduction and builder provenance
+
+The default legacy builder pin is unchanged. Docker archive compatibility is
+explicit opt-in, not a fallback. The selector hashes and parses the same opened
+archive descriptor, requires the exact archive bytes/config/architecture, and
+selects only the fixed config image already recorded in the Platform closure.
+It never trusts an arbitrary archive tag. See `temporal/toolchain.json` and
+`tools/prepared_builder.py`. The qualifier uses the exact prepared runtime in
+`docs/runtime-build.json`. All sources, configs and manifests are checked for
+changes before and after qualification.
+
+With those exact dependencies prepared and pinned quality tools on PATH:
+
+```sh
+RUNSPINDLE_BUILDER_ARCHIVE=/absolute/path/to/verified-builder-closure.tar.gz \
+python3 tools/qualify_verified_authority.py \
+  --platform /path/to/pinned-platform \
+  --platform-prepared /path/to/prepared-temporal \
+  --composition /path/to/pinned-composition \
+  --prepared local/runtime-prepared --report-dir /path/to/report
 ```
-timeout 300 cargo test --locked --offline --features verified-authority
-```
 
-Set `PROTOC`, `PROTOC_INCLUDE` and its library search path to an independently
-verified extraction of the pinned packages if the compiler is not installed.
-This command acquires nothing. Temporary synthetic stores are removed by fixture
-owners; no real account, provider, persistent job or runner setting is changed.
+The client fixture runs as its owning UID only when its private effects directory
+is mounted. All existing Lane resource limits, dropped capabilities,
+no-new-privileges, read-only filesystem and internal-only network remain intact.
+No fleet controller or host security configuration is changed.
 
-Full qualification remains blocked: neither accessible non-Mac machine has the
-exact x64 builder image `sha256:9045681d1e2443e55bffe0c86dd93ee262157ea807fbf55c4e58e82699c9a53e`.
-The checked-in acquisition recipe identifies the official Rust base and Debian
-packages, but no registry locator for that final prepared image. Official-source
-search did not locate a published final image. Its pin was not replaced with a
-locally built substitute. Fresh Temporal dispatch/revocation/restart/replay for
-these new workflow registrations, independent producer/consumer scoped-wire
-qualification and end-to-end delivery integration remain **not run**. Existing
-v1 historical integration reports do not transfer. Core #16 remains open.
+Earlier attempts failed because mocked builder tests inherited the explicit
+archive environment and composition submodules were uninitialized. The tests now
+isolate that environment; exact pinned submodules were initialized without pin
+changes. The subsequent full qualifier passed. Final independent candidate
+review remains required; this document does not close broader parent issue #2 or
+claim live acceptance.

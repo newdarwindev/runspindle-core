@@ -148,6 +148,11 @@ def main() -> None:
     authority_repeat = checks[-1][2].copy()
     authority_repeat[-1] = str(reports / "authority-repeat.json")
     checks.append(("authority-repeat", ROOT, authority_repeat))
+    for name in ("scoped-authority", "scoped-authority-repeat"):
+        scoped_command = authority_repeat.copy()
+        scoped_command[-1] = str(reports / (name + ".json"))
+        scoped_command.append("--scoped")
+        checks.append((name, ROOT, scoped_command))
     observed: list[dict[str, Any]] = []
     summary: dict[str, Any] = {
         "status": "running",

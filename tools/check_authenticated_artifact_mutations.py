@@ -15,10 +15,9 @@ import sys
 import tempfile
 import uuid
 
-from mutation_target import isolated_target
-
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from tools.mutation_target import isolated_target  # noqa: E402
 from tools.prepared_builder import select  # noqa: E402
 
 # Match the normal Rust validation feature set and existing offline lockfile.
@@ -29,21 +28,21 @@ mutations = [
         "forged-validator",
         "forged_same_revision_validator_and_producer_signatures_are_rejected",
         {
-            "verify_key(&state.validator, &validator.signer, Role::Validator, &validator.scope.validator.principal, now, &validator.signing_bytes()?, &evidence.validator.signature)?;": "",
+            "verify_key(\n        &state.validator,\n        &validator.signer,\n        Role::Validator,\n        &validator.scope.validator.principal,\n        now,\n        &validator.signing_bytes()?,\n        &evidence.validator.signature,\n    )?;": "",
         },
     ),
     (
         "forged-producer",
         "forged_same_revision_validator_and_producer_signatures_are_rejected",
         {
-            "verify_key(&state.producer, &producer.signer, Role::Producer, &producer.scope.producer.principal, now, &producer.signing_bytes()?, &evidence.producer.signature)?;": "",
+            "verify_key(\n        &state.producer,\n        &producer.signer,\n        Role::Producer,\n        &producer.scope.producer.principal,\n        now,\n        &producer.signing_bytes()?,\n        &evidence.producer.signature,\n    )?;": "",
         },
     ),
     (
         "native-scope",
         "signed_native_identity_policy_principal_and_epoch_need_exact_authority",
         {
-            "state.scope == producer.scope &&": "true &&",
+            "state.scope == producer.scope": "true",
         },
     ),
     (
@@ -151,7 +150,9 @@ def run_case(
     source: str,
     case: str | None,
 ) -> subprocess.CompletedProcess[str]:
-    with tempfile.TemporaryDirectory(prefix="core-artifact-evidence-source-") as directory:
+    with tempfile.TemporaryDirectory(
+        prefix="core-artifact-evidence-source-"
+    ) as directory:
         root = pathlib.Path(directory)
         for item in ("Cargo.toml", "Cargo.lock", "src", "tests", "fixtures"):
             original = ROOT / item

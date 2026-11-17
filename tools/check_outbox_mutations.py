@@ -8,10 +8,9 @@ import subprocess
 import sys
 import tempfile
 
-from mutation_target import isolated_target
-
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from tools.mutation_target import isolated_target  # noqa: E402
 from tools.prepared_builder import select  # noqa: E402
 
 source = (ROOT / "src/outbox.rs").read_text()
@@ -21,7 +20,9 @@ mutations = [
     (
         "missing-journal-recreated",
         "missing_journal_blocks_fresh_process_without_resend",
-        {"durable::require_schema(&tx, OUTBOX_SCHEMA)?;": "durable::create_schema(&tx, OUTBOX_SCHEMA)?;"},
+        {
+            "durable::require_schema(&tx, OUTBOX_SCHEMA)?;": "durable::create_schema(&tx, OUTBOX_SCHEMA)?;"
+        },
     ),
     (
         "fabricated-receipt",

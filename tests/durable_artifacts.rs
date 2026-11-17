@@ -357,10 +357,23 @@ fn corrupt_file_and_unversioned_schema_block_without_initialization() {
     assert_eq!(std::fs::read(t.db()).unwrap(), corrupt);
     let t = Temp::new();
     let db = rusqlite::Connection::open(t.db()).unwrap();
-    db.execute_batch("CREATE VIEW artifacts AS SELECT 1;").unwrap();
+    db.execute_batch("CREATE VIEW artifacts AS SELECT 1;")
+        .unwrap();
     assert!(Store::open(t.db()).is_err());
-    assert_eq!(db.query_row("PRAGMA user_version", [], |r| r.get::<_, u64>(0)).unwrap(), 0);
-    assert_eq!(db.query_row("SELECT count(*) FROM sqlite_master WHERE type='table'", [], |r| r.get::<_, u64>(0)).unwrap(), 0);
+    assert_eq!(
+        db.query_row("PRAGMA user_version", [], |r| r.get::<_, u64>(0))
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        db.query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table'",
+            [],
+            |r| r.get::<_, u64>(0)
+        )
+        .unwrap(),
+        0
+    );
 }
 
 #[test]
@@ -375,13 +388,39 @@ fn missing_primary_key_token_boundary_blocks_artifact_reopen() {
           CREATE TABLE artifacts(identity {declared_type},reference TEXT NOT NULL,bytes BLOB NOT NULL CHECK(length(bytes)<=1048576));
           CREATE TRIGGER artifacts_immutable BEFORE UPDATE ON artifacts BEGIN SELECT RAISE(ABORT,'immutable artifact');END;
           CREATE TRIGGER artifacts_retained BEFORE DELETE ON artifacts BEGIN SELECT RAISE(ABORT,'retained artifact');END;")).unwrap();
-        let pk: u64 = db.query_row("SELECT pk FROM pragma_table_info('artifacts') WHERE name='identity'", [], |r| r.get(0)).unwrap();
+        let pk: u64 = db
+            .query_row(
+                "SELECT pk FROM pragma_table_info('artifacts') WHERE name='identity'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(pk, 0, "fixture must actually lack a primary key");
         for _ in 0..2 {
-            db.execute("INSERT INTO artifacts VALUES('duplicate','{}',x'00')", []).unwrap();
+            db.execute("INSERT INTO artifacts VALUES('duplicate','{}',x'00')", [])
+                .unwrap();
         }
-        assert_eq!(db.query_row("SELECT count(*) FROM artifacts WHERE identity='duplicate'", [], |r| r.get::<_, u64>(0)).unwrap(), 2);
-        assert!(Store::open(t.db()).is_err(), "accepted missing identity constraint: {declared_type}");
-        assert_eq!(db.query_row("SELECT count(*) FROM artifacts WHERE identity='duplicate'", [], |r| r.get::<_, u64>(0)).unwrap(), 2);
+        assert_eq!(
+            db.query_row(
+                "SELECT count(*) FROM artifacts WHERE identity='duplicate'",
+                [],
+                |r| r.get::<_, u64>(0)
+            )
+            .unwrap(),
+            2
+        );
+        assert!(
+            Store::open(t.db()).is_err(),
+            "accepted missing identity constraint: {declared_type}"
+        );
+        assert_eq!(
+            db.query_row(
+                "SELECT count(*) FROM artifacts WHERE identity='duplicate'",
+                [],
+                |r| r.get::<_, u64>(0)
+            )
+            .unwrap(),
+            2
+        );
     }
 }
