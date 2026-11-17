@@ -216,7 +216,7 @@ def main() -> None:
             expected = (
                 "deliberate checkpoint cleanup probe"
                 if mode == "failure"
-                else "checkpoint qualification interrupted"
+                else "KeyboardInterrupt: lane cancelled by signal 15"
             )
             if (
                 not result.returncode
