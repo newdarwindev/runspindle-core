@@ -29,6 +29,26 @@ use temporalio_sdk::{
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
     #[cfg(feature = "verified-authority")]
+    StartIntent {
+        wire: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    AdmitIntentBatch {
+        wire: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    IntentReceipt {
+        wire: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    AdmitIntent {
+        wire: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    Intent {
+        workflow_id: String,
+    },
+    #[cfg(feature = "verified-authority")]
     StartAuthenticated {
         registry_id: String,
     },
@@ -134,6 +154,17 @@ async fn main() -> anyhow::Result<()> {
             std::path::Path::new(args.get(3).map(String::as_str).unwrap_or("")),
         );
     }
+    #[cfg(feature = "verified-authority")]
+    if args.get(1).map(String::as_str) == Some("intent") {
+        let mut bytes = Vec::new();
+        std::io::stdin().take(1_048_577).read_to_end(&mut bytes)?;
+        let value = runspindle_core::intent::IntentAdmission::decode(&bytes)?;
+        println!(
+            "{}",
+            serde_json::json!({"wire":String::from_utf8(value.encode()?)?,"workflow_id":runspindle_core::intent_runtime::workflow_id(&value)?})
+        );
+        return Ok(());
+    }
     #[cfg(feature = "runtime-envelope")]
     if args.get(1).map(String::as_str) == Some("envelope") {
         use runspindle_core::envelope::{Envelope, Message};
@@ -193,7 +224,8 @@ async fn main() -> anyhow::Result<()> {
             .register_workflow::<runspindle_core::authenticated::AuthenticatedRegistryV1>()?
             .register_workflow::<runspindle_core::authenticated::AuthenticatedOperationV1>()?
             .register_workflow::<runspindle_core::scoped_authenticated::ScopedRegistryV1>()?
-            .register_workflow::<runspindle_core::scoped_authenticated::ScopedOperationV1>()?;
+            .register_workflow::<runspindle_core::scoped_authenticated::ScopedOperationV1>()?
+            .register_workflow::<runspindle_core::intent_runtime::IntentWorkflowV1>()?;
         let replayer = WorkflowReplayer::new(replay_options.build())?;
         replayer.replay_workflow(history).await?;
         println!("{{\"status\":\"passed\",\"evidence_class\":\"isolated_integration\",\"check\":\"history_replay\"}}");
@@ -218,7 +250,10 @@ async fn main() -> anyhow::Result<()> {
     anyhow::ensure!(
         matches!(mode, "worker" | "client")
             || (cfg!(feature = "verified-authority")
-                && matches!(mode, "authenticated-worker" | "scoped-worker")),
+                && matches!(
+                    mode,
+                    "authenticated-worker" | "scoped-worker" | "intent-worker"
+                )),
         "expected worker, client or enabled authenticated-worker"
     );
     // Deliberately no environment profile/API key/credential discovery.
@@ -272,6 +307,25 @@ async fn main() -> anyhow::Result<()> {
             .register_workflow::<ScopedRegistryV1>()?
             .register_workflow::<ScopedOperationV1>()?
             .register_activities(AuthenticatedPorts {
+                helper,
+                script_directory: args.get(3).map(PathBuf::from),
+            })
+            .build();
+        Worker::new(&runtime, client, options)?
+            .run_until(tokio::signal::ctrl_c())
+            .await?;
+        return Ok(());
+    }
+    #[cfg(feature = "verified-authority")]
+    if mode == "intent-worker" {
+        use runspindle_core::intent_runtime::*;
+        let runtime = Runtime::from_current_tokio(Default::default())?;
+        let helper = args
+            .get(4)
+            .and_then(|p| runspindle_core::authority::LocalHelper::read(p).ok());
+        let options = WorkerOptions::new(runspindle_core::intent_runtime::QUEUE)
+            .register_workflow::<IntentWorkflowV1>()?
+            .register_activities(IntentPorts {
                 helper,
                 script_directory: args.get(3).map(PathBuf::from),
             })
@@ -387,6 +441,69 @@ async fn main() -> anyhow::Result<()> {
         Command::CancelAuthenticated { job_id, wire } => {
             serde_json::json!({"accepted":client.get_workflow_handle::<runspindle_core::authenticated::AuthenticatedOperationV1>(job_id).execute_update(runspindle_core::authenticated::AuthenticatedOperationV1::request_cancel,wire,Default::default()).await?})
         }
+        #[cfg(feature = "verified-authority")]
+        Command::StartIntent { wire } => {
+            use runspindle_core::intent_runtime::*;
+            let value = runspindle_core::intent::IntentAdmission::decode(wire.as_bytes())?;
+            let id = workflow_id(&value)?;
+            let h = client
+                .start_workflow(
+                    IntentWorkflowV1::run,
+                    (),
+                    WorkflowStartOptions::new(runspindle_core::intent_runtime::QUEUE, id.clone())
+                        .build(),
+                )
+                .await?;
+            serde_json::json!({"status":"started_intake_only","workflow_id":id,"run_id":h.run_id()})
+        }
+        #[cfg(feature = "verified-authority")]
+        Command::AdmitIntent { wire } => {
+            use runspindle_core::intent_runtime::*;
+            let value = runspindle_core::intent::IntentAdmission::decode(wire.as_bytes())?;
+            serde_json::json!({"status":client.get_workflow_handle::<IntentWorkflowV1>(workflow_id(&value)?).execute_update(IntentWorkflowV1::admit,wire,Default::default()).await?})
+        }
+        #[cfg(feature = "verified-authority")]
+        Command::AdmitIntentBatch { wire } => {
+            use runspindle_core::{intent::IntentBatch, intent_runtime::*};
+            let batch = IntentBatch::decode(wire.as_bytes())?;
+            let last = batch.intents.last().expect("validated");
+            let id = workflow_id(last)?;
+            let status = client
+                .get_workflow_handle::<IntentWorkflowV1>(id.clone())
+                .execute_update(
+                    IntentWorkflowV1::admit_batch,
+                    wire.clone(),
+                    Default::default(),
+                )
+                .await?;
+            serde_json::json!({"status":status,"workflow_id":id,"revision":last.event.revision,"batch_sha256":runspindle_core::intent::digest(wire.as_bytes())})
+        }
+        #[cfg(feature = "verified-authority")]
+        Command::IntentReceipt { wire } => {
+            use runspindle_core::{intent::IntentBatch, intent_runtime::*};
+            let batch = IntentBatch::decode(wire.as_bytes())?;
+            let last = batch.intents.last().expect("validated");
+            let id = workflow_id(last)?;
+            let snapshot = client
+                .get_workflow_handle::<IntentWorkflowV1>(id.clone())
+                .query(IntentWorkflowV1::snapshot, (), Default::default())
+                .await?;
+            let retained = snapshot.state.history.starts_with(&batch.intents);
+            serde_json::json!({"status":if retained{"retained"}else{"not_retained"},"workflow_id":id,"revision":last.event.revision,"batch_sha256":runspindle_core::intent::digest(wire.as_bytes())})
+        }
+        #[cfg(feature = "verified-authority")]
+        Command::Intent { workflow_id } => serde_json::to_value(
+            client
+                .get_workflow_handle::<runspindle_core::intent_runtime::IntentWorkflowV1>(
+                    workflow_id,
+                )
+                .query(
+                    runspindle_core::intent_runtime::IntentWorkflowV1::snapshot,
+                    (),
+                    Default::default(),
+                )
+                .await?,
+        )?,
         #[cfg(feature = "verified-authority")]
         Command::StartScoped { registry_id } => {
             use runspindle_core::scoped_authenticated::*;
