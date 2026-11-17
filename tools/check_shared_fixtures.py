@@ -13,7 +13,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r'[0-9a-f]{64}\Z')
 SHA1 = re.compile(r'[0-9a-f]{40}\Z')
-FILES = {'fixturekit.py', 'contract.json', 'artifact.txt', 'golden.json', 'vectors.json'}
+FILES = {'faults.json', 'fixturekit.py', 'contract.json', 'artifact.txt', 'golden.json', 'vectors.json'}
 KINDS = {'admission.observed', 'native.observed', 'artifact.observed'}
 
 
@@ -98,7 +98,7 @@ def load_pinned_kit(root=ROOT):
         require(type(digest) is str and SHA256.fullmatch(digest), 'file-digest-format')
         verified[name] = (bundle / name).read_bytes()
         require(hashlib.sha256(verified[name]).hexdigest() == digest, 'file-digest')
-    for name in ['fixturekit.py', 'contract.json', 'artifact.txt']:
+    for name in ['fixturekit.py', 'contract.json', 'artifact.txt', 'faults.json']:
         require(manifest['files'][name] == origin['files'][name], 'source-file')
     # Import only after the independently reviewed pin and file checks succeed.
     kit = load_verified_module(bundle / 'fixturekit.py', verified['fixturekit.py'])
