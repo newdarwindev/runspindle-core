@@ -80,6 +80,16 @@ impl DeliveryAuthority for durable::Deny {
     }
 }
 /// Error/None after send means unknown; lookup is read-only and never sends.
+#[derive(Default)]
+pub struct SendObservation {
+    pub acknowledgement: Option<DeliveryReceipt>,
+    pub conflict: bool,
+}
+#[derive(Default)]
+pub struct ReadbackObservation {
+    pub receipts: Vec<DeliveryReceipt>,
+    pub conflict: bool,
+}
 pub trait Transport {
     fn send(
         &mut self,
@@ -87,6 +97,26 @@ pub trait Transport {
         bytes: &[u8],
     ) -> anyhow::Result<Option<DeliveryReceipt>>;
     fn lookup(&mut self, request: &DeliveryRequest) -> anyhow::Result<Vec<DeliveryReceipt>>;
+    /// Explicit trusted conflict evidence without manufacturing a receipt.
+    fn send_observation(
+        &mut self,
+        request: &DeliveryRequest,
+        bytes: &[u8],
+    ) -> anyhow::Result<SendObservation> {
+        Ok(SendObservation {
+            acknowledgement: self.send(request, bytes)?,
+            conflict: false,
+        })
+    }
+    fn lookup_observation(
+        &mut self,
+        request: &DeliveryRequest,
+    ) -> anyhow::Result<ReadbackObservation> {
+        Ok(ReadbackObservation {
+            receipts: self.lookup(request)?,
+            conflict: false,
+        })
+    }
 }
 type StoredDelivery = (String, String, Option<String>, u64, Option<String>, bool);
 pub struct Outbox {
@@ -413,7 +443,9 @@ impl Outbox {
             authority.verify(request) && resolver.verify_resolution(resolution),
             "resolution readback denied"
         );
-        let observed = transport.lookup(request)?;
+        let readback = transport.lookup_observation(request)?;
+        anyhow::ensure!(!readback.conflict, "transport conflict remains unresolved");
+        let observed = readback.receipts;
         anyhow::ensure!(
             observed.as_slice() == std::slice::from_ref(&resolution.receipt),
             "resolution requires exact unique readback"
@@ -502,7 +534,14 @@ impl Outbox {
         );
         // This call path is reachable only after a newly committed reservation. An
         // existing reservation can only reach read-only reconciliation above.
-        let reply = transport.send(request, &bytes).ok().flatten();
+        let sent = transport
+            .send_observation(request, &bytes)
+            .unwrap_or_default();
+        if sent.conflict {
+            self.remember(request, None, true, &[])?;
+            anyhow::bail!("transport reported delivery conflict")
+        }
+        let reply = sent.acknowledgement;
         if let Some(reply) = reply {
             if !reply.matches(request) {
                 self.settle(&reserved, None, authority)?;
@@ -514,7 +553,12 @@ impl Outbox {
                 "acknowledgement contradicts retained receipt"
             );
             anyhow::ensure!(authority.verify(request), "readback authority unavailable");
-            let observed = transport.lookup(request).unwrap_or_default();
+            let readback = transport.lookup_observation(request).unwrap_or_default();
+            if readback.conflict {
+                self.remember(request, None, true, &readback.receipts)?;
+                anyhow::bail!("transport reported readback conflict")
+            }
+            let observed = readback.receipts;
             anyhow::ensure!(authority.verify(request), "readback authority changed");
             if Self::contradiction(&reserved, &observed) {
                 self.remember(request, None, true, &observed)?;
@@ -543,7 +587,12 @@ impl Outbox {
             .ok_or_else(|| anyhow::anyhow!("missing reservation"))?;
         anyhow::ensure!(!old.conflict, "delivery receipt conflict is durably fenced");
         anyhow::ensure!(authority.verify(request), "readback authority unavailable");
-        let observed = transport.lookup(request).unwrap_or_default();
+        let readback = transport.lookup_observation(request).unwrap_or_default();
+        if readback.conflict {
+            self.remember(request, None, true, &readback.receipts)?;
+            anyhow::bail!("transport reported readback conflict")
+        }
+        let observed = readback.receipts;
         anyhow::ensure!(authority.verify(request), "readback authority changed");
         if Self::contradiction(&old, &observed) {
             self.remember(request, None, true, &observed)?;

@@ -1169,3 +1169,386 @@ fn missing_primary_key_token_boundary_blocks_outbox_reopen() {
         assert_eq!(peer.count("lookup"), 0);
     }
 }
+
+struct WirePeer {
+    mode: &'static str,
+    calls: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+}
+impl runspindle_core::tether_wire::Peer for WirePeer {
+    fn exchange(&mut self, raw: &[u8]) -> anyhow::Result<Vec<u8>> {
+        let request: serde_json::Value = serde_json::from_slice(raw)?;
+        self.calls
+            .borrow_mut()
+            .push(request["action"].as_str().unwrap().into());
+        assert_eq!(
+            request["payload"]["attachment"]["content_hex"],
+            BYTES.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        );
+        assert_eq!(
+            request["envelope"]["binding"]["operation_id"],
+            "native-operation"
+        );
+        let conflict = self.mode == "conflict";
+        let unknown = conflict || self.mode == "unknown";
+        Ok(serde_json::to_vec(&serde_json::json!({
+            "version": runspindle_core::tether_wire::VERSION,
+            "request_sha256": if self.mode == "wrong-binding" { "0".repeat(64) } else { digest(raw) },
+            "evidence_class": if self.mode == "synthetic" { "synthetic" } else { "slack_wire_content_observation" },
+            "state": if unknown { "unknown" } else { "content_confirmed" },
+            "file_id": "F100", "message_id": if unknown { None } else { Some("1700000000.000002") },
+            "conflict": conflict
+        }))?)
+    }
+}
+#[test]
+fn tether_wire_exact_readback_and_reconstruction() {
+    use runspindle_core::tether_wire::WireTransport;
+    let temp = Temp::new();
+    let request = request(&temp);
+    let calls = std::rc::Rc::new(std::cell::RefCell::new(vec![]));
+    let store = Store::open(temp.db()).unwrap();
+    let make = || {
+        WireTransport::new(
+            &store,
+            request.clone(),
+            "result.bin",
+            "accepted",
+            WirePeer {
+                mode: "confirmed",
+                calls: calls.clone(),
+            },
+        )
+        .unwrap()
+    };
+    let mut outbox = Outbox::open(temp.db()).unwrap();
+    let first = outbox
+        .deliver(&request, &Grant(request.clone()), &mut make())
+        .unwrap();
+    assert_eq!(first.state, DeliveryState::Delivered);
+    drop(outbox);
+    let mut reopened = Outbox::open(temp.db()).unwrap();
+    let next = reopened
+        .deliver(&request, &Grant(request.clone()), &mut make())
+        .unwrap();
+    assert_eq!(first.receipt, next.receipt);
+    assert_eq!(*calls.borrow(), vec!["send", "lookup", "lookup"]);
+}
+#[test]
+fn tether_wire_unbound_unknown_and_synthetic_never_deliver() {
+    use runspindle_core::tether_wire::WireTransport;
+    for mode in ["wrong-binding", "synthetic", "unknown", "conflict"] {
+        let temp = Temp::new();
+        let request = request(&temp);
+        let calls = std::rc::Rc::new(std::cell::RefCell::new(vec![]));
+        let mut adapter = WireTransport::new(
+            &Store::open(temp.db()).unwrap(),
+            request.clone(),
+            "result.bin",
+            "accepted",
+            WirePeer {
+                mode,
+                calls: calls.clone(),
+            },
+        )
+        .unwrap();
+        let mut outbox = Outbox::open(temp.db()).unwrap();
+        let _ = outbox.deliver(&request, &Grant(request.clone()), &mut adapter);
+        let state = outbox.snapshot(&request).unwrap().unwrap();
+        assert_ne!(state.state, DeliveryState::Delivered);
+        assert!(state.receipt.is_none());
+        assert_eq!(state.conflict, mode == "conflict");
+        let _ = outbox.deliver(&request, &Grant(request.clone()), &mut adapter);
+        assert_eq!(calls.borrow().iter().filter(|c| *c == "send").count(), 1);
+    }
+}
+
+struct ExplicitConflict;
+impl Transport for ExplicitConflict {
+    fn send(&mut self, _: &DeliveryRequest, _: &[u8]) -> anyhow::Result<Option<DeliveryReceipt>> {
+        Ok(None)
+    }
+    fn lookup(&mut self, _: &DeliveryRequest) -> anyhow::Result<Vec<DeliveryReceipt>> {
+        Ok(vec![])
+    }
+    fn lookup_observation(&mut self, _: &DeliveryRequest) -> anyhow::Result<ReadbackObservation> {
+        Ok(ReadbackObservation {
+            receipts: vec![],
+            conflict: true,
+        })
+    }
+}
+#[test]
+fn explicit_readback_conflict_is_durable_without_fake_receipts() {
+    let temp = Temp::new();
+    let request = request(&temp);
+    let mut outbox = Outbox::open(temp.db()).unwrap();
+    let grant = Grant(request.clone());
+    let first = outbox
+        .deliver(&request, &grant, &mut ExplicitConflict)
+        .unwrap();
+    assert_eq!(first.state, DeliveryState::Unknown);
+    assert!(outbox
+        .reconcile(&request, &grant, &mut ExplicitConflict)
+        .is_err());
+    drop(outbox);
+    let state = Outbox::open(temp.db())
+        .unwrap()
+        .snapshot(&request)
+        .unwrap()
+        .unwrap();
+    assert!(state.conflict);
+    assert!(state.receipt.is_none());
+    assert!(state.acknowledgement.is_none());
+}
+
+/// This helper exists only in the integration test binary. Production transport
+/// has no process launcher, no executable selection, and no ambient authority.
+struct PythonWirePeer {
+    source: PathBuf,
+    root: PathBuf,
+    expected: PathBuf,
+}
+impl runspindle_core::tether_wire::Peer for PythonWirePeer {
+    fn exchange(&mut self, request: &[u8]) -> anyhow::Result<Vec<u8>> {
+        use std::io::{Read, Write};
+        use std::process::Stdio;
+        let mut child = Command::new("python3")
+            .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tether_wire_peer.py"))
+            .args([
+                "--root",
+                self.root.to_str().unwrap(),
+                "--expected",
+                self.expected.to_str().unwrap(),
+            ])
+            .current_dir(&self.source)
+            .env("PYTHONPATH", &self.source)
+            .env("PYTHONDONTWRITEBYTECODE", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()?;
+        // Requests are bounded below OS pipe capacity in this small fixture.
+        child.stdin.take().unwrap().write_all(request)?;
+        let mut stdout = child.stdout.take().unwrap();
+        let reader = std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            stdout
+                .by_ref()
+                .take(4097)
+                .read_to_end(&mut bytes)
+                .map(|_| bytes)
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let status = loop {
+            if let Some(status) = child.try_wait()? {
+                break status;
+            }
+            if std::time::Instant::now() >= deadline {
+                child.kill()?;
+                child.wait()?;
+                let _ = reader.join();
+                anyhow::bail!("isolated wire peer deadline");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        };
+        let bytes = reader
+            .join()
+            .map_err(|_| anyhow::anyhow!("peer reader failed"))??;
+        anyhow::ensure!(
+            status.success() && bytes.len() <= 4096,
+            "isolated wire peer failed"
+        );
+        Ok(bytes)
+    }
+}
+fn tether_request(temp: &Temp) -> DeliveryRequest {
+    let mut store = Store::open(temp.db()).unwrap();
+    let artifact = store
+        .put(
+            VERSION,
+            Binding {
+                task_id: "task-1".into(),
+                revision: 1,
+                operation_id: "operation-1".into(),
+                policy_revision: "policy".into(),
+                host_id: "host-1".into(),
+                workspace_id: "T100".into(),
+                lease_epoch: 1,
+            },
+            "artifact-1".into(),
+            1,
+            BYTES,
+        )
+        .unwrap();
+    let validation = store
+        .validate(VERSION, &artifact, "policy", &Check)
+        .unwrap();
+    DeliveryRequest {
+        version: VERSION.into(),
+        accepted: store.accept(VERSION, &validation, &Accept).unwrap(),
+        account_id: "account-1".into(),
+        destination_id: "destination-1".into(),
+        delivery_operation_id: "delivery-1".into(),
+    }
+}
+fn expected_wire(request: &DeliveryRequest) -> serde_json::Value {
+    let a = request.accepted.artifact();
+    // Independent fixture-side encoding, not obtained from the adapter/peer.
+    serde_json::json!({"version":runspindle_core::tether_wire::VERSION,"action":"send",
+        "envelope":{"version":"runspindle.envelope.v1","message_type":"delivery_request","message_id":request.delivery_operation_id,
+        "binding":a.binding,"payload":{"artifact_id":a.artifact_id,"artifact_revision":a.artifact_revision,"sha256":a.sha256,"validator_revision":request.accepted.validation.validator_revision,
+        "account_id":request.account_id,"destination_id":request.destination_id,"delivery_operation_id":request.delivery_operation_id}},
+        "payload":{"text":"Synthetic accepted artifact","attachment":{"attachment_id":a.artifact_id,"filename":"result.bin","content_hex":BYTES.iter().map(|b| format!("{b:02x}")).collect::<String>()}}})
+}
+#[test]
+fn wire_integration_child() {
+    use runspindle_core::tether_wire::WireTransport;
+    let Ok(root) = std::env::var("CORE_WIRE_CHILD_ROOT") else {
+        return;
+    };
+    let root = PathBuf::from(root);
+    let source = PathBuf::from(std::env::var("RUNSPINDLE_TETHER_WIRE_SOURCE").unwrap());
+    let request: DeliveryRequest =
+        serde_json::from_slice(&std::fs::read(root.join("request.json")).unwrap()).unwrap();
+    let store = Store::open(root.join("core.sqlite")).unwrap();
+    let mut transport = WireTransport::new(
+        &store,
+        request.clone(),
+        "result.bin",
+        "Synthetic accepted artifact",
+        PythonWirePeer {
+            source,
+            root: root.clone(),
+            expected: root.join("expected.json"),
+        },
+    )
+    .unwrap();
+    let mut outbox = Outbox::open(root.join("core.sqlite")).unwrap();
+    let result = outbox.deliver(&request, &Grant(request.clone()), &mut transport);
+    let snapshot = outbox.snapshot(&request).unwrap().unwrap();
+    std::fs::write(
+        root.join("result.json"),
+        serde_json::to_vec(&serde_json::json!({"ok":result.is_ok(),"snapshot":snapshot})).unwrap(),
+    )
+    .unwrap();
+}
+fn wire_step(temp: &Temp, source: &Path) -> (bool, DeliverySnapshot) {
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "wire_integration_child", "--nocapture"])
+        .env("CORE_WIRE_CHILD_ROOT", &temp.0)
+        .env("RUNSPINDLE_TETHER_WIRE_SOURCE", source)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "child failed: {} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(temp.0.join("result.json")).unwrap()).unwrap();
+    (
+        result["ok"].as_bool().unwrap(),
+        serde_json::from_value(result["snapshot"].clone()).unwrap(),
+    )
+}
+fn wire_seed(temp: &Temp, request: &DeliveryRequest, fault: &str) {
+    std::fs::write(
+        temp.0.join("expected.json"),
+        serde_json::to_vec(&expected_wire(request)).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        temp.0.join("request.json"),
+        serde_json::to_vec(request).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(temp.0.join("fault.txt"), fault).unwrap();
+}
+fn wire_effect_counts(temp: &Temp) {
+    let peer = Connection::open(temp.0.join("service.db")).unwrap();
+    for action in ["allocate", "upload", "complete"] {
+        let calls: u64 = peer
+            .query_row(
+                "SELECT count(*) FROM calls WHERE action=?1",
+                [action],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(calls, 1, "{action} must never repeat");
+    }
+    let bytes: Vec<u8> = peer
+        .query_row("SELECT content FROM files", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(bytes, BYTES);
+}
+#[test]
+#[ignore = "requires explicitly pinned local Tether source, actual journals and isolated SQL HTTP fixture"]
+fn actual_tether_journals_wire_readback_and_lost_ack() {
+    let source = PathBuf::from(
+        std::env::var("RUNSPINDLE_TETHER_WIRE_SOURCE").expect("explicit Tether source required"),
+    );
+    for fault in ["", "lost:complete", "lost:bridge-response"] {
+        let temp = Temp::new();
+        let request = tether_request(&temp);
+        wire_seed(&temp, &request, fault);
+        let (ok, first) = wire_step(&temp, &source);
+        assert!(ok);
+        if fault != "lost:bridge-response" {
+            assert_eq!(first.state, DeliveryState::Delivered);
+        } else {
+            assert_eq!(first.state, DeliveryState::Unknown);
+        }
+        std::fs::write(temp.0.join("fault.txt"), "").unwrap();
+        let (ok, second) = wire_step(&temp, &source);
+        assert!(ok);
+        assert_eq!(second.state, DeliveryState::Delivered);
+        wire_effect_counts(&temp);
+    }
+}
+#[test]
+#[ignore = "requires explicitly pinned local Tether source, actual journals and isolated SQL HTTP fixture"]
+fn actual_tether_wrong_thread_and_conflict_never_retarget() {
+    let source = PathBuf::from(
+        std::env::var("RUNSPINDLE_TETHER_WIRE_SOURCE").expect("explicit Tether source required"),
+    );
+    for field in ["thread", "message"] {
+        let temp = Temp::new();
+        let request = tether_request(&temp);
+        wire_seed(&temp, &request, "lost:bridge-response");
+        assert_eq!(wire_step(&temp, &source).1.state, DeliveryState::Unknown);
+        std::fs::write(temp.0.join("fault.txt"), "").unwrap();
+        let peer = Connection::open(temp.0.join("service.db")).unwrap();
+        peer.execute(&format!("UPDATE files SET {field}='1700000999.000001'"), [])
+            .unwrap();
+        drop(peer);
+        let (_, state) = wire_step(&temp, &source);
+        assert_eq!(state.state, DeliveryState::Unknown);
+        assert!(state.receipt.is_none());
+        if field == "message" {
+            assert!(state.conflict);
+        }
+        let (_, repeated) = wire_step(&temp, &source);
+        assert!(repeated.receipt.is_none());
+        wire_effect_counts(&temp);
+    }
+}
+
+#[test]
+#[ignore = "requires explicitly pinned local Tether source and isolated synthetic authority"]
+fn actual_tether_revocation_after_lost_ack_cannot_deliver_or_retry() {
+    let source = PathBuf::from(
+        std::env::var("RUNSPINDLE_TETHER_WIRE_SOURCE").expect("explicit Tether source required"),
+    );
+    let temp = Temp::new();
+    let request = tether_request(&temp);
+    wire_seed(&temp, &request, "lost:bridge-response");
+    assert_eq!(wire_step(&temp, &source).1.state, DeliveryState::Unknown);
+    std::fs::write(temp.0.join("fault.txt"), "").unwrap();
+    std::fs::write(temp.0.join("revoked"), "synthetic authority revoked").unwrap();
+    let (ok, state) = wire_step(&temp, &source);
+    assert!(!ok);
+    assert_eq!(state.state, DeliveryState::Unknown);
+    assert!(state.receipt.is_none());
+    wire_effect_counts(&temp);
+}
