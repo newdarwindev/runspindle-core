@@ -95,7 +95,8 @@
     "jobs": 2,
     "debug_symbols": false,
     "incremental": false,
-    "rust_optimized": false
+    "rust_optimized": false,
+    "owned_target": "/home/standard/.cache/core17-resolution-target"
   },
   "exclusions": [
     "live provider",
@@ -112,7 +113,15 @@
     "log": "core4-failed-cache-aggregate.log",
     "log_sha256": "2c37e343ed434b7b876f632cf6b8ca67840ee6dfe7fad86450265bc414ce1ced",
     "binary_sha256": "67be5638a6df8753fceec42ff6dcda0cdb8e093a901cec2049e930f232cbdc3d",
-    "diagnosis": "Guard-bypass mutant reused owned Cargo target; subsequent aggregate reused mutated artifact. Cleaning only runspindle-core package outputs then rebuilding unchanged source restored all tests. Final logs supersede only this failed attempt, which remains retained."
+    "diagnosis": "Guard-bypass mutant reused owned Cargo target; subsequent aggregate reused mutated artifact. Cleaning only runspindle-core package outputs then rebuilding unchanged source restored all tests. Final logs supersede only this failed attempt, which remains retained.",
+    "containment": {
+      "command": "CARGO_TARGET_DIR=/home/standard/.cache/core17-resolution-target cargo clean --offline -p runspindle-core",
+      "observed_output": "Removed 201 files, 379.5MiB total",
+      "evidence_kind": "reported execution-tool receipt; no separate persisted cleanup log",
+      "scope": "only runspindle-core package outputs in this owned target; dependencies and unrelated targets unchanged",
+      "final_rebuild": "same clean e28019f source, full normal and optimized-Python rerun",
+      "future_mutants": "use separate owned target or explicit package-only clean plus baseline rebuild/fingerprint verification before final qualification"
+    }
   },
   "counts": {
     "normal": {
