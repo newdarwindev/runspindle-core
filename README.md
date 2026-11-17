@@ -1,4 +1,48 @@
-# runspindle-core
+# RUNSPINDLE CORE
+
+## One authorized job. One durable identity. Evidence that survives interruption.
+
+**CORE — DURABLE INTENT AND EFFECT COORDINATION** binds a task to its operation,
+selected host, workspace and native-session identity. It distinguishes a repeated
+request from a conflicting revision, checks scoped authority and preserves
+uncertainty instead of turning a missing reply into success.
+
+[Temporal](https://temporal.io/) provides durable workflow progression; SQLite
+provides the implemented local persistent records. **CORE** supplies the admission
+rules, immutable bindings and effect semantics around those foundations. Recovery
+must continue the same authorized work, not silently dispatch a replacement on
+another machine.
+
+The bounded F02 acceptance is complete: [Core #2](https://github.com/newdarwindev/runspindle-core/issues/2)
+is closed following [interruption/upgrade qualification](docs/AUTHENTICATED_CHECKPOINTS.md)
+and [exact-component composition](https://github.com/newdarwindev/runspindle/pull/76).
+The evidence uses real Temporal and SQLite with controlled issuers and scripted
+peers. It includes 44 checkpoint/revocation cases and six pinned old-binary upgrades,
+not a production-system certification.
+
+*UPCOMING — qualify production issuer custody, actual native/provider boundaries,
+and full live journeys. The tested upgrade pairs do not prove arbitrary version
+compatibility, and process-kill recovery does not prove power-loss durability.*
+
+[![Conceptual identity and evidence chain, gallery page 18](https://newdarwindev.github.io/runspindle_for_bloomberg/gallery/18.webp)](https://newdarwindev.github.io/runspindle_for_bloomberg/assets/Runspindle_Gallery_Index.html#page-18)
+
+**Concept illustration, not a running Console screenshot.** The gallery connects
+authority, exact artifacts, delivery receipts and evaluation into one inspectable
+record chain. [Slide/source index](https://newdarwindev.github.io/runspindle_for_bloomberg/assets/Runspindle_Gallery_Index.html#page-18)
+· [Research proposal](https://github.com/newdarwindev/runspindle_for_bloomberg/blob/main/assets/runspindle-paper.pdf)
+· [Product concept slides](https://github.com/newdarwindev/runspindle_for_bloomberg/blob/main/assets/runspindle_bloomberg_product.pdf).
+These linked materials contain proposed workflows and synthetic examples, not
+measured savings, live trading or Bloomberg endorsement. See the
+[source asset guide](https://github.com/newdarwindev/runspindle_for_bloomberg/blob/main/ASSETS.md).
+
+### Follow the implementation
+
+- [Scoped authority](docs/FOUNDATION_AUTHORITY.md) and [signed assertions](docs/VERIFIED_AUTHORITY.md).
+- [Tether intent bridge](docs/INTENT_BRIDGE.md): semantic revisions and durable recovery.
+- [Host runtime](docs/HOST_RUNTIME.md), [artifact store](specs/durable-artifacts.md), and [delivery/outbox semantics](specs/durable-delivery.md).
+- [Current source](src/), [tests](tests/) and [machine-readable status](STATUS.json).
+
+## Development and qualification boundaries
 
 Rust coordination, Temporal integration, task identity and receipts.
 
