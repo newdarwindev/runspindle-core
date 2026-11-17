@@ -115,9 +115,10 @@ impl Outbox {
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         if durable::schema_object_exists(&tx, "outbox_schema")? {
             durable::require_schema(&tx, OUTBOX_VERSION_SCHEMA)?;
-            let version: u64 = tx.query_row(
-                "SELECT version FROM outbox_schema WHERE id=1", [], |r| r.get(0),
-            )?;
+            let version: u64 =
+                tx.query_row("SELECT version FROM outbox_schema WHERE id=1", [], |r| {
+                    r.get(0)
+                })?;
             anyhow::ensure!(version == 1 || version == 2, "unsupported outbox version");
             durable::require_schema(&tx, OUTBOX_SCHEMA)?;
             if version == 1 {
@@ -131,16 +132,23 @@ impl Outbox {
                     durable::create_schema(&tx, EVIDENCE_SCHEMA)?;
                 }
                 durable::require_schema(&tx, EVIDENCE_SCHEMA)?;
-                anyhow::ensure!(tx.execute(
-                    "UPDATE outbox_schema SET version=2 WHERE id=1 AND version=1", [],
-                )? == 1, "outbox migration conflict");
+                anyhow::ensure!(
+                    tx.execute(
+                        "UPDATE outbox_schema SET version=2 WHERE id=1 AND version=1",
+                        [],
+                    )? == 1,
+                    "outbox migration conflict"
+                );
             } else {
                 durable::require_schema(&tx, EVIDENCE_SCHEMA)?;
             }
         } else {
             // Only a genuinely artifact-only store may acquire a first outbox.
             for (_, name, _) in OUTBOX_SCHEMA.iter().chain(EVIDENCE_SCHEMA) {
-                anyhow::ensure!(!durable::schema_object_exists(&tx, name)?, "unversioned outbox schema");
+                anyhow::ensure!(
+                    !durable::schema_object_exists(&tx, name)?,
+                    "unversioned outbox schema"
+                );
             }
             durable::create_schema(&tx, OUTBOX_VERSION_SCHEMA)?;
             durable::create_schema(&tx, OUTBOX_SCHEMA)?;

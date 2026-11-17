@@ -10,6 +10,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -29,7 +30,9 @@ def require(condition: Any, message: str) -> None:
         raise AssertionError(message)
 
 
-def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str, Any]:
+def test(
+    platform: str, platform_prepared: str, core_prepared: str, scoped: bool = False
+) -> dict[str, Any]:
     spec = importlib.util.spec_from_file_location(
         "authority_temporal_lane", pathlib.Path(platform) / "tools/temporal_lane.py"
     )
@@ -68,7 +71,19 @@ def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str,
             )
 
         def wire(e: dict[str, Any]) -> str:
-            return json.dumps(e, sort_keys=True, separators=(",", ":"))
+            value = e
+            if scoped:
+                value = {
+                    "version": "runspindle.scoped-admission.v1",
+                    "request": e,
+                    "destination": {
+                        "account_id": "account-1",
+                        "destination_id": "workspace-1.channel-1.thread-1",
+                        "delivery_operation_id": "deliver-"
+                        + e["binding"]["operation_id"],
+                    },
+                }
+            return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
         def envelope(name: str) -> dict[str, Any]:
             return {
@@ -121,9 +136,28 @@ def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str,
                 time.sleep(0.1)
             raise AssertionError("authority scenario deadline exceeded")
 
-        with module.Lane(platform_prepared) as lane:
+        class FixtureOwnedLane(module.Lane):  # type: ignore[name-defined,misc]
+            # The lane is loaded from the explicitly pinned platform checkout.
+            def _limits(self, name: str, image: str, mounts: Any = ()) -> list[str]:
+                args: list[str] = super()._limits(name, image, mounts)
+                # Root without DAC_OVERRIDE cannot access a 0700 host-owned mount.
+                # Run fixture clients as its owner; retain all lane hardening.
+                if any(mount["target"] == "/effects" for mount in mounts):
+                    args.extend(["--user", f"{os.getuid()}:{os.getgid()}"])
+                return args
+
+        with FixtureOwnedLane(platform_prepared) as lane:
 
             def request(command: dict[str, Any], issuer: bool = False) -> Any:
+                command = dict(command)
+                if scoped:
+                    command["command"] = {
+                        "init": "init_scoped",
+                        "issue": "issue_scoped",
+                    }.get(
+                        command["command"],
+                        command["command"].replace("authenticated", "scoped"),
+                    )
                 name = "command-" + uuid.uuid4().hex + ".json"
                 (directory / name).write_text(json.dumps(command))
                 args = (
@@ -166,7 +200,7 @@ def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str,
             worker = lane.spawn_client(
                 image,
                 [
-                    "authenticated-worker",
+                    "scoped-worker" if scoped else "authenticated-worker",
                     "http://temporal:7233",
                     "/effects",
                     "/effects/authority-helper.json",
@@ -226,6 +260,24 @@ def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str,
             changed = copy.deepcopy(held)
             changed["message_id"] = "altered-message"
             require(admit(changed)["status"] == "denied", "exact wire digest ignored")
+            if scoped:
+                for field in ("account_id", "destination_id", "delivery_operation_id"):
+                    wrong = json.loads(wire(held))
+                    wrong["destination"][field] = "other-target"
+                    reply = request(
+                        {
+                            "command": "admit_authenticated",
+                            "registry_id": "authenticated-v1",
+                            "wire": json.dumps(
+                                wrong, sort_keys=True, separators=(",", ":")
+                            ),
+                        }
+                    )
+                    require(
+                        reply["status"] == "denied",
+                        "changed scoped destination admitted",
+                    )
+                checks.append("signed_exact_destination_tampering_denied")
             conflict = envelope("conflict")
             other = copy.deepcopy(conflict)
             other["message_id"] = "message-conflict2"
@@ -367,7 +419,7 @@ def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str,
             worker2 = lane.spawn_client(
                 image,
                 [
-                    "authenticated-worker",
+                    "scoped-worker" if scoped else "authenticated-worker",
                     "http://temporal:7233",
                     "/effects",
                     "/effects/authority-helper.json",
@@ -512,6 +564,7 @@ def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str,
         )
         return {
             "status": "passed",
+            "scoped_exact_destination": scoped,
             "evidence_class": "isolated_integration",
             "checks": checks,
             "image_id": image,
@@ -543,11 +596,12 @@ def test(platform: str, platform_prepared: str, core_prepared: str) -> dict[str,
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
+    p.add_argument("--scoped", action="store_true")
     p.add_argument("--platform", required=True)
     p.add_argument("--platform-prepared", required=True)
     p.add_argument("--core-prepared", required=True)
     p.add_argument("--report", required=True)
     a = p.parse_args()
-    report = test(a.platform, a.platform_prepared, a.core_prepared)
+    report = test(a.platform, a.platform_prepared, a.core_prepared, a.scoped)
     pathlib.Path(a.report).write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))

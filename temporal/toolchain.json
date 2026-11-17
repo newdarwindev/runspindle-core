@@ -33,7 +33,9 @@
       "clippy_driver_sha256": "1a437e83cc2a03e5302f5bec88398b8e89574b998aa46faf8ce2f5ec588597c5",
       "clippy_target": "x86_64-unknown-linux-gnu",
       "acquisition": "verified-platform-image",
-      "closure_sha256": "9e872bae015df2787ef50be0a1fcd5d96b0f3f2a2f5b11414ef388f1dd61527c"
+      "closure_sha256": "9e872bae015df2787ef50be0a1fcd5d96b0f3f2a2f5b11414ef388f1dd61527c",
+      "archive_config_image_id": "sha256:58997199116d9c2d765803753fce17a910d9b1c0f92b8c1519b5e9f64d1dbdcb",
+      "archive_bytes": "621462027"
     }
   }
 }

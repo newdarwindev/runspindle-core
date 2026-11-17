@@ -1,0 +1,451 @@
+{
+  "status": "passed",
+  "evidence_class": "bounded_offline_qualification",
+  "checks": [
+    {
+      "name": "scaffold",
+      "status": "passed",
+      "log_sha256": "c52bbd42355fd2567cf441cccec70fdabb47ce1aad2f1c6533d0a6779dd06cf2"
+    },
+    {
+      "name": "composition-scaffold",
+      "status": "passed",
+      "log_sha256": "01e6a0ef0ce6af7ad1ab9382911063ed22627f3f3ebae194d4b6309961503205"
+    },
+    {
+      "name": "python",
+      "status": "passed",
+      "log_sha256": "86e5b62c241a0e70f427d4e0611e5ef631114ddd16b1fdd8f2432e877e880aa4"
+    },
+    {
+      "name": "composition-python",
+      "status": "passed",
+      "log_sha256": "ee2049c12b872825877fecf9ffe735ded2519552e02f419df6e7966022236dee"
+    },
+    {
+      "name": "rust-fmt",
+      "status": "passed",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "rust",
+      "status": "passed",
+      "log_sha256": "5cd780b56772dc6b15349a56e643a6fc0639ef3bdcea564f0ce26ac1b3736427"
+    },
+    {
+      "name": "strict-clippy",
+      "status": "passed",
+      "log_sha256": "e75d501c11f5d0680c8febf60fbab125d969f65310508ab71313cf52aad457b1"
+    },
+    {
+      "name": "mutations",
+      "status": "passed",
+      "log_sha256": "abddf4581dce787170fda128e4395947dd3d595f8e8b059a1bfb25f62216ea22"
+    },
+    {
+      "name": "wire",
+      "status": "passed",
+      "log_sha256": "0f0c03aaa9e0bcc04745cad2886b18471189fde4cf061075c3fb40a0bc374474"
+    },
+    {
+      "name": "authority",
+      "status": "passed",
+      "log_sha256": "d476cd53fac853fe5e0ffd6f2c04a0041f6d6df3711b2e1d649ce69fb1f584ad"
+    },
+    {
+      "name": "authority-repeat",
+      "status": "passed",
+      "log_sha256": "d79a1d3368301c88e727523acf1ca369946263e5e07d36b340d2b1034f35d22a"
+    },
+    {
+      "name": "scoped-authority",
+      "status": "passed",
+      "log_sha256": "9eeebfd762463660c969cbd96ae004c468dbe6ad23a4b90f0b9ae2f711aa99a7"
+    },
+    {
+      "name": "scoped-authority-repeat",
+      "status": "passed",
+      "log_sha256": "ac8d3eab690a1887ed4c49b19c02d917881bdaa698f6169b4c577233d45c3725"
+    }
+  ],
+  "image_id": "sha256:57c1c93a7f7fdeeb5efa6704af5d2f491722697dec8967ecc1883faf0f9033fe",
+  "source_hashes": {
+    "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+    "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+    "temporal/toolchain.json": "d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7",
+    "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+    "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+    "src/authenticated_artifacts.rs": "c79a66f9e3657d9b0b9b57459a2ba319aad38699e0eee8c7e8f8853b634cf637",
+    "src/authority.rs": "be0e80e99ebe38e7894ad42955d76634c7a001c9fc9ec743ee0a47a588f434fc",
+    "src/bin/checkpoints/mod.rs": "f8f52b3724c66207fbf0156b0984da23bcb532d4cde9baf7ff10d2e48d22e208",
+    "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+    "src/bin/synthetic_authority.rs": "09eb9601f3fca3d2865831e1378991e90f84fd89b6a2201b53b8471c5a4a82f8",
+    "src/bin/temporal-runtime.rs": "788369ef64a5f15db736f84bbbc18135dcda7b620eae39284fca926f3a49e5b4",
+    "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+    "src/durable.rs": "1e8333ba9df96bf1b65032e3c1afbf076b28c8921ff65c53e35c41758c3ae214",
+    "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+    "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+    "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+    "src/lib.rs": "52833822e7f8852f04868ad0bd7a366f7a23162adabcba2469f742d1debff865",
+    "src/outbox.rs": "dfc47fdbb4d80906da18b97118625ef3ced3fd2e755b4d3ee188a656a8505ca8",
+    "src/runtime.rs": "9fb29411e60a7e31a0eb259e36e23b3e189fff2e89096b7e3ac2641ae21aea96",
+    "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+    "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97"
+  },
+  "qualification_source_fingerprints": {
+    "core": "9900941e69f4d439644286fc3cb6eb596433791cab3b889816d1ad334824d87b",
+    "composition": "f4fcb77ccfaea0657d389577a7ec2553676d1dbef4a01392f0c831b04ab2dbaf",
+    "platform": "f8f9f4a1b6cef8447e78765a4ec9310cdffaf2fd08d4024c51c597a85c4a05f2"
+  },
+  "qualification_source_revisions": {
+    "core": "5225eec8613efe477caf3a6bbd48389901f9e062",
+    "composition": "ba5a102d7a2115ec9e00f748236ecbfddaab4c21",
+    "platform": "398c74766b9ec9f7203256e17dea34f1b15cac4c"
+  },
+  "prepared_manifest_sha256": {
+    "core": "50f3bb70d88889c0189a64b0c8c2dbf53e40cb6eb843d890f31e47535849ff36",
+    "platform": "f0dc8ca20763bc4020f784ec8178f08ff81c2238aa31b244154784c148d9ce56"
+  },
+  "independent_review": {
+    "status": "no_blocking_findings",
+    "reviewed_revision": "5225eec8613efe477caf3a6bbd48389901f9e062",
+    "verified": "source/harness, same-descriptor archive hash and parse, all13 qualifier log hashes, runtime and test/config hashes, both scoped integration results",
+    "scope": "bounded offline Core16 only; final published docs review remains separate"
+  },
+  "live_acceptance": "not_run",
+  "test_and_config_hashes": {
+    "core/tools/test_verified_authority.py": "c5d1ea5185cfa810c88ace4a002102e7ec79b754754ea53601a8b90599883146",
+    "core/tools/qualify_verified_authority.py": "11174b5ba7f5c6be416f53cbae324fa22a6aa9bd56a08ee0450de9c4659a65ae",
+    "core/tools/check_authority_mutations.py": "7eadf46fcfb115368b40b6db4fd2541651a4a56d2825e208e36d9749ef7afd78",
+    "core/tests/authority.rs": "d1540a36dd11257137be0f7057a28fba1fa685bbefef6c12454e55b4fcae8e89",
+    "core/tests/envelopes.rs": "d32971a076f1c2445d8196b8a2ff057cfb9cba1ef31ff2dbbdfa7ee6f605905a",
+    "core/tools/test_envelope_conformance.py": "7f68ba4770c084114d3851d1cbc27d4bd0e55318e36c44a0e648a891ceda0715",
+    "composition/conformance/envelope-v1/codec.py": "6f525c6b33b294c12a0947a6130992143282927c59c878cab3041851b11769a2",
+    "composition/conformance/envelope-v1/vectors.json": "fcebde87ffb2273e430de1115e809b0c8bee4efb02497f6a5dbfde3ebed02941",
+    "platform-prepared/prepared.json": "f0dc8ca20763bc4020f784ec8178f08ff81c2238aa31b244154784c148d9ce56"
+  },
+  "original_report_sha256": "7b8d87f6f7c953e9696ddfe3be363b0fa56e2064f92ca57d78160f3f90d93060",
+  "counts": {
+    "core_python": 104,
+    "composition_python_discovered": 357,
+    "composition_python_skipped": 3,
+    "rust_verified_authority": 85,
+    "authority_mutants_killed": 3
+  },
+  "static_quality": {
+    "status": "passed",
+    "existing_debt": 407,
+    "new_diagnostics": 0,
+    "baseline_changed": false
+  },
+  "integration_reports": {
+    "authority": {
+      "status": "passed",
+      "scoped_exact_destination": false,
+      "evidence_class": "isolated_integration",
+      "checks": [
+        "concurrent_duplicate_one_retained_task_and_child",
+        "offline_selected_host_zero_launch",
+        "invalid_signature_unknown_key_actor_audience_policy_digest_time_denied",
+        "concurrent_conflicting_revision_retains_one_identity",
+        "expiry_and_revocation_before_dispatch_zero_adapter_calls",
+        "admit_only_scope_zero_children",
+        "cancel_separate_scope_and_acknowledgement_not_terminal",
+        "missing_cancel_action_zero_cancel_calls",
+        "fresh_temporal_sqlite_worker_recovery",
+        "revocation_persists_across_processes",
+        "unknown_outcome_retained_zero_blind_retry",
+        "missing_stale_authority_default_deny",
+        "real_history_child_id_inspection_zero_unauthorized_children",
+        "authenticated_history_replay_no_effects_or_assertion_material"
+      ],
+      "image_id": "sha256:57c1c93a7f7fdeeb5efa6704af5d2f491722697dec8967ecc1883faf0f9033fe",
+      "binary_sha256": "c69f0e144b871ed2d1d3f6a10c882b3825df571888d05deb4803c84b91a6b8ec",
+      "source_hashes": {
+        "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+        "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+        "temporal/toolchain.json": "d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7",
+        "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+        "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+        "src/authenticated_artifacts.rs": "c79a66f9e3657d9b0b9b57459a2ba319aad38699e0eee8c7e8f8853b634cf637",
+        "src/authority.rs": "be0e80e99ebe38e7894ad42955d76634c7a001c9fc9ec743ee0a47a588f434fc",
+        "src/bin/checkpoints/mod.rs": "f8f52b3724c66207fbf0156b0984da23bcb532d4cde9baf7ff10d2e48d22e208",
+        "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+        "src/bin/synthetic_authority.rs": "09eb9601f3fca3d2865831e1378991e90f84fd89b6a2201b53b8471c5a4a82f8",
+        "src/bin/temporal-runtime.rs": "788369ef64a5f15db736f84bbbc18135dcda7b620eae39284fca926f3a49e5b4",
+        "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+        "src/durable.rs": "1e8333ba9df96bf1b65032e3c1afbf076b28c8921ff65c53e35c41758c3ae214",
+        "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+        "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+        "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+        "src/lib.rs": "52833822e7f8852f04868ad0bd7a366f7a23162adabcba2469f742d1debff865",
+        "src/outbox.rs": "dfc47fdbb4d80906da18b97118625ef3ced3fd2e755b4d3ee188a656a8505ca8",
+        "src/runtime.rs": "9fb29411e60a7e31a0eb259e36e23b3e189fff2e89096b7e3ac2641ae21aea96",
+        "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+        "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97"
+      },
+      "retained_revisions": 7,
+      "child_ids": [
+        "job-d8d271aeec352ea85615b3d1f0bc354120314e3f1f1a1ff807352cbe6a1b49d9",
+        "job-f3a705de8e4b4abff970ee4ff1516c13c644d332738c24412fe9f5af25be0540",
+        "job-001607fc0378ab3b784ba397185256b159e33277526b18ee6a0bbc7336103ec4",
+        "job-58599476af28096881081b00bed0149f92898d7fb5f110cd7f350c944da00d21"
+      ],
+      "launch_count": 3,
+      "cancel_count": 1,
+      "history_digests": {
+        "authenticated-v1": "0a3b158b65a095dcee7c2980fbae702dd2d30091366a6514f86271898c460719",
+        "job-d8d271aeec352ea85615b3d1f0bc354120314e3f1f1a1ff807352cbe6a1b49d9": "a01fd3e661a4a9e9ed26d56347ced925642c6b4b29cf00aef3194ff644b7352a",
+        "job-f3a705de8e4b4abff970ee4ff1516c13c644d332738c24412fe9f5af25be0540": "99b4b5759924b70bf2d09fb20167f916635dad68469d8dfaf86dc211bb4794b6",
+        "job-001607fc0378ab3b784ba397185256b159e33277526b18ee6a0bbc7336103ec4": "c0689f1b188bfdbb1b978ceeb0fd1f4130e0ee998c2b96deeada078f79646f76",
+        "job-58599476af28096881081b00bed0149f92898d7fb5f110cd7f350c944da00d21": "760bdd70500e042836516fa0492bd0e8024dcb8b45e0105f9b82d0ba43a5a4bf"
+      },
+      "cleanup": "passed",
+      "independent_review": "pending_exact_candidate_review",
+      "boundary_matrix": {
+        "core": "real",
+        "Temporal": "real_disposable_SQLite",
+        "authority": "real_ring_Ed25519_local_SQLite_ephemeral_synthetic_issuer",
+        "host": "scripted_independent_fsynced_peer_ledger",
+        "provider": "not_exercised",
+        "browser": "not_exercised",
+        "console": "not_exercised",
+        "Tether": "not_exercised"
+      },
+      "live_acceptance": "not_run"
+    },
+    "authority-repeat": {
+      "status": "passed",
+      "scoped_exact_destination": false,
+      "evidence_class": "isolated_integration",
+      "checks": [
+        "concurrent_duplicate_one_retained_task_and_child",
+        "offline_selected_host_zero_launch",
+        "invalid_signature_unknown_key_actor_audience_policy_digest_time_denied",
+        "concurrent_conflicting_revision_retains_one_identity",
+        "expiry_and_revocation_before_dispatch_zero_adapter_calls",
+        "admit_only_scope_zero_children",
+        "cancel_separate_scope_and_acknowledgement_not_terminal",
+        "missing_cancel_action_zero_cancel_calls",
+        "fresh_temporal_sqlite_worker_recovery",
+        "revocation_persists_across_processes",
+        "unknown_outcome_retained_zero_blind_retry",
+        "missing_stale_authority_default_deny",
+        "real_history_child_id_inspection_zero_unauthorized_children",
+        "authenticated_history_replay_no_effects_or_assertion_material"
+      ],
+      "image_id": "sha256:57c1c93a7f7fdeeb5efa6704af5d2f491722697dec8967ecc1883faf0f9033fe",
+      "binary_sha256": "c69f0e144b871ed2d1d3f6a10c882b3825df571888d05deb4803c84b91a6b8ec",
+      "source_hashes": {
+        "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+        "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+        "temporal/toolchain.json": "d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7",
+        "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+        "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+        "src/authenticated_artifacts.rs": "c79a66f9e3657d9b0b9b57459a2ba319aad38699e0eee8c7e8f8853b634cf637",
+        "src/authority.rs": "be0e80e99ebe38e7894ad42955d76634c7a001c9fc9ec743ee0a47a588f434fc",
+        "src/bin/checkpoints/mod.rs": "f8f52b3724c66207fbf0156b0984da23bcb532d4cde9baf7ff10d2e48d22e208",
+        "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+        "src/bin/synthetic_authority.rs": "09eb9601f3fca3d2865831e1378991e90f84fd89b6a2201b53b8471c5a4a82f8",
+        "src/bin/temporal-runtime.rs": "788369ef64a5f15db736f84bbbc18135dcda7b620eae39284fca926f3a49e5b4",
+        "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+        "src/durable.rs": "1e8333ba9df96bf1b65032e3c1afbf076b28c8921ff65c53e35c41758c3ae214",
+        "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+        "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+        "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+        "src/lib.rs": "52833822e7f8852f04868ad0bd7a366f7a23162adabcba2469f742d1debff865",
+        "src/outbox.rs": "dfc47fdbb4d80906da18b97118625ef3ced3fd2e755b4d3ee188a656a8505ca8",
+        "src/runtime.rs": "9fb29411e60a7e31a0eb259e36e23b3e189fff2e89096b7e3ac2641ae21aea96",
+        "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+        "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97"
+      },
+      "retained_revisions": 7,
+      "child_ids": [
+        "job-d8d271aeec352ea85615b3d1f0bc354120314e3f1f1a1ff807352cbe6a1b49d9",
+        "job-f3a705de8e4b4abff970ee4ff1516c13c644d332738c24412fe9f5af25be0540",
+        "job-001607fc0378ab3b784ba397185256b159e33277526b18ee6a0bbc7336103ec4",
+        "job-58599476af28096881081b00bed0149f92898d7fb5f110cd7f350c944da00d21"
+      ],
+      "launch_count": 3,
+      "cancel_count": 1,
+      "history_digests": {
+        "authenticated-v1": "761c4ce9231e364705718cd6313554ed5cce20096960669e770c8f62acf27fee",
+        "job-d8d271aeec352ea85615b3d1f0bc354120314e3f1f1a1ff807352cbe6a1b49d9": "7c146e61f3b6a87064b4b6d0465d9ef244b38faf4cbaa509ce8846e45ed8139d",
+        "job-f3a705de8e4b4abff970ee4ff1516c13c644d332738c24412fe9f5af25be0540": "bd4d46234cc60a40e708711955aaccecd792c4473c0b0805c27cb75b469681c5",
+        "job-001607fc0378ab3b784ba397185256b159e33277526b18ee6a0bbc7336103ec4": "4a6fb438635ab82e0d995281fd405187e54cb4b8ddb76367fc8c5d7edbfa2ce0",
+        "job-58599476af28096881081b00bed0149f92898d7fb5f110cd7f350c944da00d21": "3ea3794477c1f8c953bb1533fd51e22889d9082c767640beecfce94ef6f5c970"
+      },
+      "cleanup": "passed",
+      "independent_review": "pending_exact_candidate_review",
+      "boundary_matrix": {
+        "core": "real",
+        "Temporal": "real_disposable_SQLite",
+        "authority": "real_ring_Ed25519_local_SQLite_ephemeral_synthetic_issuer",
+        "host": "scripted_independent_fsynced_peer_ledger",
+        "provider": "not_exercised",
+        "browser": "not_exercised",
+        "console": "not_exercised",
+        "Tether": "not_exercised"
+      },
+      "live_acceptance": "not_run"
+    },
+    "scoped-authority": {
+      "status": "passed",
+      "scoped_exact_destination": true,
+      "evidence_class": "isolated_integration",
+      "checks": [
+        "concurrent_duplicate_one_retained_task_and_child",
+        "offline_selected_host_zero_launch",
+        "signed_exact_destination_tampering_denied",
+        "invalid_signature_unknown_key_actor_audience_policy_digest_time_denied",
+        "concurrent_conflicting_revision_retains_one_identity",
+        "expiry_and_revocation_before_dispatch_zero_adapter_calls",
+        "admit_only_scope_zero_children",
+        "cancel_separate_scope_and_acknowledgement_not_terminal",
+        "missing_cancel_action_zero_cancel_calls",
+        "fresh_temporal_sqlite_worker_recovery",
+        "revocation_persists_across_processes",
+        "unknown_outcome_retained_zero_blind_retry",
+        "missing_stale_authority_default_deny",
+        "real_history_child_id_inspection_zero_unauthorized_children",
+        "authenticated_history_replay_no_effects_or_assertion_material"
+      ],
+      "image_id": "sha256:57c1c93a7f7fdeeb5efa6704af5d2f491722697dec8967ecc1883faf0f9033fe",
+      "binary_sha256": "c69f0e144b871ed2d1d3f6a10c882b3825df571888d05deb4803c84b91a6b8ec",
+      "source_hashes": {
+        "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+        "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+        "temporal/toolchain.json": "d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7",
+        "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+        "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+        "src/authenticated_artifacts.rs": "c79a66f9e3657d9b0b9b57459a2ba319aad38699e0eee8c7e8f8853b634cf637",
+        "src/authority.rs": "be0e80e99ebe38e7894ad42955d76634c7a001c9fc9ec743ee0a47a588f434fc",
+        "src/bin/checkpoints/mod.rs": "f8f52b3724c66207fbf0156b0984da23bcb532d4cde9baf7ff10d2e48d22e208",
+        "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+        "src/bin/synthetic_authority.rs": "09eb9601f3fca3d2865831e1378991e90f84fd89b6a2201b53b8471c5a4a82f8",
+        "src/bin/temporal-runtime.rs": "788369ef64a5f15db736f84bbbc18135dcda7b620eae39284fca926f3a49e5b4",
+        "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+        "src/durable.rs": "1e8333ba9df96bf1b65032e3c1afbf076b28c8921ff65c53e35c41758c3ae214",
+        "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+        "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+        "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+        "src/lib.rs": "52833822e7f8852f04868ad0bd7a366f7a23162adabcba2469f742d1debff865",
+        "src/outbox.rs": "dfc47fdbb4d80906da18b97118625ef3ced3fd2e755b4d3ee188a656a8505ca8",
+        "src/runtime.rs": "9fb29411e60a7e31a0eb259e36e23b3e189fff2e89096b7e3ac2641ae21aea96",
+        "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+        "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97"
+      },
+      "retained_revisions": 7,
+      "child_ids": [
+        "job-d8d271aeec352ea85615b3d1f0bc354120314e3f1f1a1ff807352cbe6a1b49d9",
+        "job-f3a705de8e4b4abff970ee4ff1516c13c644d332738c24412fe9f5af25be0540",
+        "job-001607fc0378ab3b784ba397185256b159e33277526b18ee6a0bbc7336103ec4",
+        "job-58599476af28096881081b00bed0149f92898d7fb5f110cd7f350c944da00d21"
+      ],
+      "launch_count": 3,
+      "cancel_count": 1,
+      "history_digests": {
+        "authenticated-v1": "1aad27e13d049ba8e8326bad7712960c759c139a1c7fab323c0ce744e018ba71",
+        "job-d8d271aeec352ea85615b3d1f0bc354120314e3f1f1a1ff807352cbe6a1b49d9": "2f5022107401b073076ac9daeb1dd63b9ba8ff9613e79940315a18a19efd3b72",
+        "job-f3a705de8e4b4abff970ee4ff1516c13c644d332738c24412fe9f5af25be0540": "da05db0883374458ed4ce55a8d596288674d0fd32b422f60859608da33d92cc3",
+        "job-001607fc0378ab3b784ba397185256b159e33277526b18ee6a0bbc7336103ec4": "df5ca7492927c7521c2e05f1590595120184bc960f9e70c8172f3bb894683460",
+        "job-58599476af28096881081b00bed0149f92898d7fb5f110cd7f350c944da00d21": "0196e801d79dd38323d781a9bb1490690352b1cd59460de12e927e91d21b9814"
+      },
+      "cleanup": "passed",
+      "independent_review": "pending_exact_candidate_review",
+      "boundary_matrix": {
+        "core": "real",
+        "Temporal": "real_disposable_SQLite",
+        "authority": "real_ring_Ed25519_local_SQLite_ephemeral_synthetic_issuer",
+        "host": "scripted_independent_fsynced_peer_ledger",
+        "provider": "not_exercised",
+        "browser": "not_exercised",
+        "console": "not_exercised",
+        "Tether": "not_exercised"
+      },
+      "live_acceptance": "not_run"
+    },
+    "scoped-authority-repeat": {
+      "status": "passed",
+      "scoped_exact_destination": true,
+      "evidence_class": "isolated_integration",
+      "checks": [
+        "concurrent_duplicate_one_retained_task_and_child",
+        "offline_selected_host_zero_launch",
+        "signed_exact_destination_tampering_denied",
+        "invalid_signature_unknown_key_actor_audience_policy_digest_time_denied",
+        "concurrent_conflicting_revision_retains_one_identity",
+        "expiry_and_revocation_before_dispatch_zero_adapter_calls",
+        "admit_only_scope_zero_children",
+        "cancel_separate_scope_and_acknowledgement_not_terminal",
+        "missing_cancel_action_zero_cancel_calls",
+        "fresh_temporal_sqlite_worker_recovery",
+        "revocation_persists_across_processes",
+        "unknown_outcome_retained_zero_blind_retry",
+        "missing_stale_authority_default_deny",
+        "real_history_child_id_inspection_zero_unauthorized_children",
+        "authenticated_history_replay_no_effects_or_assertion_material"
+      ],
+      "image_id": "sha256:57c1c93a7f7fdeeb5efa6704af5d2f491722697dec8967ecc1883faf0f9033fe",
+      "binary_sha256": "c69f0e144b871ed2d1d3f6a10c882b3825df571888d05deb4803c84b91a6b8ec",
+      "source_hashes": {
+        "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+        "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+        "temporal/toolchain.json": "d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7",
+        "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+        "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+        "src/authenticated_artifacts.rs": "c79a66f9e3657d9b0b9b57459a2ba319aad38699e0eee8c7e8f8853b634cf637",
+        "src/authority.rs": "be0e80e99ebe38e7894ad42955d76634c7a001c9fc9ec743ee0a47a588f434fc",
+        "src/bin/checkpoints/mod.rs": "f8f52b3724c66207fbf0156b0984da23bcb532d4cde9baf7ff10d2e48d22e208",
+        "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+        "src/bin/synthetic_authority.rs": "09eb9601f3fca3d2865831e1378991e90f84fd89b6a2201b53b8471c5a4a82f8",
+        "src/bin/temporal-runtime.rs": "788369ef64a5f15db736f84bbbc18135dcda7b620eae39284fca926f3a49e5b4",
+        "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+        "src/durable.rs": "1e8333ba9df96bf1b65032e3c1afbf076b28c8921ff65c53e35c41758c3ae214",
+        "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+        "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+        "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+        "src/lib.rs": "52833822e7f8852f04868ad0bd7a366f7a23162adabcba2469f742d1debff865",
+        "src/outbox.rs": "dfc47fdbb4d80906da18b97118625ef3ced3fd2e755b4d3ee188a656a8505ca8",
+        "src/runtime.rs": "9fb29411e60a7e31a0eb259e36e23b3e189fff2e89096b7e3ac2641ae21aea96",
+        "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+        "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97"
+      },
+      "retained_revisions": 7,
+      "child_ids": [
+        "job-d8d271aeec352ea85615b3d1f0bc354120314e3f1f1a1ff807352cbe6a1b49d9",
+        "job-f3a705de8e4b4abff970ee4ff1516c13c644d332738c24412fe9f5af25be0540",
+        "job-001607fc0378ab3b784ba397185256b159e33277526b18ee6a0bbc7336103ec4",
+        "job-58599476af28096881081b00bed0149f92898d7fb5f110cd7f350c944da00d21"
+      ],
+      "launch_count": 3,
+      "cancel_count": 1,
+      "history_digests": {
+        "authenticated-v1": "624816a81d806e2bdd8b771f8a946351aa7acc84ccceee6f9409a9d9faad0461",
+        "job-d8d271aeec352ea85615b3d1f0bc354120314e3f1f1a1ff807352cbe6a1b49d9": "5cc68e433068944eece5410534b8f8ded47be190166e0979ca12a46ef054e4fa",
+        "job-f3a705de8e4b4abff970ee4ff1516c13c644d332738c24412fe9f5af25be0540": "8bfcb3526f3742f61e4ff2a1a4cf609b583c179b15ff70a74d8351ad815eb3cf",
+        "job-001607fc0378ab3b784ba397185256b159e33277526b18ee6a0bbc7336103ec4": "b52db7dd4184cef599c25de9e62f79ee1bfae40113fc4c45a9eb37ed898b0389",
+        "job-58599476af28096881081b00bed0149f92898d7fb5f110cd7f350c944da00d21": "98ecae798fb7ddc1e2a6aa0bdc330ed8d75deaee3ef94b240c271cd73bf2b702"
+      },
+      "cleanup": "passed",
+      "independent_review": "pending_exact_candidate_review",
+      "boundary_matrix": {
+        "core": "real",
+        "Temporal": "real_disposable_SQLite",
+        "authority": "real_ring_Ed25519_local_SQLite_ephemeral_synthetic_issuer",
+        "host": "scripted_independent_fsynced_peer_ledger",
+        "provider": "not_exercised",
+        "browser": "not_exercised",
+        "console": "not_exercised",
+        "Tether": "not_exercised"
+      },
+      "live_acceptance": "not_run"
+    }
+  },
+  "limitations": [
+    "Synthetic ephemeral issuer and scripted host only; no real providers or Tether transport.",
+    "Revocation recheck is not atomic with an external effect.",
+    "Independent scoped producer interoperability beyond this test harness is not claimed.",
+    "The authenticated-artifacts feature is outside this qualification."
+  ]
+}

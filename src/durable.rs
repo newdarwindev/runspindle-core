@@ -162,21 +162,31 @@ fn normalized_schema(sql: &str) -> String {
     }
     normalized.trim_end_matches(';').to_owned()
 }
-pub(crate) fn require_schema(connection: &Connection, objects: &[SchemaObject]) -> anyhow::Result<()> {
+pub(crate) fn require_schema(
+    connection: &Connection,
+    objects: &[SchemaObject],
+) -> anyhow::Result<()> {
     for (kind, name, sql) in objects {
-        let mut statement = connection.prepare("SELECT type,sql FROM sqlite_master WHERE name=?1")?;
-        let rows = statement.query_map([name], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })?.collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut statement =
+            connection.prepare("SELECT type,sql FROM sqlite_master WHERE name=?1")?;
+        let rows = statement
+            .query_map([name], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
         anyhow::ensure!(
-            rows.len() == 1 && rows[0].0 == *kind
+            rows.len() == 1
+                && rows[0].0 == *kind
                 && normalized_schema(&rows[0].1) == normalized_schema(sql),
             "missing or incompatible core schema object: {name}"
         );
     }
     Ok(())
 }
-pub(crate) fn create_schema(connection: &Connection, objects: &[SchemaObject]) -> anyhow::Result<()> {
+pub(crate) fn create_schema(
+    connection: &Connection,
+    objects: &[SchemaObject],
+) -> anyhow::Result<()> {
     for (_, _, sql) in objects {
         connection.execute_batch(sql)?;
     }
@@ -196,13 +206,20 @@ impl Store {
         // must never turn an incomplete journal into a new empty store.
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current: u64 = tx.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        anyhow::ensure!(current == 0 || current == 1, "unsupported concurrent core schema");
+        anyhow::ensure!(
+            current == 0 || current == 1,
+            "unsupported concurrent core schema"
+        );
         if current == 0 {
             let existing: u64 = tx.query_row(
                 "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'",
-                [], |r| r.get(0),
+                [],
+                |r| r.get(0),
             )?;
-            anyhow::ensure!(existing == 0, "unversioned nonempty database is not a core store");
+            anyhow::ensure!(
+                existing == 0,
+                "unversioned nonempty database is not a core store"
+            );
             create_schema(&tx, ARTIFACT_SCHEMA)?;
             tx.pragma_update(None, "user_version", 1)?;
         }

@@ -871,30 +871,53 @@ fn legacy_outbox(t: &Temp, r: &DeliveryRequest) {
       CREATE TABLE outbox(operation TEXT PRIMARY KEY,request TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('reserved','unknown','delivered')),receipt TEXT,generation INTEGER NOT NULL,acknowledgement TEXT,conflict INTEGER NOT NULL CHECK(conflict IN (0,1)));
       CREATE TRIGGER outbox_binding_immutable BEFORE UPDATE OF operation,request ON outbox BEGIN SELECT RAISE(ABORT,'immutable delivery binding');END;
       CREATE TRIGGER outbox_retained BEFORE DELETE ON outbox BEGIN SELECT RAISE(ABORT,'retained delivery');END;").unwrap();
-    db.execute("INSERT INTO outbox VALUES(?1,?2,'unknown',NULL,4,NULL,0)",
-        params![r.delivery_operation_id, serde_json::to_string(r).unwrap()]).unwrap();
+    db.execute(
+        "INSERT INTO outbox VALUES(?1,?2,'unknown',NULL,4,NULL,0)",
+        params![r.delivery_operation_id, serde_json::to_string(r).unwrap()],
+    )
+    .unwrap();
 }
 fn schema_version(db: &Connection) -> u64 {
-    db.query_row("SELECT version FROM outbox_schema WHERE id=1", [], |r| r.get(0)).unwrap()
+    db.query_row("SELECT version FROM outbox_schema WHERE id=1", [], |r| {
+        r.get(0)
+    })
+    .unwrap()
 }
 fn schema_count(db: &Connection, name: &str) -> u64 {
-    db.query_row("SELECT count(*) FROM sqlite_master WHERE name=?1", [name], |r| r.get(0)).unwrap()
+    db.query_row(
+        "SELECT count(*) FROM sqlite_master WHERE name=?1",
+        [name],
+        |r| r.get(0),
+    )
+    .unwrap()
 }
 fn retained_row(db: &Connection) -> String {
-    db.query_row("SELECT request || '|' || state || '|' || generation || '|' || conflict FROM outbox", [], |r| r.get(0)).unwrap()
+    db.query_row(
+        "SELECT request || '|' || state || '|' || generation || '|' || conflict FROM outbox",
+        [],
+        |r| r.get(0),
+    )
+    .unwrap()
 }
 struct SchemaChild(std::process::Child);
 impl SchemaChild {
     fn spawn(t: &Temp, mode: &str, result: &str) -> Self {
         if !t.0.join("request.json").exists() {
-            std::fs::write(t.0.join("request.json"), serde_json::to_vec(&request(t)).unwrap()).unwrap();
+            std::fs::write(
+                t.0.join("request.json"),
+                serde_json::to_vec(&request(t)).unwrap(),
+            )
+            .unwrap();
         }
-        Self(Command::new(std::env::current_exe().unwrap())
-            .args(["--exact", "schema_reopen_child", "--nocapture"])
-            .env("CORE_SCHEMA_DIR", &t.0)
-            .env("CORE_SCHEMA_MODE", mode)
-            .env("CORE_SCHEMA_RESULT", result)
-            .spawn().unwrap())
+        Self(
+            Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "schema_reopen_child", "--nocapture"])
+                .env("CORE_SCHEMA_DIR", &t.0)
+                .env("CORE_SCHEMA_MODE", mode)
+                .env("CORE_SCHEMA_RESULT", result)
+                .spawn()
+                .unwrap(),
+        )
     }
     fn wait(&mut self) {
         let end = std::time::Instant::now() + std::time::Duration::from_secs(15);
@@ -916,9 +939,12 @@ impl Drop for SchemaChild {
 }
 #[test]
 fn schema_reopen_child() {
-    let Ok(directory) = std::env::var("CORE_SCHEMA_DIR") else { return; };
+    let Ok(directory) = std::env::var("CORE_SCHEMA_DIR") else {
+        return;
+    };
     let directory = PathBuf::from(directory);
-    let r: DeliveryRequest = serde_json::from_slice(&std::fs::read(directory.join("request.json")).unwrap()).unwrap();
+    let r: DeliveryRequest =
+        serde_json::from_slice(&std::fs::read(directory.join("request.json")).unwrap()).unwrap();
     let outcome = match Outbox::open(directory.join("core.sqlite")) {
         Ok(mut outbox) => {
             if std::env::var("CORE_SCHEMA_MODE").unwrap() == "deliver" {
@@ -933,7 +959,11 @@ fn schema_reopen_child() {
         }
         Err(_) => "blocked",
     };
-    std::fs::write(directory.join(std::env::var("CORE_SCHEMA_RESULT").unwrap()), outcome).unwrap();
+    std::fs::write(
+        directory.join(std::env::var("CORE_SCHEMA_RESULT").unwrap()),
+        outcome,
+    )
+    .unwrap();
 }
 #[test]
 fn missing_journal_blocks_fresh_process_without_resend() {
@@ -949,11 +979,25 @@ fn missing_journal_blocks_fresh_process_without_resend() {
     // The authoritative marker and accepted BLOB survive the missing journal.
     assert_eq!(schema_version(&db), 2);
     SchemaChild::spawn(&t, "deliver", "reopen.txt").wait();
-    assert_eq!(peer.count("send"), 1, "reopen must not attempt a second send");
+    assert_eq!(
+        peer.count("send"),
+        1,
+        "reopen must not attempt a second send"
+    );
     assert_eq!(peer.count("lookup"), 0);
-    assert_eq!(std::fs::read_to_string(t.0.join("reopen.txt")).unwrap(), "blocked");
-    assert_eq!(schema_count(&db, "outbox"), 0, "missing journal must not be recreated");
-    assert_eq!(Store::open(t.db()).unwrap().accepted(&r.accepted).unwrap(), BYTES);
+    assert_eq!(
+        std::fs::read_to_string(t.0.join("reopen.txt")).unwrap(),
+        "blocked"
+    );
+    assert_eq!(
+        schema_count(&db, "outbox"),
+        0,
+        "missing journal must not be recreated"
+    );
+    assert_eq!(
+        Store::open(t.db()).unwrap().accepted(&r.accepted).unwrap(),
+        BYTES
+    );
 }
 #[test]
 fn legacy_migration_preserves_reservation_across_concurrent_processes() {
@@ -975,10 +1019,19 @@ fn legacy_migration_preserves_reservation_across_concurrent_processes() {
     assert_eq!(retained_row(&db), before);
     assert_eq!(schema_count(&db, "outbox_evidence"), 1);
     let mut outbox = Outbox::open(t.db()).unwrap();
-    assert_eq!(outbox.deliver(&r, &Grant(r.clone()), &mut peer).unwrap().state, DeliveryState::Delivered);
+    assert_eq!(
+        outbox
+            .deliver(&r, &Grant(r.clone()), &mut peer)
+            .unwrap()
+            .state,
+        DeliveryState::Delivered
+    );
     assert_eq!(peer.count("send"), 1);
     assert_eq!(peer.count("lookup"), 1);
-    assert_eq!(Store::open(t.db()).unwrap().accepted(&r.accepted).unwrap(), BYTES);
+    assert_eq!(
+        Store::open(t.db()).unwrap().accepted(&r.accepted).unwrap(),
+        BYTES
+    );
 }
 #[test]
 fn failed_schema_upgrade_rolls_back_before_fresh_process_retry() {
@@ -991,16 +1044,29 @@ fn failed_schema_upgrade_rolls_back_before_fresh_process_retry() {
     // objects must disappear on failure while the old journal remains intact.
     db.execute_batch("CREATE TRIGGER fail_upgrade BEFORE UPDATE ON outbox_schema BEGIN SELECT RAISE(ABORT,'synthetic upgrade interruption');END;").unwrap();
     SchemaChild::spawn(&t, "deliver", "failed.txt").wait();
-    assert_eq!(std::fs::read_to_string(t.0.join("failed.txt")).unwrap(), "blocked");
+    assert_eq!(
+        std::fs::read_to_string(t.0.join("failed.txt")).unwrap(),
+        "blocked"
+    );
     assert_eq!(schema_version(&db), 1);
     assert_eq!(retained_row(&db), before);
-    for name in ["outbox_evidence", "outbox_evidence_immutable", "outbox_evidence_retained"] {
+    for name in [
+        "outbox_evidence",
+        "outbox_evidence_immutable",
+        "outbox_evidence_retained",
+    ] {
         assert_eq!(schema_count(&db, name), 0);
     }
-    assert!(!t.0.join("peer.sqlite").exists(), "blocked reopen reached transport");
+    assert!(
+        !t.0.join("peer.sqlite").exists(),
+        "blocked reopen reached transport"
+    );
     db.execute_batch("DROP TRIGGER fail_upgrade;").unwrap();
     SchemaChild::spawn(&t, "snapshot", "retry.txt").wait();
-    assert_eq!(std::fs::read_to_string(t.0.join("retry.txt")).unwrap(), "opened");
+    assert_eq!(
+        std::fs::read_to_string(t.0.join("retry.txt")).unwrap(),
+        "opened"
+    );
     assert_eq!(schema_version(&db), 2);
     assert_eq!(retained_row(&db), before);
 }
@@ -1036,13 +1102,21 @@ fn existing_v1_evidence_is_retained_but_partial_audit_schema_is_denied() {
     let r = request(&t);
     Outbox::open(t.db()).unwrap();
     let db = Connection::open(t.db()).unwrap();
-    db.execute_batch("UPDATE outbox_schema SET version=1;").unwrap();
-    db.execute("INSERT INTO outbox_evidence VALUES(?1,0,'conflict','synthetic preserved audit')", [&r.delivery_operation_id]).unwrap();
+    db.execute_batch("UPDATE outbox_schema SET version=1;")
+        .unwrap();
+    db.execute(
+        "INSERT INTO outbox_evidence VALUES(?1,0,'conflict','synthetic preserved audit')",
+        [&r.delivery_operation_id],
+    )
+    .unwrap();
     Outbox::open(t.db()).unwrap();
     assert_eq!(schema_version(&db), 2);
-    let record: String = db.query_row("SELECT record FROM outbox_evidence", [], |r| r.get(0)).unwrap();
+    let record: String = db
+        .query_row("SELECT record FROM outbox_evidence", [], |r| r.get(0))
+        .unwrap();
     assert_eq!(record, "synthetic preserved audit");
-    db.execute_batch("UPDATE outbox_schema SET version=1;DROP TRIGGER outbox_evidence_retained;").unwrap();
+    db.execute_batch("UPDATE outbox_schema SET version=1;DROP TRIGGER outbox_evidence_retained;")
+        .unwrap();
     assert!(Outbox::open(t.db()).is_err());
     assert_eq!(schema_version(&db), 1);
     assert_eq!(schema_count(&db, "outbox_evidence_retained"), 0);
@@ -1059,16 +1133,38 @@ fn missing_primary_key_token_boundary_blocks_outbox_reopen() {
           CREATE TABLE outbox(operation {declared_type},request TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('reserved','unknown','delivered')),receipt TEXT,generation INTEGER NOT NULL,acknowledgement TEXT,conflict INTEGER NOT NULL CHECK(conflict IN (0,1)));
           CREATE TRIGGER outbox_binding_immutable BEFORE UPDATE OF operation,request ON outbox BEGIN SELECT RAISE(ABORT,'immutable delivery binding');END;
           CREATE TRIGGER outbox_retained BEFORE DELETE ON outbox BEGIN SELECT RAISE(ABORT,'retained delivery');END;")).unwrap();
-        let pk: u64 = db.query_row("SELECT pk FROM pragma_table_info('outbox') WHERE name='operation'", [], |row| row.get(0)).unwrap();
+        let pk: u64 = db
+            .query_row(
+                "SELECT pk FROM pragma_table_info('outbox') WHERE name='operation'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(pk, 0, "fixture must actually lack a primary key");
         for _ in 0..2 {
-            db.execute("INSERT INTO outbox VALUES(?1,?2,'unknown',NULL,0,NULL,0)",
-                params![r.delivery_operation_id, serde_json::to_string(&r).unwrap()]).unwrap();
+            db.execute(
+                "INSERT INTO outbox VALUES(?1,?2,'unknown',NULL,0,NULL,0)",
+                params![r.delivery_operation_id, serde_json::to_string(&r).unwrap()],
+            )
+            .unwrap();
         }
-        assert_eq!(db.query_row("SELECT count(*) FROM outbox", [], |row| row.get::<_, u64>(0)).unwrap(), 2);
+        assert_eq!(
+            db.query_row("SELECT count(*) FROM outbox", [], |row| row
+                .get::<_, u64>(0))
+                .unwrap(),
+            2
+        );
         let peer = Peer::open(&t.0.join("peer.sqlite"));
-        assert!(Outbox::open(t.db()).is_err(), "accepted missing operation constraint: {declared_type}");
-        assert_eq!(db.query_row("SELECT count(*) FROM outbox", [], |row| row.get::<_, u64>(0)).unwrap(), 2);
+        assert!(
+            Outbox::open(t.db()).is_err(),
+            "accepted missing operation constraint: {declared_type}"
+        );
+        assert_eq!(
+            db.query_row("SELECT count(*) FROM outbox", [], |row| row
+                .get::<_, u64>(0))
+                .unwrap(),
+            2
+        );
         assert_eq!(peer.count("send"), 0);
         assert_eq!(peer.count("lookup"), 0);
     }

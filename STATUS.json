@@ -92,24 +92,25 @@
   },
   "temporal_integration": "locally_tested_pinned_development_server",
   "verified_admission": {
-    "evidence": "docs/FOUNDATION_AUTHORITY.md",
-    "exact_delivery_destination_binding": "not_implemented_requires_versioned_contract_extension",
+    "evidence": "docs/scoped-authority-qualification.json",
+    "exact_delivery_destination_binding": "implemented_in_versioned_scoped_admission_v1_authority_v2",
     "independent_review": "pending_exact_candidate_review",
-    "issue_16": "open_partial_host_workspace_scope_only",
+    "issue_16": "open_pending_final_review",
     "issuer": "synthetic_ephemeral_only",
     "production_issuer": "not_implemented",
-    "status": "locally_tested_offline_candidate_dependency_qualification_blocked",
+    "status": "bounded_offline_qualification_passed_review_pending",
     "store": "local_authoritative_SQLite",
     "version": "runspindle.authority.v1"
   },
   "scoped_admission_candidate": {
     "version": "runspindle.scoped-admission.v1",
     "assertion": "runspindle.authority.v2",
-    "status": "component_tested_candidate",
+    "status": "bounded_offline_qualification_passed_review_pending",
     "specification": "specs/scoped-authority-v2.md",
     "exact_destination": "account_destination_delivery_operation_signed_and_outbox_enforced",
-    "temporal_scoped_integration": "not_run_missing_exact_prepared_builder",
+    "temporal_scoped_integration": "passed_twice_fresh_SQLite_recovery_and_replay",
     "real_tether_delivery": "not_integrated",
-    "issue_16": "open"
+    "issue_16": "open",
+    "evidence": "docs/scoped-authority-qualification.json"
   }
 }

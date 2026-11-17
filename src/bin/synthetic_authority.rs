@@ -18,6 +18,14 @@ use std::{
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
     Init,
+    InitScoped,
+    IssueScoped {
+        wire: String,
+        #[serde(default)]
+        changes: serde_json::Map<String, serde_json::Value>,
+        #[serde(default)]
+        bad_signature: bool,
+    },
     Issue {
         wire: String,
         #[serde(default)]
@@ -41,8 +49,9 @@ pub fn run(directory: &Path, input: &Path) -> anyhow::Result<()> {
         .read_to_end(&mut bytes)?;
     let command: Command = serde_json::from_value(envelope::strict_json(&bytes)?)?;
     let db = directory.join("authority.sqlite");
+    let scoped = matches!(&command, Command::InitScoped | Command::IssueScoped { .. });
     match command {
-        Command::Init => {
+        Command::Init | Command::InitScoped => {
             let key = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new())
                 .map_err(|_| anyhow::anyhow!("ephemeral key generation"))?;
             let pair = Ed25519KeyPair::from_pkcs8(key.as_ref())
@@ -71,12 +80,18 @@ pub fn run(directory: &Path, input: &Path) -> anyhow::Result<()> {
                 issuer: "synthetic-issuer".into(),
                 actor: "synthetic-actor".into(),
                 audience: "offline-core".into(),
-                allowed_actions: vec![
-                    Action::Admit,
-                    Action::Dispatch,
-                    Action::Reconcile,
-                    Action::Cancel,
-                ],
+                allowed_actions: {
+                    let mut actions = vec![
+                        Action::Admit,
+                        Action::Dispatch,
+                        Action::Reconcile,
+                        Action::Cancel,
+                    ];
+                    if scoped {
+                        actions.push(Action::Deliver);
+                    }
+                    actions
+                },
             };
             std::fs::write(
                 directory.join("authority-helper.json"),
@@ -87,23 +102,44 @@ pub fn run(directory: &Path, input: &Path) -> anyhow::Result<()> {
             wire,
             changes,
             bad_signature,
+        }
+        | Command::IssueScoped {
+            wire,
+            changes,
+            bad_signature,
         } => {
-            let admission = authority::request(wire.as_bytes())?;
+            let admission = if scoped {
+                runspindle_core::scoped_authority::ScopedAdmission::decode(wire.as_bytes())?
+                    .admission()?
+            } else {
+                authority::request(wire.as_bytes())?
+            };
             let now = authority::now_ms()?;
             let a = Assertion {
-                version: authority::VERSION.into(),
+                version: if scoped {
+                    runspindle_core::scoped_authority::ASSERTION_VERSION
+                } else {
+                    authority::VERSION
+                }
+                .into(),
                 issuer: "synthetic-issuer".into(),
                 key_id: "test-key".into(),
                 actor: "synthetic-actor".into(),
                 audience: "offline-core".into(),
                 grant_id: admission.grant_ref.clone(),
                 request_digest: format!("{:x}", Sha256::digest(wire.as_bytes())),
-                actions: vec![
-                    Action::Admit,
-                    Action::Dispatch,
-                    Action::Reconcile,
-                    Action::Cancel,
-                ],
+                actions: {
+                    let mut actions = vec![
+                        Action::Admit,
+                        Action::Dispatch,
+                        Action::Reconcile,
+                        Action::Cancel,
+                    ];
+                    if scoped {
+                        actions.push(Action::Deliver);
+                    }
+                    actions
+                },
                 policy_revision: admission.binding.policy_revision.clone(),
                 target: admission.binding,
                 not_before_ms: now,
