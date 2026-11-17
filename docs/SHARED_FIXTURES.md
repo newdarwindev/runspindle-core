@@ -3,10 +3,13 @@
 The current bundle is exported from composition commit
 [`e283957d80aebc48fb0bd3b6e2a600850ff6dc97`](https://github.com/newdarwindev/runspindle/tree/e283957d80aebc48fb0bd3b6e2a600850ff6dc97/fixtures/v1),
 reviewed tree `dee5e9fc7ab96420075dea3cc7ee59d0cb5012b2`.
-[Explicit old/new compatibility diff](shared-fixture-compatibility.json) records
+[Explicit old/new compatibility diff](shared-fixture-compatibility.json), including
+observed old/new validator decisions on identical golden fixtures, records
 unchanged contract/golden/vector semantics, new `faults.json`, hardened independent
 identity/receipt validation and changed origin metadata. No automatic pin upgrade
-or runtime compatibility is implied. All six exported files are byte-preserved;
+or runtime compatibility is implied. Verified prior source accepts floating-point
+independent revision/receipt counters that the upgraded validator correctly
+rejects; both accept the same valid golden fixtures. All six exported files are byte-preserved;
 the reviewed exporter filters golden/vector entries for this consumer.
 
 [Current test receipt](shared-fixture-upgrade-tests.json): full Python normal and

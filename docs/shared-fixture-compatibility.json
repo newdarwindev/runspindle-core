@@ -29,5 +29,57 @@
   "automatic_pin_upgrade": false,
   "source_commit": "e283957d80aebc48fb0bd3b6e2a600850ff6dc97",
   "previous_source_commit": "e8cd5779968fede213443db13a591c992cd0e183",
-  "component": "core"
+  "component": "core",
+  "observed_validator_decisions": {
+    "old_component_base": "18b5d65392b176e1ab6c4b65ac27e941f530956c",
+    "old_validator_sha256": "1bd6d10ae7105a44a0d583a8974230dde56af603c6ed2b75f67fe3f1fb16319f",
+    "new_validator_sha256": "29857e337c30f84e673387a2ac27c7f0fc95bada1d783b346085286251f65279",
+    "same_contract_and_golden_bytes": true,
+    "source_loading": "verified_exact_Git_prior_bytes_and_reviewed_current_bundle",
+    "decisions": [
+      {
+        "kind": "admission.observed",
+        "case": "golden",
+        "old": "accepted",
+        "new": "accepted"
+      },
+      {
+        "kind": "admission.observed",
+        "case": "float_expected_revision",
+        "old": "accepted",
+        "new": "rejected"
+      },
+      {
+        "kind": "native.observed",
+        "case": "golden",
+        "old": "accepted",
+        "new": "accepted"
+      },
+      {
+        "kind": "native.observed",
+        "case": "float_expected_revision",
+        "old": "accepted",
+        "new": "rejected"
+      },
+      {
+        "kind": "artifact.observed",
+        "case": "golden",
+        "old": "accepted",
+        "new": "accepted"
+      },
+      {
+        "kind": "artifact.observed",
+        "case": "float_expected_revision",
+        "old": "accepted",
+        "new": "rejected"
+      },
+      {
+        "kind": "artifact.observed",
+        "case": "float_receipt_sequence",
+        "old": "accepted",
+        "new": "rejected"
+      }
+    ],
+    "scope": "synthetic_fixture_validation_only_not_runtime_compatibility"
+  }
 }
