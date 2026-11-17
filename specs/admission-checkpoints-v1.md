@@ -62,7 +62,8 @@ RUNSPINDLE_BUILDER_ARCHIVE=/path/to/exact-builder-closure.tar.gz \
 
 It runs the complete bridge regression aggregate, 22 checkpoint/revocation cases
 twice, three specified-version upgrade integrations twice, and explicit failure and
-SIGTERM cleanup probes. Inputs must be clean/pinned and remain unchanged. This is
-an unqualified candidate until the final exact-source run and independent review
-are recorded. Native peers and issuer identities remain synthetic; real provider,
+SIGTERM cleanup probes. Inputs must be clean/pinned and remain unchanged. The corrected exact-source aggregate passed all 53 top-level phases at
+`077963fa00ca587e7044c950a9b091d5ce90f541`. See the
+[evidence receipt](../docs/authenticated-checkpoints-qualification.json) and
+[criterion audit](../docs/AUTHENTICATED_CHECKPOINTS.md). Independent source and corrected exact-evidence review found no blocking findings. Native peers and issuer identities remain synthetic; real provider,
 native session and production activation remain outside this evidence.

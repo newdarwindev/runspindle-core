@@ -125,5 +125,13 @@
     "issue_tether_8": "open",
     "evidence": "docs/intent-bridge-qualification.json",
     "tested_source": "9358554cc615c6fe027be0910e4d09fbf392899b"
+  },
+  "authenticated_admission_checkpoints": {
+    "status": "bounded_isolated_qualification_passed_independently_reviewed",
+    "evidence": "docs/authenticated-checkpoints-qualification.json",
+    "specification": "specs/admission-checkpoints-v1.md",
+    "tested_source": "077963fa00ca587e7044c950a9b091d5ce90f541",
+    "issue_2": "open_pending_composition_and_criterion_audit",
+    "live_acceptance": "not_run"
   }
 }
