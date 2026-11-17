@@ -30,6 +30,37 @@ def require(condition: Any, message: str) -> None:
         raise AssertionError(message)
 
 
+class ChildNotStarted(RuntimeError):
+    """Only an exact expected-child not-found observation, never an outcome."""
+
+
+def operation_snapshot(request: Callable[[dict[str, Any]], Any], job_id: str) -> Any:
+    try:
+        return request(dict(command="authenticated_operation", job_id=job_id))
+    except RuntimeError as error:
+        expected = (
+            "client failed with exit 1: Error: Workflow not found\n\nCaused by:\n"
+            "    code: 'Some requested entity was not found', message: "
+            f'"workflow not found for ID: {job_id}"'
+        )
+        if str(error).strip() != expected:
+            raise
+        raise ChildNotStarted(job_id) from error
+
+
+def poll(predicate: Callable[[], Any], timeout: float = 40) -> Any:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            result = predicate()
+        except ChildNotStarted:
+            result = None
+        if result:
+            return result
+        time.sleep(0.1)
+    raise AssertionError("authority scenario deadline exceeded")
+
+
 def test(
     platform: str, platform_prepared: str, core_prepared: str, scoped: bool = False
 ) -> dict[str, Any]:
@@ -127,15 +158,6 @@ def test(
             save()
             return value
 
-        def poll(predicate: Callable[[], Any], timeout: float = 40) -> Any:
-            deadline = time.monotonic() + timeout
-            while time.monotonic() < deadline:
-                result = predicate()
-                if result:
-                    return result
-                time.sleep(0.1)
-            raise AssertionError("authority scenario deadline exceeded")
-
         class FixtureOwnedLane(module.Lane):  # type: ignore[name-defined,misc]
             # The lane is loaded from the explicitly pinned platform checkout.
             def _limits(self, name: str, image: str, mounts: Any = ()) -> list[str]:
@@ -189,7 +211,7 @@ def test(
                 )
 
             def operation(e: dict[str, Any]) -> Any:
-                return request(dict(command="authenticated_operation", job_id=job(e)))
+                return operation_snapshot(request, job(e))
 
             def cancel(e: dict[str, Any]) -> Any:
                 return request(

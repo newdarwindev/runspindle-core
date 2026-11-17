@@ -55,3 +55,9 @@ pub mod authenticated_artifacts;
 pub mod scoped_authenticated;
 #[cfg(feature = "verified-authority")]
 pub mod scoped_authority;
+
+#[cfg(feature = "verified-authority")]
+pub mod intent;
+
+#[cfg(feature = "verified-authority")]
+pub mod intent_runtime;

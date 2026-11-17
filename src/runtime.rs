@@ -570,6 +570,10 @@ pub(crate) trait OperationAccess {
     fn operation(&self) -> &OperationWorkflow;
     fn operation_mut(&mut self) -> &mut OperationWorkflow;
     #[cfg(feature = "verified-authority")]
+    fn intent_wire(&self) -> Option<String> {
+        None
+    }
+    #[cfg(feature = "verified-authority")]
     fn authority_wire(&self) -> Option<String> {
         None
     }
@@ -594,6 +598,22 @@ async fn invoke_operation<W: OperationAccess>(
     options: ActivityOptions,
     _authority_action: GuardAction,
 ) -> anyhow::Result<PortReply> {
+    #[cfg(feature = "verified-authority")]
+    if let Some(wire) = ctx.state(|s| s.intent_wire()) {
+        use crate::authority::Action;
+        let action = match _authority_action {
+            GuardAction::Cancel => Action::Cancel,
+            GuardAction::Reconcile => Action::Reconcile,
+            GuardAction::Dispatch => Action::Dispatch,
+        };
+        return Ok(ctx
+            .execute_activity(
+                crate::intent_runtime::IntentPorts::invoke_intent,
+                crate::authenticated::AuthenticatedCall { wire, call, action },
+                options,
+            )
+            .await?);
+    }
     #[cfg(feature = "verified-authority")]
     if let Some(wire) = ctx.state(|s| s.authority_wire()) {
         use crate::authority::Action;

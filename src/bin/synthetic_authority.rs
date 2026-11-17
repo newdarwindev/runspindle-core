@@ -19,6 +19,13 @@ use std::{
 enum Command {
     Init,
     InitScoped,
+    IssueIntent {
+        wire: String,
+        #[serde(default)]
+        changes: serde_json::Map<String, serde_json::Value>,
+        #[serde(default)]
+        bad_signature: bool,
+    },
     IssueScoped {
         wire: String,
         #[serde(default)]
@@ -49,6 +56,7 @@ pub fn run(directory: &Path, input: &Path) -> anyhow::Result<()> {
         .read_to_end(&mut bytes)?;
     let command: Command = serde_json::from_value(envelope::strict_json(&bytes)?)?;
     let db = directory.join("authority.sqlite");
+    let intent = matches!(&command, Command::IssueIntent { .. });
     let scoped = matches!(&command, Command::InitScoped | Command::IssueScoped { .. });
     match command {
         Command::Init | Command::InitScoped => {
@@ -103,12 +111,19 @@ pub fn run(directory: &Path, input: &Path) -> anyhow::Result<()> {
             changes,
             bad_signature,
         }
+        | Command::IssueIntent {
+            wire,
+            changes,
+            bad_signature,
+        }
         | Command::IssueScoped {
             wire,
             changes,
             bad_signature,
         } => {
-            let admission = if scoped {
+            let admission = if intent {
+                runspindle_core::intent::IntentAdmission::decode(wire.as_bytes())?.admission()?
+            } else if scoped {
                 runspindle_core::scoped_authority::ScopedAdmission::decode(wire.as_bytes())?
                     .admission()?
             } else {
@@ -116,7 +131,9 @@ pub fn run(directory: &Path, input: &Path) -> anyhow::Result<()> {
             };
             let now = authority::now_ms()?;
             let a = Assertion {
-                version: if scoped {
+                version: if intent {
+                    runspindle_core::intent::ASSERTION_VERSION
+                } else if scoped {
                     runspindle_core::scoped_authority::ASSERTION_VERSION
                 } else {
                     authority::VERSION

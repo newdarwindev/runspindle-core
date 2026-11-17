@@ -45,6 +45,7 @@ impl Assertion {
         let mut bytes = match self.version.as_str() {
             VERSION => DOMAIN.to_vec(),
             crate::scoped_authority::ASSERTION_VERSION => crate::scoped_authority::DOMAIN.to_vec(),
+            crate::intent::ASSERTION_VERSION => crate::intent::DOMAIN.to_vec(),
             _ => anyhow::bail!("unsupported assertion version"),
         };
         bytes.extend(envelope::canonical(self)?);
@@ -113,6 +114,46 @@ impl LocalHelper {
             anyhow::ensure!(action != Action::Deliver, "v1 grants no delivery authority");
             request(wire)?
         };
+        self.check_record(
+            wire,
+            action,
+            admission,
+            if scoped {
+                crate::scoped_authority::ASSERTION_VERSION
+            } else {
+                VERSION
+            },
+            scoped,
+        )
+    }
+    pub(crate) fn check_intent(&self, wire: &[u8], action: Action) -> anyhow::Result<()> {
+        let intent = crate::intent::IntentAdmission::decode(wire)?;
+        anyhow::ensure!(
+            intent.event.source.actor_id == self.actor,
+            "intent actor binding"
+        );
+        anyhow::ensure!(
+            action != Action::Deliver
+                && !(intent.event.kind == crate::intent::Kind::Delete
+                    && action == Action::Dispatch),
+            "intent action kind"
+        );
+        self.check_record(
+            wire,
+            action,
+            intent.admission()?,
+            crate::intent::ASSERTION_VERSION,
+            false,
+        )
+    }
+    fn check_record(
+        &self,
+        wire: &[u8],
+        action: Action,
+        admission: Admission,
+        expected_version: &str,
+        scoped: bool,
+    ) -> anyhow::Result<()> {
         anyhow::ensure!(
             [&self.issuer, &self.actor, &self.audience]
                 .iter()
@@ -155,12 +196,7 @@ impl LocalHelper {
         )?;
         let a: Assertion = serde_json::from_value(envelope::strict_json(assertion.as_bytes())?)?;
         anyhow::ensure!(
-            a.version
-                == if scoped {
-                    crate::scoped_authority::ASSERTION_VERSION
-                } else {
-                    VERSION
-                }
+            a.version == expected_version
                 && a.issuer == self.issuer
                 && a.actor == self.actor
                 && a.audience == self.audience

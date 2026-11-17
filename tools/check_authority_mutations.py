@@ -20,6 +20,22 @@ signal.signal(signal.SIGTERM, cancelled)
 ROOT = Path(__file__).resolve().parents[1]
 MUTATIONS = [
     (
+        "intent_dispatch_guard",
+        "src/intent_runtime.rs",
+        "|| !self.authorized(&AuthorityCheck {",
+        "|| false && !self.authorized(&AuthorityCheck {",
+        "intent",
+        "signatures_scope_time_and_unavailable_trust_deny_before_effect",
+    ),
+    (
+        "atomic_delete_pending",
+        "src/intent_runtime.rs",
+        "self.pending = if self.tombstone {\n            None",
+        'self.pending = if self.tombstone {\n            Some(String::from_utf8(batch.intents[0].encode().expect("validated")).expect("utf8"))',
+        "intent",
+        "atomic_chain_never_schedules_superseded_creates_or_edits",
+    ),
+    (
         "scoped_delivery_destination",
         "src/scoped_authority.rs",
         "&& request.account_id == scoped.destination.account_id",

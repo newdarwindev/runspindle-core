@@ -1,0 +1,417 @@
+{
+  "status": "passed",
+  "evidence_class": "bounded_offline_qualification",
+  "revisions": {
+    "core": "9358554cc615c6fe027be0910e4d09fbf392899b",
+    "platform": "398c74766b9ec9f7203256e17dea34f1b15cac4c",
+    "composition": "ba5a102d7a2115ec9e00f748236ecbfddaab4c21",
+    "tether": "f1392fbf4861c4667732f351bd5d466d34c5ece8"
+  },
+  "fingerprints": {
+    "core": "49c5129229221e6f932af87ef861be34d37b8159d3d65ea91af99498ed91b192",
+    "platform": "f8f9f4a1b6cef8447e78765a4ec9310cdffaf2fd08d4024c51c597a85c4a05f2",
+    "composition": "f4fcb77ccfaea0657d389577a7ec2553676d1dbef4a01392f0c831b04ab2dbaf",
+    "tether": "bfe5355927e5b054c55c9bb115822114f7921e881555f582b9a2886958a55fa7"
+  },
+  "image_id": "sha256:38986012cf946ae70218fc806f373ca5a53cd3757d1545a7c3effe07cb0666c2",
+  "checks": [
+    {
+      "name": "legacy-and-component",
+      "status": "passed",
+      "log_sha256": "a7c90b1100c87e59ec3d1c2010d7241821a3a934f2413dfb281b8d161ddf42bf"
+    },
+    {
+      "name": "tether",
+      "status": "passed",
+      "log_sha256": "96733c2bafce43f1070658a0cd804c38cc4bc4da025dde6d1803eed6e2b17508"
+    },
+    {
+      "name": "tether-optimized",
+      "status": "passed",
+      "log_sha256": "a0136b371cc6fd9f6094da3041edbdcad6cd844a7b29367a7e27ac96003a8853"
+    },
+    {
+      "name": "intent-conformance",
+      "status": "passed",
+      "log_sha256": "9dc2dcfb78dc93380aaf6cc3b3938b2c9366d0dd14a2a4821dbbb40c7d9086c2"
+    },
+    {
+      "name": "intent",
+      "status": "passed",
+      "log_sha256": "c7e3d41d43be38a421d51752b87aa3e3fa97f3cb6440d08263dfc66c1d741e61"
+    },
+    {
+      "name": "intent-repeat",
+      "status": "passed",
+      "log_sha256": "59095e9ced982016b88dfcc6e2ae21e8fbddf14a0b03a91ae58863cec3441252"
+    },
+    {
+      "name": "failure-cleanup",
+      "status": "passed",
+      "log_sha256": "c7cdfd706ae3ef85316709affcf1b288a3969166c91462e4ad0cd4d505b191b4"
+    },
+    {
+      "name": "cancel-cleanup",
+      "status": "passed",
+      "log_sha256": "a24a67bbf605d7e3097c38e105f96ae1a9d47f9894a22242396df07e9271f4ce"
+    }
+  ],
+  "live_acceptance": "not_run",
+  "independent_review": {
+    "status": "no_blocking_findings_source_and_exact_evidence_reviewed",
+    "reviewed_revision": "9358554cc615c6fe027be0910e4d09fbf392899b",
+    "verified": "All 8 top-level and 13 legacy log hashes; runtime and test/config hashes; both journal integration reports; full Tether counts; direct Docker inspect confirming exact owned resources absent and temporary directories absent"
+  },
+  "original_report_sha256": "16c15cf9a9148e494ff1b4db22ef9a2f8e47e2afd29e0e3de065428fc0c8471d",
+  "counts": {
+    "core_python": 108,
+    "composition_python_discovered": 357,
+    "composition_python_skipped": 3,
+    "rust_verified_authority": 96,
+    "tether_normal_discovered": 425,
+    "tether_optimized_discovered": 425,
+    "tether_skipped_each_mode": 1,
+    "authority_mutants_killed": 5,
+    "semantic_integration_runs": 2,
+    "launches_each_semantic_run": 6,
+    "cancels_each_semantic_run": 3
+  },
+  "legacy_checks": [
+    {
+      "name": "scaffold",
+      "status": "passed",
+      "log_sha256": "c52bbd42355fd2567cf441cccec70fdabb47ce1aad2f1c6533d0a6779dd06cf2"
+    },
+    {
+      "name": "composition-scaffold",
+      "status": "passed",
+      "log_sha256": "01e6a0ef0ce6af7ad1ab9382911063ed22627f3f3ebae194d4b6309961503205"
+    },
+    {
+      "name": "python",
+      "status": "passed",
+      "log_sha256": "8deb6c36b26396be9dce364672d4311335f6050886e0ad0699b16c74826856f5"
+    },
+    {
+      "name": "composition-python",
+      "status": "passed",
+      "log_sha256": "bfd8be86ee3b6071c38c82b6db708a36b64d9de94413f54d15669af5e09ac5b3"
+    },
+    {
+      "name": "rust-fmt",
+      "status": "passed",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "rust",
+      "status": "passed",
+      "log_sha256": "7b21b03d0f5f6f9678d272e64b8121abf4380b4511c2e7419c5d449069653ace"
+    },
+    {
+      "name": "strict-clippy",
+      "status": "passed",
+      "log_sha256": "1559d1fa055a0f90faa880037b117fb746591ed8230e8b82e83b6c03edd8972f"
+    },
+    {
+      "name": "mutations",
+      "status": "passed",
+      "log_sha256": "03875b3e80bb687d35ba1de5341c620b4b6c71a62c6198e48e48579e02d22836"
+    },
+    {
+      "name": "wire",
+      "status": "passed",
+      "log_sha256": "522117bf5296ec95731a91ef1071a11986cfaa6aeaae2257e844e6d1f8b7d80d"
+    },
+    {
+      "name": "authority",
+      "status": "passed",
+      "log_sha256": "4fdffd1b16647d02a7b1f6be10d0d2180a72e93741cdbb6ea112d64ddf67f932"
+    },
+    {
+      "name": "authority-repeat",
+      "status": "passed",
+      "log_sha256": "0fa3665c97e9506e1abdb54950947be11d3ec7e018f40f3ab9f16e86ad32d4c3"
+    },
+    {
+      "name": "scoped-authority",
+      "status": "passed",
+      "log_sha256": "2d34d8de333f35ba6b340eeefad94a31e93b53cdc3c8c829c76fc865552b15d9"
+    },
+    {
+      "name": "scoped-authority-repeat",
+      "status": "passed",
+      "log_sha256": "26eed38e1ec088f4018be732c528791dea5c971b008303cbe554cceabd515beb"
+    }
+  ],
+  "integration_reports": {
+    "intent": {
+      "status": "passed",
+      "evidence_class": "isolated_integration",
+      "checks": [
+        "forged_authority_zero_retained_revision_or_effect",
+        "delete_during_host_verification_zero_launch",
+        "current_delete_authority_cancels_revoked_prior_ack_not_terminal",
+        "already_scheduled_launch_reconciles_then_cancels_no_atomic_fence_claim",
+        "atomic_latest_chain_supersession_missing_edits_and_exact_lost_ack_readback",
+        "actual_tether_atomic_journal_crash_offline_edits_delete_and_receipt_recovery",
+        "ordered_revisions_fresh_process_store_recovery_and_history_replay"
+      ],
+      "image_id": "sha256:38986012cf946ae70218fc806f373ca5a53cd3757d1545a7c3effe07cb0666c2",
+      "binary_sha256": "f90fd328898cd179e2d246f2e8e9d797ecff2dd8ff9417c19694a10283e5b56e",
+      "source_hashes": {
+        "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+        "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+        "temporal/toolchain.json": "d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7",
+        "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+        "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+        "src/authenticated_artifacts.rs": "c79a66f9e3657d9b0b9b57459a2ba319aad38699e0eee8c7e8f8853b634cf637",
+        "src/authority.rs": "1743074ff355bcf2018119d1682f16b05d8973227c1e763e4659589be6002f78",
+        "src/bin/checkpoints/mod.rs": "f8f52b3724c66207fbf0156b0984da23bcb532d4cde9baf7ff10d2e48d22e208",
+        "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+        "src/bin/synthetic_authority.rs": "2139b832b71b7d90136d7ed40de3db3232ee28775964242d36d4be781fc51e15",
+        "src/bin/temporal-runtime.rs": "ff06de15b16c970907087b72c2bee3b28bd7b298cefa729bee23a22fbe8fa53a",
+        "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+        "src/durable.rs": "1e8333ba9df96bf1b65032e3c1afbf076b28c8921ff65c53e35c41758c3ae214",
+        "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+        "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+        "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+        "src/intent.rs": "b23db4e239ab97d0bf15b77aac0b64581918e1a42a95b34c7abb1166bc67ca71",
+        "src/intent_runtime.rs": "cfa44be310daa141cd21afe83722c3d5c83857243b2d9d89f8902c3983396a34",
+        "src/lib.rs": "78ae7015afc41601284b29678aab43669f1f40224d8c9891e01370b897fbfe50",
+        "src/outbox.rs": "dfc47fdbb4d80906da18b97118625ef3ced3fd2e755b4d3ee188a656a8505ca8",
+        "src/runtime.rs": "264126aa0b25d35f20c6c6c0eeee7df06dbbacc1e398215b47d8fd367afc7257",
+        "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+        "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97"
+      },
+      "history_digests": {
+        "intent-8b98e4270d31cf1da6d65cbd3032aabe1dcec02710d85a01c3344edc57e79196": "6e1119a49e95d147fa78c177a7152b47ef57c109cb6820ff18778a5e6f1a8b09",
+        "intent-db08c6380792ef67253cff8abded0e20821bf430aec1bf7f90c74e13200d6d83": "e37760e5447272d8412c2673fd552350fa3ddcee18510863c86f4a0b58780563",
+        "intent-868e221f219b68d7fcb89773cee426384375555335c0d2ce8bfd7d3345ed9a64": "190a895b1efaab79a56e134aea0d00097144aadc3a8fcc19660ebf196cfce493",
+        "intent-00ca1b021926d6fc171e7e2ea264b42f824f697b728d4b8e65adee37350716c9": "90a61300bed67df242df2698b039e745f0424410276df5f801460f957ec93b86",
+        "intent-d5d02e744eb33e488bd6396e8b1374b4e6ecd53e645d26af657f2eab5b91efa8": "f2e84f37b856b2cc52378fa569992c6679413f4505dfb5d49e9714d0d8f71395",
+        "intent-b3dd6379983731cc27d8872c73d04c2eaa3d661d1ea8e9053543b8584bcb0859": "9bbef84e58357d54909a630a3f63421d81de77eac73f4969c6aacca9f0267d49",
+        "intent-c4e870c37785128aa81688c995685a489fe493fefcb713b1edb067dc8921509d": "7b2ddbcffbe43b62cf56727ad0fb38fea49dcf8158d9e56b321ba5749b049e9a",
+        "intent-ab9af0f7ba871fde58984b90246f2dd9a0f00b07e8350822d8d00fa26ab2f7ff": "fef78cdc835f69a39de1b5dd58b7a0da1ccc029cee46c0b977af250ca2061845",
+        "intent-1a28422e668c630793dfad122c600c5b54da0485320a059008b3dcaf62df991b": "ed991417fb937726bdf61b4521045b465f36224956796a1e50c8214aeef5f348"
+      },
+      "launch_count": 6,
+      "cancel_count": 3,
+      "cleanup": "passed",
+      "live_acceptance": "not_run",
+      "boundaries": {
+        "core": "real",
+        "temporal": "real_SQLite",
+        "tether": "real_producer_codec",
+        "issuer": "synthetic_ephemeral",
+        "host": "scripted_peer",
+        "slack_transport": "not_exercised"
+      }
+    },
+    "intent-repeat": {
+      "status": "passed",
+      "evidence_class": "isolated_integration",
+      "checks": [
+        "forged_authority_zero_retained_revision_or_effect",
+        "delete_during_host_verification_zero_launch",
+        "current_delete_authority_cancels_revoked_prior_ack_not_terminal",
+        "already_scheduled_launch_reconciles_then_cancels_no_atomic_fence_claim",
+        "atomic_latest_chain_supersession_missing_edits_and_exact_lost_ack_readback",
+        "actual_tether_atomic_journal_crash_offline_edits_delete_and_receipt_recovery",
+        "ordered_revisions_fresh_process_store_recovery_and_history_replay"
+      ],
+      "image_id": "sha256:38986012cf946ae70218fc806f373ca5a53cd3757d1545a7c3effe07cb0666c2",
+      "binary_sha256": "f90fd328898cd179e2d246f2e8e9d797ecff2dd8ff9417c19694a10283e5b56e",
+      "source_hashes": {
+        "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+        "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+        "temporal/toolchain.json": "d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7",
+        "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+        "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+        "src/authenticated_artifacts.rs": "c79a66f9e3657d9b0b9b57459a2ba319aad38699e0eee8c7e8f8853b634cf637",
+        "src/authority.rs": "1743074ff355bcf2018119d1682f16b05d8973227c1e763e4659589be6002f78",
+        "src/bin/checkpoints/mod.rs": "f8f52b3724c66207fbf0156b0984da23bcb532d4cde9baf7ff10d2e48d22e208",
+        "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+        "src/bin/synthetic_authority.rs": "2139b832b71b7d90136d7ed40de3db3232ee28775964242d36d4be781fc51e15",
+        "src/bin/temporal-runtime.rs": "ff06de15b16c970907087b72c2bee3b28bd7b298cefa729bee23a22fbe8fa53a",
+        "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+        "src/durable.rs": "1e8333ba9df96bf1b65032e3c1afbf076b28c8921ff65c53e35c41758c3ae214",
+        "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+        "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+        "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+        "src/intent.rs": "b23db4e239ab97d0bf15b77aac0b64581918e1a42a95b34c7abb1166bc67ca71",
+        "src/intent_runtime.rs": "cfa44be310daa141cd21afe83722c3d5c83857243b2d9d89f8902c3983396a34",
+        "src/lib.rs": "78ae7015afc41601284b29678aab43669f1f40224d8c9891e01370b897fbfe50",
+        "src/outbox.rs": "dfc47fdbb4d80906da18b97118625ef3ced3fd2e755b4d3ee188a656a8505ca8",
+        "src/runtime.rs": "264126aa0b25d35f20c6c6c0eeee7df06dbbacc1e398215b47d8fd367afc7257",
+        "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+        "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97"
+      },
+      "history_digests": {
+        "intent-8b98e4270d31cf1da6d65cbd3032aabe1dcec02710d85a01c3344edc57e79196": "3c3e22501a4eea89243851c50b125f6dfa78812a8d51b4c4769fb78be93776cb",
+        "intent-db08c6380792ef67253cff8abded0e20821bf430aec1bf7f90c74e13200d6d83": "84e8a02685c57b46fa139eddfd2dc90f9237fbc2fd737ca733fd917f6e05fd38",
+        "intent-868e221f219b68d7fcb89773cee426384375555335c0d2ce8bfd7d3345ed9a64": "d07b0a269c2f4bc7d611fca1cffa71703351c9f044590e8ac5817d14088e5ab7",
+        "intent-00ca1b021926d6fc171e7e2ea264b42f824f697b728d4b8e65adee37350716c9": "7f478a2f98c2ac41563a83027f9935e84e28527387da3039a8003bbaf9560dc5",
+        "intent-d5d02e744eb33e488bd6396e8b1374b4e6ecd53e645d26af657f2eab5b91efa8": "49c5285b879300600bcec9dc5bbde66838c714fbdcd9e97ff5688cf5ef4bf31a",
+        "intent-b3dd6379983731cc27d8872c73d04c2eaa3d661d1ea8e9053543b8584bcb0859": "9d6350c06f22b8ce9dadb1973237ad744024a5f62f820abfbe25cfa5c0dd264c",
+        "intent-c4e870c37785128aa81688c995685a489fe493fefcb713b1edb067dc8921509d": "374a7ad95b19f567aeeae346a0ea181eab614acc03c635600ae4d85d7e368236",
+        "intent-ab9af0f7ba871fde58984b90246f2dd9a0f00b07e8350822d8d00fa26ab2f7ff": "2ae232fd91de2cc0742537222914d521f4aa77fb5528682d6f70f85c2d5a4ce1",
+        "intent-1a28422e668c630793dfad122c600c5b54da0485320a059008b3dcaf62df991b": "826516d760d37e2e2b5ccd3ac84cc9235cad18040107f8db7c3c166c4f80a64c"
+      },
+      "launch_count": 6,
+      "cancel_count": 3,
+      "cleanup": "passed",
+      "live_acceptance": "not_run",
+      "boundaries": {
+        "core": "real",
+        "temporal": "real_SQLite",
+        "tether": "real_producer_codec",
+        "issuer": "synthetic_ephemeral",
+        "host": "scripted_peer",
+        "slack_transport": "not_exercised"
+      }
+    }
+  },
+  "conformance": {
+    "status": "passed",
+    "evidence_class": "independent_cross_language_conformance",
+    "image_id": "sha256:38986012cf946ae70218fc806f373ca5a53cd3757d1545a7c3effe07cb0666c2",
+    "fixture_sha256": {
+      "conformance/intent-v1/vectors.json": "47bc9415404986d25e2ae5ecea2d857d7fe880ae721607ff59da35d3555b7c49",
+      "conformance/intent-batch-v1/vectors.json": "43ad0c2957a82d2b794a71b93226eb4f16cd968bada4aa99195b6d0d16a1eb7a"
+    },
+    "checks": [
+      {
+        "mode": "intent",
+        "name": "create",
+        "sha256": "cc6dbfe3274c51de085b17d56b56fe814530d45e79070c8a44b955d949b6154b",
+        "status": "passed"
+      },
+      {
+        "mode": "intent",
+        "name": "edit",
+        "sha256": "44673aa396b8c49ebe7f75591577011b32ce1b0f808da058da5bf83cfd45fc88",
+        "status": "passed"
+      },
+      {
+        "mode": "intent",
+        "name": "delete",
+        "sha256": "cbd5795744f320621000ffdc6366e721077bb5d5a61ba8e40f5963a0662a1644",
+        "status": "passed"
+      },
+      {
+        "mode": "intent",
+        "name": "negative_wire_matrix",
+        "count": 4,
+        "status": "passed"
+      },
+      {
+        "mode": "intent-batch",
+        "name": "create",
+        "sha256": "cbad321fb53f5532ffc902a48a99d0bbd88ae4eedc56b32c9623d27c41b66e37",
+        "status": "passed"
+      },
+      {
+        "mode": "intent-batch",
+        "name": "edit",
+        "sha256": "76880da25c11f4b7b74f7a16a3b4794bdcc46bc00e621defa46b28421ca55509",
+        "status": "passed"
+      },
+      {
+        "mode": "intent-batch",
+        "name": "delete",
+        "sha256": "19ddc2284c62abd683369e1819a01c563852f208a61ba1741f637c4768f90725",
+        "status": "passed"
+      },
+      {
+        "mode": "intent-batch",
+        "name": "negative_wire_matrix",
+        "count": 4,
+        "status": "passed"
+      }
+    ],
+    "network": "none",
+    "live_acceptance": "not_run"
+  },
+  "mutations": {
+    "status": "passed",
+    "evidence_class": "synthetic_contract",
+    "mutations": [
+      {
+        "mutation": "intent_dispatch_guard",
+        "status": "killed_by_behavioral_assertion",
+        "test": "signatures_scope_time_and_unavailable_trust_deny_before_effect",
+        "output_sha256": "777b53d30d09e1f2f430262ddb24fee3dcc95ec7b85334bc62d3698c833e1cca"
+      },
+      {
+        "mutation": "atomic_delete_pending",
+        "status": "killed_by_behavioral_assertion",
+        "test": "atomic_chain_never_schedules_superseded_creates_or_edits",
+        "output_sha256": "0fee65971c0d2d65dd242427657cbc22d4f0cff447943b42688f59923ff08fb0"
+      },
+      {
+        "mutation": "scoped_delivery_destination",
+        "status": "killed_by_behavioral_assertion",
+        "test": "scoped_outbox_checks_exact_target_before_any_send_or_lookup",
+        "output_sha256": "b3e24fe4e79072bc122be13c4fed04dd006a28e137d5fdf6021b230552e9b5ab"
+      },
+      {
+        "mutation": "wire_sequence",
+        "status": "killed_by_behavioral_assertion",
+        "test": "vectors_map_existing_component_types_and_roundtrip",
+        "output_sha256": "bbe3b5a2f5bbda96e8170a6fd4530ab475590b9a27df50fadb1f249a96957f31"
+      },
+      {
+        "mutation": "dispatch_guard",
+        "status": "killed_by_behavioral_assertion",
+        "test": "current_revocation_stale_missing_and_conflicting_authoritative_state_deny",
+        "output_sha256": "10a6064f1c9e519da1bc3ce635fb6949d3c3f7948fb4c7ca60ced0ead8e3f34a"
+      }
+    ],
+    "source_restoration": "passed",
+    "independent_review": "pending_exact_candidate_review"
+  },
+  "static_quality": {
+    "status": "passed",
+    "existing_debt": 407,
+    "new_diagnostics": 0,
+    "baseline_changed": false,
+    "log_sha256": "f40ee1b4f7e90bafcb4cf35589a2b74b8fedf61d4aa9bbec13f0863627f57815"
+  },
+  "test_and_config_hashes": {
+    "tools/test_intent_bridge.py": "d4d84123b7fb3c7948607252f6841a98b091e7ad1780e68dac82284d13a7cad7",
+    "tools/qualify_intent_bridge.py": "9672e02a0a2e924dd0ea65ec243bb45344baa618e7b181f1e9e8b1a26f48199d",
+    "tools/intent_fixture_producer.py": "b47e2bea464e9d53f00f0be3edb7cc4073f7bc846ccd5df2f08f3b4bf95510cb",
+    "tools/test_intent_conformance.py": "4bf79ba858a79a48681cc2c24ca5a37388624e9b16afa9a5be1697477c5de444",
+    "tools/test_verified_authority.py": "e23041a642579a0fe7200ed70a77add2c7780f2db11b0d1892618612cb0fd811",
+    "tools/check_authority_mutations.py": "c5d695ed44bbf311d37553a456d5c99eeb436458deddb59d50e8755084f696be",
+    "tests/intent.rs": "8f12dd14c936adccffa98d9f7bfe05297a8bc9ae3fa09f2a49da164aee937291",
+    "tests/test_authority_readiness.py": "2154db174e2f84c78dff4cea1af5247c396cdbfe9187043dfea572e0fdd84e90",
+    "conformance/intent-v1/tether.pin.json": "5a064340146dc8bbe9a8b1e2ff5d8d8f747a7bf914c90e4ac7f53bfa33104f58",
+    "requirements-quality.txt": "9cbe1331549216b953f2922f1e8321357ca82bb985e1ea595c87fcee8a8fdc84"
+  },
+  "prepared_manifest_sha256": {
+    "core": "129f8d26b3c535cb8e3efbbfc35a21213c8c3aed8ea1a131fcf5b4fbb4e95f5c",
+    "platform": "f0dc8ca20763bc4020f784ec8178f08ff81c2238aa31b244154784c148d9ce56"
+  },
+  "failed_prior_attempt": {
+    "core": "e21d42ad330c19c51f7261a5c23b1b7399ea2c6e",
+    "tether": "f1392fbf4861c4667732f351bd5d466d34c5ece8",
+    "phase": "legacy authority-repeat",
+    "reason": "expected admitted child queried before creation; exact Workflow not found escaped readiness polling",
+    "report_sha256": "d441a4300ad655657e13ecf9c4183563ead76b7b271b7a31a352dc8c8c400747",
+    "failure_log_sha256": "beb0e77c0ce0626cf6063edffb99469cc855bd033570f8eb16ea260e0f5d8203",
+    "resolution": "9358554 adds exact expected-child error retry only inside original bounded poll, with four independently reviewed regression tests; final aggregate reran all phases"
+  },
+  "boundaries": {
+    "core": "real versioned semantic workflow and Ed25519 authority verifier",
+    "Temporal": "real pinned disposable SQLite server",
+    "Tether": "real codec and atomic SemanticAdmission SQLite journal via synthetic HMAC normalized transport",
+    "issuer": "ephemeral synthetic Ed25519 only",
+    "host": "scripted independent fsynced peer ledger",
+    "Slack_create": "covered in Tether local signed transport tests, not live",
+    "Slack_edit_delete": "raw provider events deny-only; generic authenticated revision lane tested",
+    "external_outbound": "no live providers; conformance network none and runtime internal isolated network",
+    "retention_receipt": "metadata only, not execution/delivery/cancellation completion",
+    "scheduled_external_effect": "reconcile then cancel; no atomic external fence or exactly-once claim"
+  }
+}
