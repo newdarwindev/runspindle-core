@@ -66,3 +66,23 @@ counts. No live Slack, native session, production authority issuance, distribute
 atomic revocation, power loss, or arbitrary supersession claim is made. Core #17
 closure still requires final exact-source review, merge and criterion audit;
 repository required-check policy is not bypassed by these local results.
+
+## Exact execution receipt
+
+The [final receipt](evidence/tether-resolution-20261117/qualification.json) binds
+Core `86d5ea1` (runtime source `d1e39f2`) and Tether
+`0393a700957bcb7dfe67754cebaf8fd98f3f05ac`, clean before and after execution.
+All 134 top-level tests across all Rust feature targets passed in each run,
+including all 41 outbox tests with six explicitly opted-in integration tests;
+zero tests were ignored. The second run enabled Python optimization, not Rust
+release optimization. The independent expected-binding test rejected six
+mutations in both Python modes. Strict mypy, isolated Ruff and rustfmt also pass
+for the changed inputs. The missing timestamp-length guard first produced the
+retained failing regression; that diagnostic is not counted as final evidence.
+
+This build used an owned disk-backed target, two compiler jobs, no debug symbols,
+no incremental compilation and offline locked dependencies. It successfully
+compiled and ran all features; this does not relabel the earlier PR #37 disk-full
+attempt as passing. No fleet, network, security or production settings were
+changed by this qualification. This branch is stacked on reviewed but unmerged
+PR #37, whose required GitHub validation check remains a separate merge gate.

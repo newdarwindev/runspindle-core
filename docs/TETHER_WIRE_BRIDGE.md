@@ -87,3 +87,7 @@ No alternative peer is used to manufacture that missing evidence.
 The final Python-only typing/import-discovery correction passed strict mypy and
 Ruff with isolated import sorting; the full isolated checks were rerun after it.
 Earlier receipts remain in Git history, not counted as final-head evidence.
+
+The later [explicit resolution lane](TETHER_WIRE_RESOLUTION.md) adds bounded
+append-only decision recovery. The earlier receipt above remains historical;
+only the separately pinned resolution receipt covers that additional behavior.

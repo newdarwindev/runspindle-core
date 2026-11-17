@@ -1,0 +1,82 @@
+{
+  "schema": "runspindle.core-tether-resolution-qualification.v1",
+  "status": "passed",
+  "core_commit": "86d5ea1c1f16aa675a01991a3c54afe81b824a73",
+  "tether_commit": "0393a700957bcb7dfe67754cebaf8fd98f3f05ac",
+  "binary_sha256": "cbbb3c5469fbcfc3bfcf5125f59be050a97a14e98bf757d993f6184c039cafd7",
+  "source_sha256": {
+    "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+    "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+    "src/authenticated_artifacts.rs": "c79a66f9e3657d9b0b9b57459a2ba319aad38699e0eee8c7e8f8853b634cf637",
+    "src/authority.rs": "1743074ff355bcf2018119d1682f16b05d8973227c1e763e4659589be6002f78",
+    "src/bin/checkpoints/mod.rs": "a3078621891e89ad3514d456db345d4b232945c352141d14ca5c924a04652f14",
+    "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+    "src/bin/synthetic_authority.rs": "2139b832b71b7d90136d7ed40de3db3232ee28775964242d36d4be781fc51e15",
+    "src/bin/temporal-runtime.rs": "038c3a1f6ded54875bae1df7c40d1ceab6e9fb1bfa0508e78bc0e1ca21b4ea5a",
+    "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+    "src/durable.rs": "1e8333ba9df96bf1b65032e3c1afbf076b28c8921ff65c53e35c41758c3ae214",
+    "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+    "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+    "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+    "src/intent.rs": "b23db4e239ab97d0bf15b77aac0b64581918e1a42a95b34c7abb1166bc67ca71",
+    "src/intent_runtime.rs": "cfa44be310daa141cd21afe83722c3d5c83857243b2d9d89f8902c3983396a34",
+    "src/lib.rs": "e1f370a48f56d45b20e35bb9d08e5565e2091970dba73735cc230f76f2541f4c",
+    "src/outbox.rs": "e14c7bca7c7e95484bde962f1d212a76838feae62c3d33eebeea134c0a944b0e",
+    "src/runtime.rs": "264126aa0b25d35f20c6c6c0eeee7df06dbbacc1e398215b47d8fd367afc7257",
+    "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+    "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97",
+    "src/tether_wire.rs": "55961767ce6f81073835231021bcfebe40b045406b83a2d30b2fe1926b791a1d",
+    "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+    "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+    "tests/outbox.rs": "87d4fd0b25dff29d58f8c63da2d76b91875754b6e3714f889343a74bf996fb31",
+    "tests/fixtures/tether_wire_peer.py": "0b5dcc5b69c9e218a8a3b658cd29110665b6fca9062721695a1b447b6a930824",
+    "tests/test_tether_wire_fixture.py": "f7d097f27f865c5c698f6cfb42791398af8f4a4ac6c60c566c796b8db4359bca"
+  },
+  "logs": {
+    "allfeatures-normal": {
+      "path": "core17-resolution-qualified-allfeatures-normal.log",
+      "sha256": "94aed9d9351fff55b340b326b5f959126e11dde4f14d73646a3bc17b35be606c"
+    },
+    "allfeatures-python-optimized": {
+      "path": "core17-resolution-qualified-allfeatures-python-optimized.log",
+      "sha256": "9884ff1f16d2272a208d76601b1b17824cf9cf0d48961bd72bcf5a10f3f36949"
+    },
+    "negative-normal": {
+      "path": "core17-resolution-qualified-negative-normal.log",
+      "sha256": "24199fa1c4289ee0148de123e69d05fd254ab701a93fbf81f968044c848d97fd"
+    },
+    "negative-optimized": {
+      "path": "core17-resolution-qualified-negative-optimized.log",
+      "sha256": "33842b293222e0c855938140005de41ef6c855b9da3e6c224f0e7e66277d7366"
+    }
+  },
+  "counts": {
+    "outbox_each": 41,
+    "negative_test_each": 1,
+    "negative_mutations_each": 6,
+    "all_features_each": 134
+  },
+  "build": {
+    "all_features": true,
+    "offline": true,
+    "jobs": 2,
+    "debug_symbols": false,
+    "incremental": false,
+    "rust_optimized": false
+  },
+  "exclusions": [
+    "live provider",
+    "production authority wiring",
+    "OS network isolation",
+    "power-loss durability",
+    "arbitrary conflict supersession"
+  ],
+  "source_unchanged_before_after": true,
+  "negative_regression": {
+    "source_commit": "e2fff58",
+    "status": "expected_failure_before_length_guard",
+    "path": "pre-fix-length-guard-failed.log",
+    "sha256": "aa97f9afb7dfcd3909f3524689c98f9c8a14edcc0dfb14950e4c8f48d3891dd7",
+    "not_final_qualification": true
+  }
+}
