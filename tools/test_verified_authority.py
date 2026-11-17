@@ -62,7 +62,12 @@ def poll(predicate: Callable[[], Any], timeout: float = 40) -> Any:
 
 
 def test(
-    platform: str, platform_prepared: str, core_prepared: str, scoped: bool = False
+    platform: str,
+    platform_prepared: str,
+    core_prepared: str,
+    scoped: bool = False,
+    prior_core: str | None = None,
+    prior_prepared: str | None = None,
 ) -> dict[str, Any]:
     spec = importlib.util.spec_from_file_location(
         "authority_temporal_lane", pathlib.Path(platform) / "tools/temporal_lane.py"
@@ -72,6 +77,20 @@ def test(
     spec.loader.exec_module(module)
     manifest = validate(ROOT, core_prepared)
     image = manifest["image_id"]
+    require(
+        bool(prior_core) == bool(prior_prepared),
+        "both prior source and prepared required",
+    )
+    prior = (
+        validate(pathlib.Path(prior_core), prior_prepared)
+        if prior_core and prior_prepared
+        else None
+    )
+    require(
+        prior is None or prior["binary_sha256"] != manifest["binary_sha256"],
+        "upgrade requires distinct old executable",
+    )
+    prior_histories: dict[str, str] = {}
     checks = []
     with tempfile.TemporaryDirectory(prefix="runspindle-authority-") as tmp:
         directory = pathlib.Path(tmp)
@@ -220,7 +239,7 @@ def test(
 
             request({"command": "init"}, True)
             worker = lane.spawn_client(
-                image,
+                prior["image_id"] if prior else image,
                 [
                     "scoped-worker" if scoped else "authenticated-worker",
                     "http://temporal:7233",
@@ -437,6 +456,13 @@ def test(
                 sum(e["action"] == "launch" for e in ledger) == 3,
                 "unexpected launch count",
             )
+            if prior:
+                for identifier in ("authenticated-v1", job(recovery)):
+                    history = request(dict(command="history", workflow_id=identifier))
+                    prior_histories[identifier] = hashlib.sha256(
+                        json.dumps(history, sort_keys=True).encode()
+                    ).hexdigest()
+                require(events() == ledger, "old history inspection changed effects")
             lane.restart(abrupt=True)
             worker2 = lane.spawn_client(
                 image,
@@ -587,6 +613,8 @@ def test(
         return {
             "status": "passed",
             "scoped_exact_destination": scoped,
+            "upgrade_from": prior or "not_run",
+            "old_executable_history_digests": prior_histories,
             "evidence_class": "isolated_integration",
             "checks": checks,
             "image_id": image,
@@ -619,11 +647,20 @@ def test(
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--scoped", action="store_true")
+    p.add_argument("--prior-core")
+    p.add_argument("--prior-prepared")
     p.add_argument("--platform", required=True)
     p.add_argument("--platform-prepared", required=True)
     p.add_argument("--core-prepared", required=True)
     p.add_argument("--report", required=True)
     a = p.parse_args()
-    report = test(a.platform, a.platform_prepared, a.core_prepared, a.scoped)
+    report = test(
+        a.platform,
+        a.platform_prepared,
+        a.core_prepared,
+        a.scoped,
+        a.prior_core,
+        a.prior_prepared,
+    )
     pathlib.Path(a.report).write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))

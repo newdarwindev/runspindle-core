@@ -1,0 +1,14 @@
+{
+  "prior-scoped": {
+    "image_id": "sha256:57c1c93a7f7fdeeb5efa6704af5d2f491722697dec8967ecc1883faf0f9033fe",
+    "binary_sha256": "c69f0e144b871ed2d1d3f6a10c882b3825df571888d05deb4803c84b91a6b8ec",
+    "source_sha256": "1763a1372af7f6889c8884ee2c140dff1771ec51c100425e2933263e5af60af2",
+    "revision": "4093613f026341682bf717c20aeb1d120eff70f2"
+  },
+  "prior-intent": {
+    "image_id": "sha256:38986012cf946ae70218fc806f373ca5a53cd3757d1545a7c3effe07cb0666c2",
+    "binary_sha256": "f90fd328898cd179e2d246f2e8e9d797ecff2dd8ff9417c19694a10283e5b56e",
+    "source_sha256": "2626fa65a953fb19933d930ee1f448d7adbe5d125ba857457a095eefe3c7d67c",
+    "revision": "7f4e3bbd53fa8534a5827fd2272c245abb10f327"
+  }
+}

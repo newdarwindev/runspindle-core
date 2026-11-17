@@ -36,6 +36,8 @@ def test(
     tether: str,
     probe: str | None = None,
     probe_report: str | None = None,
+    prior_core: str | None = None,
+    prior_prepared: str | None = None,
 ) -> dict[str, Any]:
     sys.path.insert(0, tether)
     from tether.admission import canonical  # type: ignore[import-not-found]
@@ -50,6 +52,20 @@ def test(
     spec.loader.exec_module(module)
     manifest = validate(ROOT, prepared)
     image = manifest["image_id"]
+    require(
+        bool(prior_core) == bool(prior_prepared),
+        "both prior source and prepared required",
+    )
+    prior = (
+        validate(pathlib.Path(prior_core), prior_prepared)
+        if prior_core and prior_prepared
+        else None
+    )
+    require(
+        prior is None or prior["binary_sha256"] != manifest["binary_sha256"],
+        "upgrade requires distinct old executable",
+    )
+    prior_histories: dict[str, str] = {}
     checks = []
 
     class Lane(module.Lane):  # type: ignore[name-defined,misc]
@@ -228,7 +244,7 @@ def test(
 
             request(dict(command="init"), True)
             worker = lane.spawn_client(
-                image,
+                prior["image_id"] if prior else image,
                 [
                     "intent-worker",
                     "http://temporal:7233",
@@ -542,6 +558,13 @@ def test(
             )
             ledger = events()
             before = {id: snap(id) for id in ids}
+            if prior:
+                for identifier in ids:
+                    history = request(dict(command="history", workflow_id=identifier))
+                    prior_histories[identifier] = hashlib.sha256(
+                        json.dumps(history, sort_keys=True).encode()
+                    ).hexdigest()
+                require(events() == ledger, "old history inspection changed effects")
             lane.restart(abrupt=True)
             worker2 = lane.spawn_client(
                 image,
@@ -605,6 +628,8 @@ def test(
                 )
     return dict(
         status="passed",
+        upgrade_from=prior or "not_run",
+        old_executable_history_digests=prior_histories,
         evidence_class="isolated_integration",
         checks=checks,
         image_id=image,
@@ -640,9 +665,18 @@ if __name__ == "__main__":
     p.add_argument("--report", required=True)
     p.add_argument("--probe", choices=["failure", "cancel"])
     p.add_argument("--probe-report")
+    p.add_argument("--prior-core")
+    p.add_argument("--prior-prepared")
     a = p.parse_args()
     result = test(
-        a.platform, a.platform_prepared, a.prepared, a.tether, a.probe, a.probe_report
+        a.platform,
+        a.platform_prepared,
+        a.prepared,
+        a.tether,
+        a.probe,
+        a.probe_report,
+        a.prior_core,
+        a.prior_prepared,
     )
     pathlib.Path(a.report).write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(dict(status=result["status"], checks=result["checks"])))

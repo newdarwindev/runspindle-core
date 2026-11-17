@@ -293,7 +293,7 @@ async fn main() -> anyhow::Result<()> {
         let helper = args
             .get(4)
             .and_then(|p| runspindle_core::authority::LocalHelper::read(p).ok());
-        let options = WorkerOptions::new(runspindle_core::authenticated::QUEUE)
+        let mut options = WorkerOptions::new(runspindle_core::authenticated::QUEUE)
             .register_workflow::<AuthenticatedRegistryV1>()?
             .register_workflow::<AuthenticatedOperationV1>()?
             .register_activities(AuthenticatedPorts {
@@ -301,6 +301,18 @@ async fn main() -> anyhow::Result<()> {
                 script_directory: args.get(3).map(PathBuf::from),
             })
             .build();
+        if let Some(point) = args.get(5) {
+            options.worker_interceptor(admission_checkpoints::Checkpoint::exact(
+                args.get(3)
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow::anyhow!("synthetic directory required"))?,
+                point.clone(),
+                "AuthenticatedRegistryV1",
+                args.get(6)
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("exact workflow ID required"))?,
+            )?);
+        }
         Worker::new(&runtime, client, options)?
             .run_until(tokio::signal::ctrl_c())
             .await?;
@@ -315,7 +327,7 @@ async fn main() -> anyhow::Result<()> {
         let helper = args
             .get(4)
             .and_then(|p| runspindle_core::authority::LocalHelper::read(p).ok());
-        let options = WorkerOptions::new(runspindle_core::scoped_authenticated::QUEUE)
+        let mut options = WorkerOptions::new(runspindle_core::scoped_authenticated::QUEUE)
             .register_workflow::<ScopedRegistryV1>()?
             .register_workflow::<ScopedOperationV1>()?
             .register_activities(AuthenticatedPorts {
@@ -323,6 +335,18 @@ async fn main() -> anyhow::Result<()> {
                 script_directory: args.get(3).map(PathBuf::from),
             })
             .build();
+        if let Some(point) = args.get(5) {
+            options.worker_interceptor(admission_checkpoints::Checkpoint::exact(
+                args.get(3)
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow::anyhow!("synthetic directory required"))?,
+                point.clone(),
+                "ScopedRegistryV1",
+                args.get(6)
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("exact workflow ID required"))?,
+            )?);
+        }
         Worker::new(&runtime, client, options)?
             .run_until(tokio::signal::ctrl_c())
             .await?;
@@ -335,13 +359,25 @@ async fn main() -> anyhow::Result<()> {
         let helper = args
             .get(4)
             .and_then(|p| runspindle_core::authority::LocalHelper::read(p).ok());
-        let options = WorkerOptions::new(runspindle_core::intent_runtime::QUEUE)
+        let mut options = WorkerOptions::new(runspindle_core::intent_runtime::QUEUE)
             .register_workflow::<IntentWorkflowV1>()?
             .register_activities(IntentPorts {
                 helper,
                 script_directory: args.get(3).map(PathBuf::from),
             })
             .build();
+        if let Some(point) = args.get(5) {
+            options.worker_interceptor(admission_checkpoints::Checkpoint::exact(
+                args.get(3)
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow::anyhow!("synthetic directory required"))?,
+                point.clone(),
+                "IntentWorkflowV1",
+                args.get(6)
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("exact workflow ID required"))?,
+            )?);
+        }
         Worker::new(&runtime, client, options)?
             .run_until(tokio::signal::ctrl_c())
             .await?;
