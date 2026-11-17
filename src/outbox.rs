@@ -1,7 +1,7 @@
 //! Durable single-send delivery reservation. Reconciliation never resends.
 use crate::durable::{self, Accepted, Store};
 use crate::runtime::valid_id;
-use rusqlite::{params, OptionalExtension, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -119,6 +119,25 @@ pub trait Transport {
     }
 }
 type StoredDelivery = (String, String, Option<String>, u64, Option<String>, bool);
+pub(crate) trait ArtifactGuard {
+    fn verify(&self, connection: &Connection, request: &DeliveryRequest) -> anyhow::Result<()>;
+}
+fn guard_check(
+    guard: Option<&dyn ArtifactGuard>,
+    connection: &Connection,
+    request: &DeliveryRequest,
+) -> anyhow::Result<()> {
+    if let Some(guard) = guard {
+        if connection.is_autocommit() {
+            let tx = connection.unchecked_transaction()?;
+            guard.verify(&tx, request)?;
+            tx.commit()?;
+        } else {
+            guard.verify(connection, request)?;
+        }
+    }
+    Ok(())
+}
 pub struct Outbox {
     store: Store,
 }
@@ -138,6 +157,13 @@ const EVIDENCE_SCHEMA: &[durable::SchemaObject] = &[
     ("trigger", "outbox_evidence_retained", "CREATE TRIGGER IF NOT EXISTS outbox_evidence_retained BEFORE DELETE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'retained delivery evidence');END;"),
 ];
 impl Outbox {
+    pub(crate) fn check_artifact_guard(
+        &self,
+        request: &DeliveryRequest,
+        guard: Option<&dyn ArtifactGuard>,
+    ) -> anyhow::Result<()> {
+        guard_check(guard, &self.store.connection, request)
+    }
     pub fn open(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
         let mut store = Store::open(path)?;
         let tx = store
@@ -323,6 +349,7 @@ impl Outbox {
         old: &DeliverySnapshot,
         receipt: Option<DeliveryReceipt>,
         authority: &A,
+        guard: Option<&dyn ArtifactGuard>,
     ) -> anyhow::Result<DeliverySnapshot> {
         if let Some(ref receipt) = receipt {
             anyhow::ensure!(receipt.matches(&old.request), "receipt binding conflict");
@@ -337,6 +364,7 @@ impl Outbox {
             authority.verify(&old.request),
             "settlement authority unavailable"
         );
+        guard_check(guard, &tx, &old.request)?;
         anyhow::ensure!(
             !current.conflict,
             "delivery receipt conflict is durably fenced"
@@ -456,6 +484,16 @@ impl Outbox {
         resolver: &R,
         transport: &mut T,
     ) -> anyhow::Result<DeliverySnapshot> {
+        self.resolve_guarded(resolution, authority, resolver, transport, None)
+    }
+    pub(crate) fn resolve_guarded<A: DeliveryAuthority, R: ResolutionAuthority, T: Transport>(
+        &mut self,
+        resolution: &ConflictResolution,
+        authority: &A,
+        resolver: &R,
+        transport: &mut T,
+        guard: Option<&dyn ArtifactGuard>,
+    ) -> anyhow::Result<DeliverySnapshot> {
         let prior = &resolution.prior;
         let request = &prior.request;
         anyhow::ensure!(
@@ -469,6 +507,7 @@ impl Outbox {
             authority.verify(request) && resolver.verify_resolution(resolution),
             "resolution denied"
         );
+        guard_check(guard, &self.store.connection, request)?;
         self.store.accepted(&request.accepted)?;
         anyhow::ensure!(
             self.resolution_applicable(resolution)?,
@@ -478,6 +517,7 @@ impl Outbox {
             authority.verify(request) && resolver.verify_resolution(resolution),
             "resolution readback denied"
         );
+        guard_check(guard, &self.store.connection, request)?;
         let readback = transport.lookup_observation(request)?;
         anyhow::ensure!(!readback.conflict, "transport conflict remains unresolved");
         let observed = readback.receipts;
@@ -489,6 +529,7 @@ impl Outbox {
             authority.verify(request) && resolver.verify_resolution(resolution),
             "resolution authority changed"
         );
+        guard_check(guard, &self.store.connection, request)?;
         let tx = self
             .store
             .connection
@@ -503,6 +544,7 @@ impl Outbox {
             authority.verify(request) && resolver.verify_resolution(resolution),
             "resolution authority unavailable after lock"
         );
+        guard_check(guard, &tx, request)?;
         if let Some(completed) = completed {
             return Ok(completed);
         }
@@ -535,16 +577,33 @@ impl Outbox {
         authority: &A,
         transport: &mut T,
     ) -> anyhow::Result<DeliverySnapshot> {
+        self.deliver_guarded(request, authority, transport, None)
+    }
+    pub(crate) fn deliver_guarded<A: DeliveryAuthority, T: Transport>(
+        &mut self,
+        request: &DeliveryRequest,
+        authority: &A,
+        transport: &mut T,
+        guard: Option<&dyn ArtifactGuard>,
+    ) -> anyhow::Result<DeliverySnapshot> {
         anyhow::ensure!(request.valid(), "invalid delivery version/binding");
         anyhow::ensure!(authority.verify(request), "delivery denied");
+        guard_check(guard, &self.store.connection, request)?;
         self.store.accepted(&request.accepted)?;
         let tx = self
             .store
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if guard.is_some() {
+            anyhow::ensure!(
+                authority.verify(request),
+                "reservation authority unavailable after lock"
+            );
+        }
+        guard_check(guard, &tx, request)?;
         if Self::read(&tx, request)?.is_some() {
             drop(tx);
-            return self.reconcile(request, authority, transport);
+            return self.reconcile_guarded(request, authority, transport, guard);
         }
         durable::room(&tx, "outbox")?;
         tx.execute(
@@ -572,6 +631,7 @@ impl Outbox {
             authority.verify(request),
             "delivery authority revoked after reservation"
         );
+        guard_check(guard, &self.store.connection, request)?;
         // This call path is reachable only after a newly committed reservation. An
         // existing reservation can only reach read-only reconciliation above.
         let sent = transport
@@ -584,7 +644,7 @@ impl Outbox {
         let reply = sent.acknowledgement;
         if let Some(reply) = reply {
             if !reply.matches(request) {
-                self.settle(&reserved, None, authority)?;
+                self.settle(&reserved, None, authority, guard)?;
                 anyhow::bail!("send receipt mismatch")
             }
             reserved = self.remember(request, Some(reply.clone()), false, &[])?;
@@ -593,23 +653,31 @@ impl Outbox {
                 "acknowledgement contradicts retained receipt"
             );
             anyhow::ensure!(authority.verify(request), "readback authority unavailable");
+            guard_check(guard, &self.store.connection, request)?;
             let readback = transport.lookup_observation(request).unwrap_or_default();
             if readback.conflict {
                 self.remember(request, None, true, &readback.receipts)?;
                 anyhow::bail!("transport reported readback conflict")
             }
             let observed = readback.receipts;
+            // Retain contradictory observations even if authority was revoked
+            // during readback. This is quarantine, never promotion or permission.
+            if guard.is_some() && Self::contradiction(&reserved, &observed) {
+                self.remember(request, None, true, &observed)?;
+                anyhow::bail!("send/readback receipt conflict")
+            }
             anyhow::ensure!(authority.verify(request), "readback authority changed");
+            guard_check(guard, &self.store.connection, request)?;
             if Self::contradiction(&reserved, &observed) {
                 self.remember(request, None, true, &observed)?;
                 anyhow::bail!("send/readback receipt conflict")
             }
 
             if observed.len() == 1 && observed[0] == reply {
-                return self.settle(&reserved, Some(reply), authority);
+                return self.settle(&reserved, Some(reply), authority, guard);
             }
         }
-        self.settle(&reserved, None, authority)
+        self.settle(&reserved, None, authority, guard)
     }
     pub fn reconcile<A: DeliveryAuthority, T: Transport>(
         &mut self,
@@ -617,23 +685,39 @@ impl Outbox {
         authority: &A,
         transport: &mut T,
     ) -> anyhow::Result<DeliverySnapshot> {
+        self.reconcile_guarded(request, authority, transport, None)
+    }
+    pub(crate) fn reconcile_guarded<A: DeliveryAuthority, T: Transport>(
+        &mut self,
+        request: &DeliveryRequest,
+        authority: &A,
+        transport: &mut T,
+        guard: Option<&dyn ArtifactGuard>,
+    ) -> anyhow::Result<DeliverySnapshot> {
         anyhow::ensure!(
             request.valid() && authority.verify(request),
             "delivery reconciliation denied"
         );
+        guard_check(guard, &self.store.connection, request)?;
         self.store.accepted(&request.accepted)?;
         let old = self
             .snapshot(request)?
             .ok_or_else(|| anyhow::anyhow!("missing reservation"))?;
         anyhow::ensure!(!old.conflict, "delivery receipt conflict is durably fenced");
         anyhow::ensure!(authority.verify(request), "readback authority unavailable");
+        guard_check(guard, &self.store.connection, request)?;
         let readback = transport.lookup_observation(request).unwrap_or_default();
         if readback.conflict {
             self.remember(request, None, true, &readback.receipts)?;
             anyhow::bail!("transport reported readback conflict")
         }
         let observed = readback.receipts;
+        if guard.is_some() && Self::contradiction(&old, &observed) {
+            self.remember(request, None, true, &observed)?;
+            anyhow::bail!("contradictory readback receipts")
+        }
         anyhow::ensure!(authority.verify(request), "readback authority changed");
+        guard_check(guard, &self.store.connection, request)?;
         if Self::contradiction(&old, &observed) {
             self.remember(request, None, true, &observed)?;
             anyhow::bail!("contradictory readback receipts")
@@ -642,9 +726,9 @@ impl Outbox {
             if old.state == DeliveryState::Delivered {
                 anyhow::bail!("retained delivery conflicts with readback")
             }
-            self.settle(&old, None, authority)?;
+            self.settle(&old, None, authority, guard)?;
             anyhow::bail!("delivery readback unknown or conflicting")
         }
-        self.settle(&old, observed.into_iter().next(), authority)
+        self.settle(&old, observed.into_iter().next(), authority, guard)
     }
 }

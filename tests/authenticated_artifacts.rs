@@ -887,3 +887,562 @@ fn retained_read_rechecks_authority_and_clock_after_byte_read() {
         assert_eq!(f.count(table), 1);
     }
 }
+
+#[cfg(feature = "delivery-runtime")]
+mod delivery {
+    use super::*;
+    use runspindle_core::{authenticated_delivery::AuthenticatedOutbox, outbox::*};
+    use std::{
+        cell::{Cell, RefCell},
+        rc::Rc,
+    };
+    struct Live(Rc<RefCell<TrustedState>>);
+    impl Trust for Live {
+        fn current(&self, _: &Scope) -> Option<TrustedState> {
+            Some(self.0.borrow().clone())
+        }
+    }
+    struct Authority {
+        calls: Cell<usize>,
+        revoke_at: usize,
+        live: Rc<RefCell<TrustedState>>,
+        validator: bool,
+    }
+    impl DeliveryAuthority for Authority {
+        fn verify(&self, _: &DeliveryRequest) -> bool {
+            let n = self.calls.get() + 1;
+            self.calls.set(n);
+            if n == self.revoke_at {
+                if self.validator {
+                    self.live.borrow_mut().validator.revoked = true;
+                } else {
+                    self.live.borrow_mut().producer.revoked = true;
+                }
+            }
+            true
+        }
+    }
+    struct Grant;
+    impl DeliveryAuthority for Grant {
+        fn verify(&self, _: &DeliveryRequest) -> bool {
+            true
+        }
+    }
+    impl ResolutionAuthority for Grant {
+        fn verify_resolution(&self, _: &ConflictResolution) -> bool {
+            true
+        }
+    }
+    struct Spy {
+        sends: usize,
+        reads: usize,
+        live: Rc<RefCell<TrustedState>>,
+        revoke_send: bool,
+        revoke_read: bool,
+        conflict: bool,
+    }
+    impl Spy {
+        fn receipt(r: &DeliveryRequest) -> DeliveryReceipt {
+            DeliveryReceipt {
+                request: r.clone(),
+                receipt_id: "receipt".into(),
+            }
+        }
+    }
+    impl Transport for Spy {
+        fn send(
+            &mut self,
+            r: &DeliveryRequest,
+            b: &[u8],
+        ) -> anyhow::Result<Option<DeliveryReceipt>> {
+            assert_eq!(b, BYTES);
+            self.sends += 1;
+            if self.revoke_send {
+                self.live.borrow_mut().producer.revoked = true;
+            }
+            Ok(Some(Self::receipt(r)))
+        }
+        fn lookup(&mut self, r: &DeliveryRequest) -> anyhow::Result<Vec<DeliveryReceipt>> {
+            self.reads += 1;
+            if self.revoke_read {
+                self.live.borrow_mut().validator.revoked = true;
+            }
+            Ok(vec![Self::receipt(r)])
+        }
+        fn send_observation(
+            &mut self,
+            r: &DeliveryRequest,
+            b: &[u8],
+        ) -> anyhow::Result<SendObservation> {
+            Ok(SendObservation {
+                acknowledgement: self.send(r, b)?,
+                conflict: self.conflict,
+            })
+        }
+    }
+    fn setup(f: &Fixture) -> (DeliveryRequest, Live, Spy) {
+        let accepted = f
+            .open()
+            .accept(&f.evidence(), &f.trust(), &FixedClock(100))
+            .unwrap();
+        let live = Live(Rc::new(RefCell::new(f.trust().0)));
+        let spy = Spy {
+            sends: 0,
+            reads: 0,
+            live: live.0.clone(),
+            revoke_send: false,
+            revoke_read: false,
+            conflict: false,
+        };
+        (
+            DeliveryRequest {
+                version: durable::VERSION.into(),
+                accepted: accepted.accepted().clone(),
+                account_id: "account".into(),
+                destination_id: "destination".into(),
+                delivery_operation_id: "delivery".into(),
+            },
+            live,
+            spy,
+        )
+    }
+    fn open(f: &Fixture) -> AuthenticatedOutbox {
+        AuthenticatedOutbox::open(f.dir.join("core.sqlite")).unwrap()
+    }
+    fn snapshot(f: &Fixture, r: &DeliveryRequest) -> Option<DeliverySnapshot> {
+        Outbox::open(f.dir.join("core.sqlite"))
+            .unwrap()
+            .snapshot(r)
+            .unwrap()
+    }
+    #[test]
+    fn authenticated_delivery_rechecks_each_callback_and_commit_without_nested_lock() {
+        for validator in [false, true] {
+            for at in 1..=6 {
+                let f = Fixture::new();
+                let (r, live, mut spy) = setup(&f);
+                let a = Authority {
+                    calls: Cell::new(0),
+                    revoke_at: at,
+                    live: live.0.clone(),
+                    validator,
+                };
+                assert!(open(&f)
+                    .deliver(&r, &a, &mut spy, &live, &FixedClock(100))
+                    .is_err());
+                assert_eq!(spy.sends, usize::from(at > 3));
+                assert_eq!(spy.reads, usize::from(at > 4));
+                assert!(snapshot(&f, &r).is_none_or(|s| s.state != DeliveryState::Delivered));
+                // Restored authority can reconcile retained observations, never resend.
+                *live.0.borrow_mut() = f.trust().0;
+                if snapshot(&f, &r).is_some() {
+                    open(&f)
+                        .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+                        .unwrap();
+                    assert_eq!(spy.sends, usize::from(at > 3));
+                }
+            }
+        }
+        let f = Fixture::new();
+        let (r, live, mut spy) = setup(&f);
+        assert_eq!(
+            open(&f)
+                .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+                .unwrap()
+                .state,
+            DeliveryState::Delivered
+        );
+        open(&f)
+            .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+            .unwrap();
+        assert_eq!((spy.sends, spy.reads), (1, 2));
+    }
+    #[test]
+    fn post_effect_revocation_preserves_unknown_and_never_resends() {
+        for send in [false, true] {
+            let f = Fixture::new();
+            let (r, live, mut spy) = setup(&f);
+            spy.revoke_send = send;
+            spy.revoke_read = !send;
+            assert!(open(&f)
+                .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+                .is_err());
+            let s = snapshot(&f, &r).unwrap();
+            assert_ne!(s.state, DeliveryState::Delivered);
+            assert_eq!(spy.sends, 1);
+            assert!(open(&f)
+                .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+                .is_err());
+            assert_eq!(spy.sends, 1);
+            *live.0.borrow_mut() = f.trust().0;
+            spy.revoke_read = false;
+            spy.revoke_send = false;
+            open(&f)
+                .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+                .unwrap();
+            assert_eq!(spy.sends, 1);
+        }
+    }
+    #[test]
+    fn legacy_evidence_loss_schema_loss_expiry_and_denied_delivery_never_call_transport() {
+        for case in 0..5 {
+            let f = Fixture::new();
+            let (r, live, mut spy) = setup(&f);
+            if case == 0 {
+                f.db().execute_batch("DROP TRIGGER authenticated_artifact_evidence_retained; DELETE FROM authenticated_artifact_evidence;").unwrap();
+            }
+            if case == 1 {
+                f.db()
+                    .execute_batch("DROP TABLE authenticated_artifact_schema;")
+                    .unwrap();
+            }
+            let mut out = open(&f);
+            let result = if case == 2 {
+                out.deliver(&r, &Grant, &mut spy, &live, &FixedClock(1000))
+            } else if case == 3 {
+                out.deliver(&r, &durable::Deny, &mut spy, &live, &FixedClock(100))
+            } else if case == 4 {
+                live.0.borrow_mut().validator.revoked = true;
+                out.deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+            } else {
+                out.deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+            };
+            assert!(result.is_err());
+            assert_eq!((spy.sends, spy.reads), (0, 0));
+            assert!(snapshot(&f, &r).is_none());
+        }
+    }
+    #[test]
+    fn explicit_resolution_and_replay_require_current_artifact_and_separate_authority() {
+        let f = Fixture::new();
+        let (r, live, mut spy) = setup(&f);
+        spy.conflict = true;
+        assert!(open(&f)
+            .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+            .is_err());
+        let resolution = ConflictResolution {
+            prior: snapshot(&f, &r).unwrap(),
+            receipt: Spy::receipt(&r),
+            authorization_ref: "resolver".into(),
+        };
+        assert!(open(&f)
+            .resolve(
+                &resolution,
+                &Grant,
+                &durable::Deny,
+                &mut spy,
+                &live,
+                &FixedClock(100)
+            )
+            .is_err());
+        assert_eq!(spy.reads, 0);
+        open(&f)
+            .resolve(
+                &resolution,
+                &Grant,
+                &Grant,
+                &mut spy,
+                &live,
+                &FixedClock(100),
+            )
+            .unwrap();
+        open(&f)
+            .resolve(
+                &resolution,
+                &Grant,
+                &Grant,
+                &mut spy,
+                &live,
+                &FixedClock(100),
+            )
+            .unwrap();
+        assert_eq!(spy.reads, 2);
+        live.0.borrow_mut().producer.revoked = true;
+        assert!(open(&f)
+            .resolve(
+                &resolution,
+                &Grant,
+                &Grant,
+                &mut spy,
+                &live,
+                &FixedClock(100)
+            )
+            .is_err());
+        assert_eq!((spy.sends, spy.reads), (1, 2));
+    }
+
+    struct NoClock;
+    impl Clock for NoClock {
+        fn now_ms(&self) -> Option<u64> {
+            None
+        }
+    }
+    #[test]
+    fn absent_clock_and_missing_evidence_with_valid_schema_deny_without_effects() {
+        let f = Fixture::new();
+        let (r, live, mut spy) = setup(&f);
+        assert!(open(&f)
+            .deliver(&r, &Grant, &mut spy, &live, &NoClock)
+            .is_err());
+        f.db().execute_batch("DROP TRIGGER authenticated_artifact_evidence_retained; DELETE FROM authenticated_artifact_evidence; CREATE TRIGGER authenticated_artifact_evidence_retained BEFORE DELETE ON authenticated_artifact_evidence BEGIN SELECT RAISE(ABORT,'retained artifact evidence');END").unwrap();
+        assert!(open(&f)
+            .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+            .is_err());
+        assert_eq!((spy.sends, spy.reads), (0, 0));
+        assert!(snapshot(&f, &r).is_none());
+    }
+    struct RevokingResolver {
+        calls: Cell<usize>,
+        at: usize,
+        live: Rc<RefCell<TrustedState>>,
+    }
+    impl ResolutionAuthority for RevokingResolver {
+        fn verify_resolution(&self, _: &ConflictResolution) -> bool {
+            let n = self.calls.get() + 1;
+            self.calls.set(n);
+            if n == self.at {
+                self.live.borrow_mut().validator.revoked = true;
+            }
+            true
+        }
+    }
+    #[test]
+    fn resolver_callback_revocation_blocks_lookup_or_commit_including_exact_replay() {
+        for replay in [false, true] {
+            for at in 1..=4 {
+                let f = Fixture::new();
+                let (r, live, mut spy) = setup(&f);
+                spy.conflict = true;
+                assert!(open(&f)
+                    .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+                    .is_err());
+                let resolution = ConflictResolution {
+                    prior: snapshot(&f, &r).unwrap(),
+                    receipt: Spy::receipt(&r),
+                    authorization_ref: "resolver".into(),
+                };
+                if replay {
+                    open(&f)
+                        .resolve(
+                            &resolution,
+                            &Grant,
+                            &Grant,
+                            &mut spy,
+                            &live,
+                            &FixedClock(100),
+                        )
+                        .unwrap();
+                }
+                let before = snapshot(&f, &r).unwrap();
+                let reads = spy.reads;
+                let resolver = RevokingResolver {
+                    calls: Cell::new(0),
+                    at,
+                    live: live.0.clone(),
+                };
+                assert!(open(&f)
+                    .resolve(
+                        &resolution,
+                        &Grant,
+                        &resolver,
+                        &mut spy,
+                        &live,
+                        &FixedClock(100)
+                    )
+                    .is_err());
+                assert_eq!(spy.reads - reads, usize::from(at > 2));
+                assert_eq!(snapshot(&f, &r).unwrap(), before);
+                assert_eq!(spy.sends, 1);
+            }
+        }
+    }
+    struct ResolutionPeer {
+        calls: Rc<Cell<usize>>,
+    }
+    impl runspindle_core::tether_wire::Peer for ResolutionPeer {
+        fn exchange(&mut self, raw: &[u8]) -> anyhow::Result<Vec<u8>> {
+            self.calls.set(self.calls.get() + 1);
+            let v: serde_json::Value = serde_json::from_slice(raw)?;
+            assert!(["resolve", "lookup_resolution"].contains(&v["action"].as_str().unwrap()));
+            Ok(serde_json::to_vec(
+                &serde_json::json!({"version":runspindle_core::tether_wire::RESOLUTION_VERSION,
+                "request_sha256":durable::digest(raw),"decision_sha256":durable::digest(&serde_json::to_vec(&v["decision"])?),
+                "evidence_class":"slack_wire_resolution_observation","state":"independently_reconciled_under_decision",
+                "file_id":v["decision"]["file_id"],"message_id":v["decision"]["message_id"]}),
+            )?)
+        }
+    }
+    #[test]
+    fn specialized_wire_resolution_first_call_is_guarded_and_repeat_reauthenticates() {
+        use runspindle_core::tether_wire::{ResolutionBridge, ResolutionDecision};
+        let f = Fixture::new();
+        let (r, live, mut spy) = setup(&f);
+        spy.conflict = true;
+        assert!(open(&f)
+            .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+            .is_err());
+        let pair = serde_json::to_vec(&("F123", "1700000000.000001")).unwrap();
+        let resolution = ConflictResolution {
+            prior: snapshot(&f, &r).unwrap(),
+            receipt: DeliveryReceipt {
+                request: r.clone(),
+                receipt_id: format!("tether:{}", durable::digest(&pair)),
+            },
+            authorization_ref: "resolver".into(),
+        };
+        let decision = ResolutionDecision {
+            version: "runspindle.wire-resolution.v1".into(),
+            decision_id: "decision".into(),
+            policy_ref: "policy".into(),
+            authorization_ref: "resolver".into(),
+            conflict_sha256: "a".repeat(64),
+            core_resolution_sha256: durable::digest(
+                &serde_json::to_vec(&serde_json::to_value(&resolution).unwrap()).unwrap(),
+            ),
+            file_id: "F123".into(),
+            message_id: "1700000000.000001".into(),
+        };
+        let calls = Rc::new(Cell::new(0));
+        let mut bridge = ResolutionBridge::new(
+            &durable::Store::open(f.dir.join("core.sqlite")).unwrap(),
+            resolution,
+            decision,
+            "file.txt",
+            "text",
+            ResolutionPeer {
+                calls: calls.clone(),
+            },
+        )
+        .unwrap();
+        live.0.borrow_mut().producer.revoked = true;
+        assert!(open(&f)
+            .resolve_wire(&mut bridge, &Grant, &Grant, &live, &FixedClock(100))
+            .is_err());
+        assert_eq!(calls.get(), 0);
+        *live.0.borrow_mut() = f.trust().0;
+        open(&f)
+            .resolve_wire(&mut bridge, &Grant, &Grant, &live, &FixedClock(100))
+            .unwrap();
+        assert_eq!(calls.get(), 2);
+        open(&f)
+            .resolve_wire(&mut bridge, &Grant, &Grant, &live, &FixedClock(100))
+            .unwrap();
+        assert_eq!(calls.get(), 4);
+        let resolver = RevokingResolver {
+            calls: Cell::new(0),
+            at: 1,
+            live: live.0.clone(),
+        };
+        assert!(open(&f)
+            .resolve_wire(&mut bridge, &Grant, &resolver, &live, &FixedClock(100))
+            .is_err());
+        assert_eq!(calls.get(), 4);
+    }
+
+    #[test]
+    fn authenticated_delivery_child() {
+        let Ok(path) = std::env::var("CORE_AUTH_DELIVERY_DIR") else {
+            return;
+        };
+        let f = Fixture::at(PathBuf::from(path), false);
+        let (r, live, mut spy) = setup(&f);
+        spy.revoke_send = true;
+        assert!(open(&f)
+            .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+            .is_err());
+        assert_eq!((spy.sends, spy.reads), (1, 0));
+        std::fs::write(f.dir.join("effect-count"), b"1").unwrap();
+        std::process::exit(95);
+    }
+    #[test]
+    fn fresh_process_retains_post_effect_denial_without_resend() {
+        let f = Fixture::new();
+        let (r, live, mut spy) = setup(&f);
+        let mut child = BoundedChild(
+            Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "delivery::authenticated_delivery_child",
+                    "--nocapture",
+                ])
+                .env("CORE_AUTH_DELIVERY_DIR", &f.dir)
+                .spawn()
+                .unwrap(),
+        );
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                assert_eq!(status.code(), Some(95));
+                break;
+            }
+            assert!(std::time::Instant::now() < end, "child timeout");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(std::fs::read(f.dir.join("effect-count")).unwrap(), b"1");
+        assert_ne!(snapshot(&f, &r).unwrap().state, DeliveryState::Delivered);
+        open(&f)
+            .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+            .unwrap();
+        assert_eq!((spy.sends, spy.reads), (0, 1));
+        assert_eq!(std::fs::read(f.dir.join("effect-count")).unwrap(), b"1");
+    }
+
+    struct Contradictory<'a> {
+        live: &'a Live,
+        reads: usize,
+    }
+    impl Transport for Contradictory<'_> {
+        fn send(
+            &mut self,
+            r: &DeliveryRequest,
+            _: &[u8],
+        ) -> anyhow::Result<Option<DeliveryReceipt>> {
+            Ok(Some(Spy::receipt(r)))
+        }
+        fn lookup(&mut self, r: &DeliveryRequest) -> anyhow::Result<Vec<DeliveryReceipt>> {
+            self.reads += 1;
+            self.live.0.borrow_mut().producer.revoked = true;
+            Ok(vec![DeliveryReceipt {
+                request: r.clone(),
+                receipt_id: "contradictory".into(),
+            }])
+        }
+    }
+    #[test]
+    fn revoked_readback_still_retains_inferred_conflict_and_cannot_silently_clear() {
+        for delivered in [false, true] {
+            let f = Fixture::new();
+            let (r, live, mut spy) = setup(&f);
+            if delivered {
+                open(&f)
+                    .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+                    .unwrap();
+            }
+            let mut wrong = Contradictory {
+                live: &live,
+                reads: 0,
+            };
+            assert!(open(&f)
+                .deliver(&r, &Grant, &mut wrong, &live, &FixedClock(100))
+                .is_err());
+            assert_eq!(wrong.reads, 1);
+            assert!(snapshot(&f, &r).unwrap().conflict);
+            let evidence: i64 = f
+                .db()
+                .query_row(
+                    "SELECT count(*) FROM outbox_evidence WHERE kind='conflict'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert!(evidence > 0);
+            *live.0.borrow_mut() = f.trust().0;
+            let reads = spy.reads;
+            assert!(open(&f)
+                .deliver(&r, &Grant, &mut spy, &live, &FixedClock(100))
+                .is_err());
+            assert_eq!(spy.reads, reads);
+            assert!(snapshot(&f, &r).unwrap().conflict);
+        }
+    }
+}

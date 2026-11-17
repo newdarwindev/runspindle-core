@@ -294,6 +294,15 @@ impl<P: Peer> ResolutionBridge<P> {
         authority: &A,
         resolver: &R,
     ) -> anyhow::Result<DeliverySnapshot> {
+        self.resolve_guarded(outbox, authority, resolver, None)
+    }
+    pub(crate) fn resolve_guarded<A: DeliveryAuthority, R: ResolutionAuthority>(
+        &mut self,
+        outbox: &mut Outbox,
+        authority: &A,
+        resolver: &R,
+        guard: Option<&dyn crate::outbox::ArtifactGuard>,
+    ) -> anyhow::Result<DeliverySnapshot> {
         anyhow::ensure!(
             authority.verify(&self.resolution.prior.request)
                 && resolver.verify_resolution(&self.resolution),
@@ -303,6 +312,7 @@ impl<P: Peer> ResolutionBridge<P> {
             outbox.resolution_applicable(&self.resolution)?,
             "stale resolution before peer call"
         );
+        outbox.check_artifact_guard(&self.resolution.prior.request, guard)?;
         anyhow::ensure!(
             self.observe("resolve")?.as_ref() == Some(&self.resolution.receipt),
             "resolution not independently observed"
@@ -313,11 +323,13 @@ impl<P: Peer> ResolutionBridge<P> {
             "resolution authority changed"
         );
         let resolution = self.resolution.clone();
-        outbox.resolve(
+        outbox.check_artifact_guard(&self.resolution.prior.request, guard)?;
+        outbox.resolve_guarded(
             &resolution,
             authority,
             resolver,
             &mut ResolutionLookup(self),
+            guard,
         )
     }
 }

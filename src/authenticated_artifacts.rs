@@ -558,7 +558,32 @@ impl AuthenticatedArtifacts {
             .store
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let (record, wire, digest): (String, Vec<u8>, String) = tx.query_row(
+        let result = Self::read_retained(&tx, accepted, trust, clock)?;
+        tx.commit()?;
+        Ok(result)
+    }
+    /// Verify without starting a transaction; the caller owns snapshot/lock scope.
+    pub(crate) fn read_retained(
+        connection: &Connection,
+        accepted: &Accepted,
+        trust: &impl Trust,
+        clock: &impl Clock,
+    ) -> anyhow::Result<(AuthenticatedAccepted, Vec<u8>)> {
+        for (name, expected) in SCHEMA {
+            let stored: String = connection.query_row(
+                "SELECT sql FROM sqlite_master WHERE name=?1",
+                [name],
+                |r| r.get(0),
+            )?;
+            anyhow::ensure!(stored == *expected, "incompatible artifact evidence schema");
+        }
+        let version: u64 = connection.query_row(
+            "SELECT version FROM authenticated_artifact_schema WHERE id=1",
+            [],
+            |r| r.get(0),
+        )?;
+        anyhow::ensure!(version == 1, "unsupported artifact evidence schema");
+        let (record, wire, digest): (String, Vec<u8>, String) = connection.query_row(
             "SELECT accepted_record,evidence,evidence_sha256 FROM authenticated_artifact_evidence WHERE acceptance_identity=?1",
             [accepted.key()?], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )?;
@@ -572,7 +597,7 @@ impl AuthenticatedArtifacts {
             evidence.producer.statement.scope.validation() == accepted.validation,
             "retained validation mismatch"
         );
-        let stored: String = tx.query_row(
+        let stored: String = connection.query_row(
             "SELECT record FROM acceptances WHERE identity=?1",
             [accepted.key()?],
             |r| r.get(0),
@@ -581,7 +606,7 @@ impl AuthenticatedArtifacts {
             serde_json::from_str::<Accepted>(&stored)? == *accepted,
             "retained acceptance mismatch"
         );
-        let validation: String = tx.query_row(
+        let validation: String = connection.query_row(
             "SELECT record FROM validations WHERE identity=?1",
             [accepted.validation.key()?],
             |r| r.get(0),
@@ -591,13 +616,13 @@ impl AuthenticatedArtifacts {
             "retained validation record mismatch"
         );
         verify(&evidence, trust, clock)?;
-        let bytes = Store::read_bytes(&tx, accepted.artifact())?;
+        let bytes = Store::read_bytes(connection, accepted.artifact())?;
         anyhow::ensure!(
             bytes.len() as u64 == evidence.producer.statement.scope.byte_length,
             "artifact byte length mismatch"
         );
         verify(&evidence, trust, clock)?;
-        tx.commit()?;
+
         Ok((
             AuthenticatedAccepted {
                 accepted: accepted.clone(),
