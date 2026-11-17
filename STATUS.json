@@ -101,5 +101,15 @@
     "status": "locally_tested_offline_candidate_dependency_qualification_blocked",
     "store": "local_authoritative_SQLite",
     "version": "runspindle.authority.v1"
+  },
+  "scoped_admission_candidate": {
+    "version": "runspindle.scoped-admission.v1",
+    "assertion": "runspindle.authority.v2",
+    "status": "component_tested_candidate",
+    "specification": "specs/scoped-authority-v2.md",
+    "exact_destination": "account_destination_delivery_operation_signed_and_outbox_enforced",
+    "temporal_scoped_integration": "not_run_missing_exact_prepared_builder",
+    "real_tether_delivery": "not_integrated",
+    "issue_16": "open"
   }
 }

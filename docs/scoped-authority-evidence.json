@@ -1,0 +1,37 @@
+{
+  "schema": "runspindle.scoped-authority-evidence.v1",
+  "base_revision": "6a665b082b156c2692be88477888c14a1c7b47c0",
+  "evidence_class": "component_tests_native_unqualified_builder",
+  "issue": 16,
+  "status": "partial_issue_remains_open",
+  "synthetic_only": true,
+  "rust": "1.94.1",
+  "protoc_version": "3.21.12-3+deb12u1",
+  "protoc_sha256": "7f5fabcc8fbcb1c65f08c37b263e6faf6bdcef9d0d95f34220cc13b28a7af813",
+  "verified_authority_rust_suite": "passed",
+  "authority_tests": 13,
+  "python_tests": 103,
+  "scaffold": "passed",
+  "changed_rust_format": "passed",
+  "mutation": {
+    "removed_account_binding": "behavioral_failure_detected",
+    "original_source_restored": true
+  },
+  "new_scoped_temporal_integration": "not_run",
+  "prepared_builder_qualification": "blocked_exact_image_unavailable",
+  "live_providers": "not_run",
+  "independent_review": "pending_final_head",
+  "source_sha256": {
+    "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+    "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+    "temporal/toolchain.json": "325e936d34587984f4382877841a8f4bb7c9cabc13873917132e8c0f0bb1d80e",
+    "src/authority.rs": "be0e80e99ebe38e7894ad42955d76634c7a001c9fc9ec743ee0a47a588f434fc",
+    "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+    "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97",
+    "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+    "src/bin/temporal-runtime.rs": "788369ef64a5f15db736f84bbbc18135dcda7b620eae39284fca926f3a49e5b4",
+    "tests/authority.rs": "d1540a36dd11257137be0f7057a28fba1fa685bbefef6c12454e55b4fcae8e89",
+    "tools/check_authority_mutations.py": "7eadf46fcfb115368b40b6db4fd2541651a4a56d2825e208e36d9749ef7afd78",
+    "specs/scoped-authority-v2.md": "6119cb723bd70e76ca727e9a62b1f4a4bfe4e557bbd779532c003c3e4bb6656b"
+  }
+}

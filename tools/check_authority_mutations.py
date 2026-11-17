@@ -20,6 +20,14 @@ signal.signal(signal.SIGTERM, cancelled)
 ROOT = Path(__file__).resolve().parents[1]
 MUTATIONS = [
     (
+        "scoped_delivery_destination",
+        "src/scoped_authority.rs",
+        "&& request.account_id == scoped.destination.account_id",
+        "&& true /* deliberately removed account binding */",
+        "authority",
+        "scoped_outbox_checks_exact_target_before_any_send_or_lookup",
+    ),
+    (
         "wire_sequence",
         "src/envelope.rs",
         "sequence: p.sequence,",

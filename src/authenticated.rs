@@ -32,9 +32,13 @@ pub struct AuthenticatedCall {
 }
 impl AuthenticatedPorts {
     pub fn authorized(&self, check: &AuthorityCheck) -> bool {
-        self.helper
-            .as_ref()
-            .is_some_and(|h| h.verify(check.wire.as_bytes(), check.action))
+        self.helper.as_ref().is_some_and(|h| {
+            if crate::scoped_authority::ScopedAdmission::decode(check.wire.as_bytes()).is_ok() {
+                h.verify_scoped(check.wire.as_bytes(), check.action)
+            } else {
+                h.verify(check.wire.as_bytes(), check.action)
+            }
+        })
     }
     pub fn invoke(&self, input: &AuthenticatedCall) -> anyhow::Result<PortReply> {
         let denied = || PortReply {
@@ -42,7 +46,10 @@ impl AuthenticatedPorts {
             status: PortStatus::Denied,
             native_session_id: None,
         };
-        let Ok(admission) = authority::request(input.wire.as_bytes()) else {
+        let Ok(admission) = authority::request(input.wire.as_bytes()).or_else(|_| {
+            crate::scoped_authority::ScopedAdmission::decode(input.wire.as_bytes())
+                .and_then(|s| s.admission())
+        }) else {
             return Ok(denied());
         };
         let action_matches = match input.call.action {

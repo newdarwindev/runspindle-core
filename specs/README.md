@@ -57,3 +57,5 @@ Bounded unqualified core17 candidate: [authorized outbox conflict resolution](..
 Bounded unqualified Core #18 candidate: [authenticated artifact evidence](../docs/AUTHENTICATED_ARTIFACTS.md). This separate opt-in path preserves existing references and envelope v1; Rust/native checks remain pending.
 
 Bounded unqualified Core #19 candidate: [fail-closed store reopening](../docs/STORE_SCHEMA_RECOVERY.md). Required schema validation and atomic outbox v2 migration are authored; Rust/native checks remain pending.
+
+[Scoped authority candidate](scoped-authority-v2.md) adds a separately versioned exact-destination admission and Outbox authority adapter. Component tests are distinct from blocked prepared-image/Temporal qualification; Core #16 remains open.

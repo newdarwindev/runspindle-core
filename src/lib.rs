@@ -50,3 +50,8 @@ pub mod authenticated;
 
 #[cfg(feature = "authenticated-artifacts")]
 pub mod authenticated_artifacts;
+
+#[cfg(feature = "verified-authority")]
+pub mod scoped_authenticated;
+#[cfg(feature = "verified-authority")]
+pub mod scoped_authority;

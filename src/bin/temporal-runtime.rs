@@ -50,6 +50,28 @@ enum Command {
         job_id: String,
         wire: String,
     },
+    #[cfg(feature = "verified-authority")]
+    StartScoped {
+        registry_id: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    AdmitScoped {
+        registry_id: String,
+        wire: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    ScopedRegistry {
+        registry_id: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    ScopedOperation {
+        job_id: String,
+    },
+    #[cfg(feature = "verified-authority")]
+    CancelScoped {
+        job_id: String,
+        wire: String,
+    },
     #[cfg(feature = "delivery-runtime")]
     Deliver {
         workflow_id: String,
@@ -169,7 +191,9 @@ async fn main() -> anyhow::Result<()> {
         #[cfg(feature = "verified-authority")]
         let replay_options = replay_options
             .register_workflow::<runspindle_core::authenticated::AuthenticatedRegistryV1>()?
-            .register_workflow::<runspindle_core::authenticated::AuthenticatedOperationV1>()?;
+            .register_workflow::<runspindle_core::authenticated::AuthenticatedOperationV1>()?
+            .register_workflow::<runspindle_core::scoped_authenticated::ScopedRegistryV1>()?
+            .register_workflow::<runspindle_core::scoped_authenticated::ScopedOperationV1>()?;
         let replayer = WorkflowReplayer::new(replay_options.build())?;
         replayer.replay_workflow(history).await?;
         println!("{{\"status\":\"passed\",\"evidence_class\":\"isolated_integration\",\"check\":\"history_replay\"}}");
@@ -193,7 +217,8 @@ async fn main() -> anyhow::Result<()> {
     let mode = args.get(1).map(String::as_str).unwrap_or("");
     anyhow::ensure!(
         matches!(mode, "worker" | "client")
-            || (cfg!(feature = "verified-authority") && mode == "authenticated-worker"),
+            || (cfg!(feature = "verified-authority")
+                && matches!(mode, "authenticated-worker" | "scoped-worker")),
         "expected worker, client or enabled authenticated-worker"
     );
     // Deliberately no environment profile/API key/credential discovery.
@@ -224,6 +249,28 @@ async fn main() -> anyhow::Result<()> {
         let options = WorkerOptions::new(runspindle_core::authenticated::QUEUE)
             .register_workflow::<AuthenticatedRegistryV1>()?
             .register_workflow::<AuthenticatedOperationV1>()?
+            .register_activities(AuthenticatedPorts {
+                helper,
+                script_directory: args.get(3).map(PathBuf::from),
+            })
+            .build();
+        Worker::new(&runtime, client, options)?
+            .run_until(tokio::signal::ctrl_c())
+            .await?;
+        return Ok(());
+    }
+    #[cfg(feature = "verified-authority")]
+    if mode == "scoped-worker" {
+        use runspindle_core::{authenticated::AuthenticatedPorts, scoped_authenticated::*};
+        let runtime = Runtime::from_current_tokio(Default::default())?;
+        // Missing/unreadable configuration yields a deny-only worker, never a
+        // fallback to development script authorization.
+        let helper = args
+            .get(4)
+            .and_then(|p| runspindle_core::authority::LocalHelper::read(p).ok());
+        let options = WorkerOptions::new(runspindle_core::scoped_authenticated::QUEUE)
+            .register_workflow::<ScopedRegistryV1>()?
+            .register_workflow::<ScopedOperationV1>()?
             .register_activities(AuthenticatedPorts {
                 helper,
                 script_directory: args.get(3).map(PathBuf::from),
@@ -339,6 +386,66 @@ async fn main() -> anyhow::Result<()> {
         #[cfg(feature = "verified-authority")]
         Command::CancelAuthenticated { job_id, wire } => {
             serde_json::json!({"accepted":client.get_workflow_handle::<runspindle_core::authenticated::AuthenticatedOperationV1>(job_id).execute_update(runspindle_core::authenticated::AuthenticatedOperationV1::request_cancel,wire,Default::default()).await?})
+        }
+        #[cfg(feature = "verified-authority")]
+        Command::StartScoped { registry_id } => {
+            use runspindle_core::scoped_authenticated::*;
+            anyhow::ensure!(valid_id(&registry_id), "invalid registry");
+            let h = client
+                .start_workflow(
+                    ScopedRegistryV1::run,
+                    (),
+                    WorkflowStartOptions::new(
+                        runspindle_core::scoped_authenticated::QUEUE,
+                        registry_id,
+                    )
+                    .build(),
+                )
+                .await?;
+            serde_json::json!({"status":"started","run_id":h.run_id()})
+        }
+        #[cfg(feature = "verified-authority")]
+        Command::AdmitScoped { registry_id, wire } => serde_json::to_value(
+            client
+                .get_workflow_handle::<runspindle_core::scoped_authenticated::ScopedRegistryV1>(
+                    registry_id,
+                )
+                .execute_update(
+                    runspindle_core::scoped_authenticated::ScopedRegistryV1::admit,
+                    wire,
+                    Default::default(),
+                )
+                .await?,
+        )?,
+        #[cfg(feature = "verified-authority")]
+        Command::ScopedRegistry { registry_id } => serde_json::to_value(
+            client
+                .get_workflow_handle::<runspindle_core::scoped_authenticated::ScopedRegistryV1>(
+                    registry_id,
+                )
+                .query(
+                    runspindle_core::scoped_authenticated::ScopedRegistryV1::snapshot,
+                    (),
+                    Default::default(),
+                )
+                .await?,
+        )?,
+        #[cfg(feature = "verified-authority")]
+        Command::ScopedOperation { job_id } => serde_json::to_value(
+            client
+                .get_workflow_handle::<runspindle_core::scoped_authenticated::ScopedOperationV1>(
+                    job_id,
+                )
+                .query(
+                    runspindle_core::scoped_authenticated::ScopedOperationV1::snapshot,
+                    (),
+                    Default::default(),
+                )
+                .await?,
+        )?,
+        #[cfg(feature = "verified-authority")]
+        Command::CancelScoped { job_id, wire } => {
+            serde_json::json!({"accepted":client.get_workflow_handle::<runspindle_core::scoped_authenticated::ScopedOperationV1>(job_id).execute_update(runspindle_core::scoped_authenticated::ScopedOperationV1::request_cancel,wire,Default::default()).await?})
         }
         #[cfg(feature = "delivery-runtime")]
         Command::Deliver {
