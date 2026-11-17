@@ -125,6 +125,6 @@ def main():
 
 if __name__ == "__main__":
     with patch.object(
-        socket.socket, "connect", side_effect=AssertionError("network forbidden")
+        socket, "socket", side_effect=AssertionError("network forbidden")
     ):
         main()
