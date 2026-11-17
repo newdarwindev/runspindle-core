@@ -233,6 +233,7 @@ impl<P: Peer> ResolutionBridge<P> {
                 && decision.file_id[1..]
                     .bytes()
                     .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
+                && decision.message_id.len() <= 64
                 && decision
                     .message_id
                     .split_once('.')
