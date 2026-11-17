@@ -1946,7 +1946,7 @@ fn actual_tether_concurrent_same_resolution_retains_one_decision() {
 #[test]
 fn resolution_bridge_rejects_oversized_refs_and_malformed_selected_identities() {
     use runspindle_core::tether_wire::ResolutionBridge;
-    for field in ["decision", "policy", "file", "message"] {
+    for field in ["decision", "policy", "file", "message", "long-message"] {
         let temp = Temp::new();
         let (_, mut resolution, _) = quarantine(&temp);
         let mut decision = wire_decision(&mut resolution);
@@ -1955,6 +1955,7 @@ fn resolution_bridge_rejects_oversized_refs_and_malformed_selected_identities() 
             "policy" => decision.policy_ref = "x".repeat(129),
             "file" => decision.file_id = "F_lowercase".into(),
             "message" => decision.message_id = "1700000002.00003".into(),
+            "long-message" => decision.message_id = format!("{}.000003", "1".repeat(65)),
             _ => unreachable!(),
         }
         resolution.receipt.receipt_id = format!(
