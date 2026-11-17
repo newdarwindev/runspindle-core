@@ -66,7 +66,7 @@ and execution results belong in a separate verification receipt after review.
 ## Reviewed execution candidate (2026-11-17)
 
 The [qualification receipt](evidence/tether-wire-20261117/qualification.json)
-records Core `f1fc39a` and Tether `d6138a833773691009863f686f235283d7a82723`,
+records Core `da1980b` and Tether `d6138a833773691009863f686f235283d7a82723`,
 clean before/after, with source and log hashes. All 33 outbox tests ran, including
 all three opted-in cross-component tests (six scenarios), with no skips. The
 same binary passed with Python optimization enabled; this is not an optimized
@@ -83,3 +83,7 @@ Core #17 remains open: the integrated Tether journal retains sticky conflicts an
 this bridge cannot clear them. Existing general Core conflict resolution has its
 own tests, but does not prove end-to-end authorized Tether conflict resolution.
 No alternative peer is used to manufacture that missing evidence.
+
+The final Python-only typing/import-discovery correction passed strict mypy and
+Ruff with isolated import sorting; the full isolated checks were rerun after it.
+Earlier receipts remain in Git history, not counted as final-head evidence.

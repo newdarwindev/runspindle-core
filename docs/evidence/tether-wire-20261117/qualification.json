@@ -1,7 +1,7 @@
 {
   "schema": "runspindle.core-tether-wire-qualification.v1",
   "status": "passed",
-  "core_commit": "f1fc39a32f85d121c87b11b9f1e32593138ddb75",
+  "core_commit": "da1980bff4a0c9b926e7abbfd2089a4e3ed3bf08",
   "compiled_rust_source_commit": "98a8f621d53b90e7022700640967fbcd634e8f2e",
   "tether_commit": "d6138a833773691009863f686f235283d7a82723",
   "binary_sha256": "06cf2339402d9e1c2c66854f2bcfb7b01b6f970893a9cc4309f7890c1ead403f",
@@ -30,25 +30,25 @@
     "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
     "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
     "tests/outbox.rs": "0e754eb83a2af254ed6efacc4e1d4bb21b9e2d158e5d2674edf1bd42927939ec",
-    "tests/fixtures/tether_wire_peer.py": "303bf5b7fd5f9bc03c0096c338ef3072487eb3a4c03c9af4e2975da385320109",
-    "tests/test_tether_wire_fixture.py": "f9e18053938aea7d3d93a5a49f83e1cd9dcc7f0a67704cecbac61d8797811df1"
+    "tests/fixtures/tether_wire_peer.py": "1cc10f5de21114736671bddc06e8fadf48b78ff1cde713007a21aef554411f77",
+    "tests/test_tether_wire_fixture.py": "f7d097f27f865c5c698f6cfb42791398af8f4a4ac6c60c566c796b8db4359bca"
   },
   "logs": {
     "outbox-normal": {
       "path": "core17-qualified-outbox-normal.log",
-      "sha256": "4ed67d2598a8eb06d5835cf0311be087fc40d826dfa8c1ace74c266cc40ebc3e"
+      "sha256": "ddba10f8bce44d70a2022e77a4af5a94fdad9d8128c138b0b8f3c182d236b2d7"
     },
     "outbox-python-optimized": {
       "path": "core17-qualified-outbox-python-optimized.log",
-      "sha256": "834b14effe137611090bc350ab71aeacb3582709b9a94a33bc604014881f6318"
+      "sha256": "11bfb2e6bb45eedea5da01c4cd4df2723b1d365f7d7795013c6f8251f91fae87"
     },
     "negative-normal": {
       "path": "core17-qualified-negative-normal.log",
-      "sha256": "84ca3562c458c1093d4005b7690371a4f4cfba8f4da368e89fd6ce2231562200"
+      "sha256": "5b3901a3b3a873f740da53192224074ef7fc8d2df140ab76efde9a2df2e0fcb4"
     },
     "negative-optimized": {
       "path": "core17-qualified-negative-optimized.log",
-      "sha256": "0015400b2718b98c6ee0af9ef63b541c5bba4b1eb39ff6e2edbbd57e97bcc92c"
+      "sha256": "c685f4fd0344a86dd45a1a175abb63930eb1cda120b84892722445036204ca21"
     }
   },
   "counts": {
