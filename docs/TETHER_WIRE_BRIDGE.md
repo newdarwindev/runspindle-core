@@ -62,3 +62,24 @@ bytes and one allocation/upload/completion in the HTTP peer ledger. They do not
 qualify Slack credentials, live provider semantics, production identity issuance,
 native sessions, power loss or storage-controller failures. Exact source revisions
 and execution results belong in a separate verification receipt after review.
+
+## Reviewed execution candidate (2026-11-17)
+
+The [qualification receipt](evidence/tether-wire-20261117/qualification.json)
+records Core `f1fc39a` and Tether `d6138a833773691009863f686f235283d7a82723`,
+clean before/after, with source and log hashes. All 33 outbox tests ran, including
+all three opted-in cross-component tests (six scenarios), with no skips. The
+same binary passed with Python optimization enabled; this is not an optimized
+Rust build. The independent expected-binding negative test rejected six mutations
+in both Python modes before any store was created. Rust source was unchanged
+from compiled commit `98a8f62`; subsequent commits only changed Python tests.
+
+A separate all-features compile attempt exhausted local disk and is **not** a
+passing result. Only owned regenerable compiler cache was reclaimed. No live
+network, credentials, production authority wiring or native integration was run.
+The Python fixture denies socket construction but is not an OS network sandbox.
+
+Core #17 remains open: the integrated Tether journal retains sticky conflicts and
+this bridge cannot clear them. Existing general Core conflict resolution has its
+own tests, but does not prove end-to-end authorized Tether conflict resolution.
+No alternative peer is used to manufacture that missing evidence.
