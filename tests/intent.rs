@@ -226,14 +226,11 @@ fn signatures_scope_time_and_unavailable_trust_deny_before_effect() {
         if case == 7 {
             ports.helper = None;
         }
-        assert_eq!(
-            ports
-                .invoke(&f.call(PortAction::Launch, Action::Dispatch))
-                .unwrap()
-                .status,
-            PortStatus::Denied
-        );
+        let observed = ports
+            .invoke(&f.call(PortAction::Launch, Action::Dispatch))
+            .unwrap();
         f.assert_zero_calls();
+        assert_eq!(observed.status, PortStatus::Denied);
     }
 }
 #[test]
@@ -270,8 +267,6 @@ fn delete_cannot_launch_even_with_dispatch_permission() {
     let mut f = Fixture::new();
     let v = vectors().remove(2);
     f.wire = String::from_utf8(v.encode().unwrap()).unwrap();
-    let mut a = f.assertion();
-    a.grant_id = "v3-grant-1".into(); // Wire grant mismatch also tested independently below.
     let mut v = v;
     let mut admission = v.admission().unwrap();
     admission.grant_ref = "v3-grant-1".into();

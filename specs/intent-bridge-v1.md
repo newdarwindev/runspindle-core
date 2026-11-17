@@ -79,3 +79,26 @@ scripted call/effect observations. `tools/test_intent_bridge.py` is the bounded 
 Temporal/SQLite plus Tether integration, with fresh-process recovery/history replay.
 Final exact-head qualification and independent review remain pending. Existing
 runtime/source reports for other lanes are historical, not evidence for this lane.
+
+Reproduce from a clean candidate and the exact Tether pin, with prepared pinned
+runtime/Temporal artifacts and pinned quality tools on PATH:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 \
+RUNSPINDLE_TETHER_V1_SOURCE=/path/to/legacy-tether-pin \
+RUNSPINDLE_BUILDER_ARCHIVE=/path/to/verified-builder-closure.tar.gz \
+/usr/bin/python3 tools/qualify_intent_bridge.py \
+  --platform /path/to/pinned-platform \
+  --platform-prepared /path/to/prepared-temporal \
+  --composition /path/to/pinned-composition \
+  --tether /path/to/pinned-tether \
+  --prepared local/runtime-prepared --report-dir /path/to/report
+```
+
+The legacy Tether test-reference pin is `040b71f` (full revision checked by Tether's
+own schema-upgrade suite). A renderer skip in its pre-existing visual suite is not
+semantic or visual acceptance. The aggregate also runs the existing13-phase Core
+qualifier, full Tether tests in normal/optimized mode, network-disabled independent
+intent/batch golden conformance, repeated actual-journal integration, and deliberate
+failure/SIGTERM cleanup probes. Deliberate mutations must fail actual assertions
+and restore exact source bytes. No baseline weakening or hosted fallback is used.

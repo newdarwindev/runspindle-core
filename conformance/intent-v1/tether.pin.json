@@ -1,0 +1,9 @@
+{
+  "repository": "newdarwindev/runspindle-tether",
+  "revision": "30297d6948208cfc1aee898610365fc7019d3c07",
+  "fixtures": {
+    "conformance/intent-v1/vectors.json": "47bc9415404986d25e2ae5ecea2d857d7fe880ae721607ff59da35d3555b7c49",
+    "conformance/intent-batch-v1/vectors.json": "43ad0c2957a82d2b794a71b93226eb4f16cd968bada4aa99195b6d0d16a1eb7a"
+  },
+  "classification": "original_synthetic_cross_language_test_fixtures_no_upstream_source_lift"
+}

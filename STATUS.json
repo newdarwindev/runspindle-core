@@ -112,5 +112,16 @@
     "real_tether_delivery": "not_integrated",
     "issue_16": "open",
     "evidence": "docs/scoped-authority-qualification.json"
+  },
+  "semantic_intent_candidate": {
+    "status": "component_and_initial_isolated_integration_passed_final_qualification_pending",
+    "specification": "specs/intent-bridge-v1.md",
+    "wire": "runspindle.intent-admission.v1",
+    "batch": "runspindle.intent-batch.v1",
+    "assertion": "runspindle.authority.v3",
+    "tether_pin": "conformance/intent-v1/tether.pin.json",
+    "live_transport": "not_qualified",
+    "production_issuer": "not_implemented",
+    "issue_tether_8": "open"
   }
 }

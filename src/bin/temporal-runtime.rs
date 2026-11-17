@@ -155,6 +155,18 @@ async fn main() -> anyhow::Result<()> {
         );
     }
     #[cfg(feature = "verified-authority")]
+    if args.get(1).map(String::as_str) == Some("intent-batch") {
+        anyhow::ensure!(args.len() == 2, "intent conformance takes no configuration");
+        let mut bytes = Vec::new();
+        std::io::stdin().take(1_048_577).read_to_end(&mut bytes)?;
+        let value = runspindle_core::intent::IntentBatch::decode(&bytes)?;
+        println!(
+            "{}",
+            serde_json::json!({"wire":String::from_utf8(value.encode()?)?,"workflow_id":runspindle_core::intent_runtime::workflow_id(value.intents.last().expect("validated"))?})
+        );
+        return Ok(());
+    }
+    #[cfg(feature = "verified-authority")]
     if args.get(1).map(String::as_str) == Some("intent") {
         let mut bytes = Vec::new();
         std::io::stdin().take(1_048_577).read_to_end(&mut bytes)?;

@@ -2,6 +2,7 @@
 """Bounded real Core/Temporal consumer + real Tether codec, synthetic authority/host."""
 
 from __future__ import annotations
+
 import argparse
 import base64
 import hashlib
@@ -9,6 +10,7 @@ import importlib.util
 import json
 import os
 import pathlib
+import signal
 import subprocess
 import sys
 import tempfile
@@ -28,7 +30,12 @@ def require(ok: Any, message: str) -> None:
 
 
 def test(
-    platform: str, platform_prepared: str, prepared: str, tether: str
+    platform: str,
+    platform_prepared: str,
+    prepared: str,
+    tether: str,
+    probe: str | None = None,
+    probe_report: str | None = None,
 ) -> dict[str, Any]:
     sys.path.insert(0, tether)
     from tether.admission import canonical  # type: ignore[import-not-found]
@@ -230,6 +237,22 @@ def test(
                 ],
                 mounts=mounts,
             )
+            if probe is not None:
+                require(probe_report is not None, "probe receipt required")
+                pathlib.Path(cast(str, probe_report)).write_text(
+                    json.dumps(
+                        dict(
+                            server=lane.server,
+                            worker=worker,
+                            volume=lane.volume,
+                            network=lane.network,
+                            directory=tmp,
+                        )
+                    )
+                )
+                if probe == "cancel":
+                    os.kill(os.getpid(), signal.SIGTERM)
+                raise RuntimeError("intent deliberate cleanup failure probe")
             # Wrong signatures create no accepted revision or adapter effect.
             bad = make("forged")
             bad_id = start(bad)
@@ -437,6 +460,86 @@ def test(
             checks.append(
                 "atomic_latest_chain_supersession_missing_edits_and_exact_lost_ack_readback"
             )
+            # Actual Tether journal survives a process exit after local commit,
+            # before any Core submission. Later edits/delete arrive while offline.
+            database = directory / "tether-semantic.sqlite"
+            producer = [
+                sys.executable,
+                str(ROOT / "tools/intent_fixture_producer.py"),
+                "--tether",
+                tether,
+                "--database",
+                str(database),
+            ]
+            crashed = subprocess.run(
+                [*producer, "--action", "crash-after-commit"],
+                capture_output=True,
+                timeout=30,
+            )
+            require(crashed.returncode == 91, "producer crash checkpoint")
+
+            def produce(action: str) -> dict[str, Any]:
+                return cast(
+                    dict[str, Any],
+                    json.loads(
+                        subprocess.check_output(
+                            [*producer, "--action", action], timeout=30
+                        )
+                    ),
+                )
+
+            first_batch = produce("snapshot")
+            require(len(first_batch["intents"]) == 1, "lost atomic first candidate")
+            produce("retain-2")
+            journal_batch = produce("retain-3")
+            journal_wire = canonical(journal_batch)
+            require(
+                produce("snapshot") == journal_batch, "fresh producer snapshot mismatch"
+            )
+            only_latest = canonical(journal_batch["intents"][-1])
+            issue(only_latest)
+            start(canonical(journal_batch["intents"][0]))
+            before_effects = events()
+            require(
+                request(dict(command="admit_intent_batch", wire=journal_wire.decode()))[
+                    "status"
+                ]
+                == "admitted",
+                "journal batch admission",
+            )
+            require(
+                events() == before_effects,
+                "offline retained create/edit caused stale effects",
+            )
+            from tether.semantic_journal import (  # type: ignore[import-not-found]
+                SemanticAdmission,
+            )
+
+            journal = SemanticAdmission(
+                str(database), app_id="app-1", account_id="account-1"
+            )
+            try:
+                task = journal_batch["intents"][-1]["scoped"]["request"]["binding"][
+                    "task_id"
+                ]
+                require(
+                    journal.pending_batch(task) == journal_wire,
+                    "lost reply marked delivered",
+                )
+                # Deliberately discard submit acknowledgment, reconcile through Core query.
+                journal.reconcile_retention(
+                    journal_wire,
+                    lambda b: request(dict(command="intent_receipt", wire=b.decode())),
+                )
+                require(
+                    journal.pending_batch(task) is None,
+                    "exact Core receipt not retained",
+                )
+            finally:
+                journal.close()
+            checks.append(
+                "actual_tether_atomic_journal_crash_offline_edits_delete_and_receipt_recovery"
+            )
             ledger = events()
             before = {id: snap(id) for id in ids}
             lane.restart(abrupt=True)
@@ -524,13 +627,22 @@ def test(
 
 
 if __name__ == "__main__":
+
+    def cancelled(_signal: int, _frame: Any) -> None:
+        raise KeyboardInterrupt("bounded intent qualifier cancelled")
+
+    signal.signal(signal.SIGTERM, cancelled)
     p = argparse.ArgumentParser()
     p.add_argument("--platform", required=True)
     p.add_argument("--platform-prepared", required=True)
     p.add_argument("--prepared", required=True)
     p.add_argument("--tether", required=True)
     p.add_argument("--report", required=True)
+    p.add_argument("--probe", choices=["failure", "cancel"])
+    p.add_argument("--probe-report")
     a = p.parse_args()
-    result = test(a.platform, a.platform_prepared, a.prepared, a.tether)
+    result = test(
+        a.platform, a.platform_prepared, a.prepared, a.tether, a.probe, a.probe_report
+    )
     pathlib.Path(a.report).write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(dict(status=result["status"], checks=result["checks"])))
