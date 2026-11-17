@@ -1,4 +1,46 @@
-# Pinned core synthetic fixture consumer
+# Reviewed fixture-only upgrade, 2026-11-17
+
+The current bundle is exported from composition commit
+[`e283957d80aebc48fb0bd3b6e2a600850ff6dc97`](https://github.com/newdarwindev/runspindle/tree/e283957d80aebc48fb0bd3b6e2a600850ff6dc97/fixtures/v1),
+reviewed tree `dee5e9fc7ab96420075dea3cc7ee59d0cb5012b2`.
+[Explicit old/new compatibility diff](shared-fixture-compatibility.json) records
+unchanged contract/golden/vector semantics, new `faults.json`, hardened independent
+identity/receipt validation and changed origin metadata. No automatic pin upgrade
+or runtime compatibility is implied. All six exported files are byte-preserved;
+the reviewed exporter filters golden/vector entries for this consumer.
+
+[Current test receipt](shared-fixture-upgrade-tests.json): full Python normal and
+optimized suites each pass 110 tests (0 existing skips); 13 focused
+fixture tests, scaffold and strict typing for the new test file pass.
+
+Seven fixed schedules (seed 90210) are executed by a separate in-memory model.
+The oracle compares observed transitions and actual per-call spy identity/order,
+not copied expected output. Extra effects, reordered steps, stale sequence,
+unauthorized retry and wrong effect identity are deliberately rejected. Malformed
+independent expected identities and receipts cannot exploit Python boolean/integer
+equality. Restart remains explicitly blocked for this model, not durable recovery.
+Python socket/DNS entrypoints are denied in these tests; this is not an OS sandbox
+or qualification of untrusted/native adapters. No services or live effects run.
+
+Run independently of siblings or a running composition:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_shared*fixtures.py'
+PYTHONDONTWRITEBYTECODE=1 python3 -O -m unittest discover -s tests -p 'test_shared*fixtures.py'
+python3 tools/check_scaffold.py
+```
+
+The exact fixture pin, inventory and every file hash are validated before fixture
+code executes. Component runtime/dependency pins are unchanged. Full-system,
+production, actual transport and live acceptance are not inferred. Original
+synthetic source rights/provenance are retained; no third-party source imported.
+
+## Historical prior-pin documentation (retained)
+
+The following text and earlier receipts describe the prior `e8cd577…` fixture
+pin only, not the current upgrade. Their test counts/remaining gates are historical.
+
+## Pinned core synthetic fixture consumer
 
 Partial progress toward [core #1](https://github.com/newdarwindev/runspindle-core/issues/1).
 This adopts the test-only admission/native/artifact subset from the reviewed

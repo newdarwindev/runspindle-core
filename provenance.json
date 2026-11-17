@@ -95,5 +95,12 @@
     "reuse": "Crates.io dependency with exact version and checksums; original notice retained; no executable SDK source copied into repository.",
     "source_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
     "version": "1.2.0"
+  },
+  "synthetic_fixture_upgrade": {
+    "classification": "original_test_only_fixture_export",
+    "source_repository": "newdarwindev/runspindle",
+    "source_commit": "e283957d80aebc48fb0bd3b6e2a600850ff6dc97",
+    "pin": "fixtures/shared-v1.pin.json",
+    "runtime_qualification": "unchanged_not_inferred"
   }
 }
