@@ -77,8 +77,11 @@ new provider credentials, persistent services or host security changes occur her
 substitution, retained ordering, capacity deletion, atomic supersession and actual
 scripted call/effect observations. `tools/test_intent_bridge.py` is the bounded real
 Temporal/SQLite plus Tether integration, with fresh-process recovery/history replay.
-Final exact-head qualification and independent review remain pending. Existing
-runtime/source reports for other lanes are historical, not evidence for this lane.
+The complete exact-source qualification at `9358554cc615c6fe027be0910e4d09fbf392899b`
+and corrected Tether `f1392fbf4861c4667732f351bd5d466d34c5ece8` passed. See
+[the evidence receipt](../docs/intent-bridge-qualification.json) and
+[acceptance mapping](../docs/INTENT_BRIDGE.md). Independent source/security and exact-evidence review found no blocking findings. Existing runtime/source
+reports for other lanes are historical, not evidence for this lane.
 
 Reproduce from a clean candidate and the exact Tether pin, with prepared pinned
 runtime/Temporal artifacts and pinned quality tools on PATH:
