@@ -887,3 +887,52 @@ fn retained_read_rechecks_authority_and_clock_after_byte_read() {
         assert_eq!(f.count(table), 1);
     }
 }
+
+#[test]
+fn malformed_evidence_diagnostics_do_not_echo_untrusted_members_or_values() {
+    let f = Fixture::new();
+    let evidence = f.evidence();
+    let valid = serde_json::to_value(&evidence).unwrap();
+    let canary = "synthetic-private-canary-DO-NOT-LOG";
+    let mut cases = Vec::new();
+    for pointer in [
+        "",
+        "/producer",
+        "/producer/statement",
+        "/producer/statement/scope",
+        "/producer/statement/scope/producer",
+        "/validator/statement/signer",
+    ] {
+        let mut value = valid.clone();
+        value
+            .pointer_mut(pointer)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert(canary.into(), serde_json::json!(canary));
+        cases.push(serde_json::to_vec(&value).unwrap());
+    }
+    for pointer in [
+        "/producer/statement/scope/byte_length",
+        "/validator/statement/passed",
+        "/producer/statement/signer/key_epoch",
+    ] {
+        let mut value = valid.clone();
+        *value.pointer_mut(pointer).unwrap() = serde_json::json!(canary);
+        cases.push(serde_json::to_vec(&value).unwrap());
+    }
+    cases.push(format!("{{\"{canary}\":").into_bytes());
+    for bytes in cases {
+        let error = Evidence::decode(&bytes).unwrap_err();
+        assert_eq!(error.to_string(), "invalid artifact evidence encoding");
+        assert_eq!(error.chain().count(), 1);
+        assert!(!format!("{error:?}").contains(canary));
+        assert!(!format!("{error:#}").contains(canary));
+    }
+    assert_eq!(
+        Evidence::decode(&evidence.encode().unwrap()).unwrap(),
+        evidence
+    );
+    assert_eq!(f.count("acceptances"), 0);
+    assert_eq!(f.count("validations"), 0);
+}
