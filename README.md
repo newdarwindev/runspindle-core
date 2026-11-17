@@ -35,6 +35,37 @@ These linked materials contain proposed workflows and synthetic examples, not
 measured savings, live trading or Bloomberg endorsement. See the
 [source asset guide](https://github.com/newdarwindev/runspindle_for_bloomberg/blob/main/ASSETS.md).
 
+## What the same operation means in practice
+
+**RESUME THE SAME CODING JOB.** A selected workstation goes offline after accepting
+a launch, before its reply reaches the coordinator. CORE must recover the original
+operation and reconcile that host's session, not create a second job elsewhere.
+This is the behavior exercised by the [host runtime lane](docs/HOST_RUNTIME.md) and
+[admission checkpoints](docs/AUTHENTICATED_CHECKPOINTS.md), with real persistence
+and scripted native peers. [The workstation concept](https://newdarwindev.github.io/runspindle_for_bloomberg/assets/Runspindle_Gallery_Index.html#page-12)
+illustrates the user experience, not additional native evidence.
+
+**CANCEL WITHOUT INVENTING AN OUTCOME.** A request to stop work, an acknowledged
+interrupt and a proven terminal outcome are different facts. The
+[durable runtime contract](specs/runtime.md) keeps those distinctions visible;
+revoked pre-dispatch recovery can remain explicitly unknown with no launch.
+*Native cancellation and provider-side effects must be independently reconciled
+before a live workflow claims that work stopped or an external change was undone.*
+
+**MATCH THE RIGHT INVOICE, ORDER AND PAYMENT.** The
+[invoice #107 concept](https://newdarwindev.github.io/runspindle_for_bloomberg/assets/Runspindle_Gallery_Index.html#page-04)
+shows why task identity is not enough: the result must refer to the exact records
+and authorized action. CORE already implements [immutable artifact acceptance](specs/durable-artifacts.md)
+and [authenticated artifact boundaries](docs/AUTHENTICATED_ARTIFACTS.md).
+*The actual accounting connectors, matching rules and approved payment workflow
+remain a proposed application of those contracts, not an implemented invoice product.*
+
+The same separation applies to an ex-dividend price-threshold paper decision in the
+[workflow catalog](https://github.com/newdarwindev/runspindle_for_bloomberg/blob/main/assets/runspindle_bloomberg_workflows.csv):
+identify the source security/date, decision rule and retained result before evaluating
+success. *A Bloomberg-backed rule, financial validity and any live action need separate
+qualification; these fictional paper examples do not authorize trades.*
+
 ### Follow the implementation
 
 - [Scoped authority](docs/FOUNDATION_AUTHORITY.md) and [signed assertions](docs/VERIFIED_AUTHORITY.md).
