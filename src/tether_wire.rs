@@ -159,3 +159,177 @@ impl<P: Peer> Transport for WireTransport<P> {
         self.observe(request, "lookup")
     }
 }
+
+pub const RESOLUTION_VERSION: &str = "runspindle.tether-wire-resolution-bridge.v1";
+#[derive(Clone, Debug, serde::Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ResolutionDecision {
+    pub version: String,
+    pub decision_id: String,
+    pub policy_ref: String,
+    pub authorization_ref: String,
+    pub conflict_sha256: String,
+    pub core_resolution_sha256: String,
+    pub file_id: String,
+    pub message_id: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ResolutionResponse {
+    version: String,
+    request_sha256: String,
+    decision_sha256: Option<String>,
+    evidence_class: String,
+    state: String,
+    file_id: Option<String>,
+    message_id: Option<String>,
+}
+fn canonical<T: serde::Serialize>(value: &T) -> anyhow::Result<Vec<u8>> {
+    Ok(serde_json::to_vec(&serde_json::to_value(value)?)?)
+}
+/// Deliberately NOT a public Transport: ordinary delivery reconciliation cannot
+/// consume resolver evidence without the separate current Core authority.
+pub struct ResolutionBridge<P> {
+    wire: WireTransport<P>,
+    resolution: ConflictResolution,
+    decision: ResolutionDecision,
+}
+impl<P: Peer> ResolutionBridge<P> {
+    pub fn new(
+        store: &Store,
+        resolution: ConflictResolution,
+        decision: ResolutionDecision,
+        filename: &str,
+        text: &str,
+        peer: P,
+    ) -> anyhow::Result<Self> {
+        let request = &resolution.prior.request;
+        let digest_valid = |s: &str| {
+            s.len() == 64
+                && s.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        };
+        anyhow::ensure!(
+            resolution.prior.conflict
+                && resolution.receipt.request == *request
+                && decision.version == "runspindle.wire-resolution.v1"
+                && [
+                    &decision.decision_id,
+                    &decision.policy_ref,
+                    &decision.authorization_ref,
+                    &decision.file_id,
+                    &decision.message_id
+                ]
+                .iter()
+                .all(|s| crate::runtime::valid_id(s))
+                && decision.authorization_ref == resolution.authorization_ref
+                && digest_valid(&decision.conflict_sha256)
+                && decision.core_resolution_sha256 == durable::digest(&canonical(&resolution)?),
+            "invalid resolution binding"
+        );
+        anyhow::ensure!(
+            decision.file_id.starts_with('F')
+                && decision.file_id.len() > 1
+                && decision.file_id[1..]
+                    .bytes()
+                    .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
+                && decision
+                    .message_id
+                    .split_once('.')
+                    .is_some_and(|(seconds, fraction)| !seconds.is_empty()
+                        && seconds.bytes().all(|b| b.is_ascii_digit())
+                        && fraction.len() == 6
+                        && fraction.bytes().all(|b| b.is_ascii_digit())),
+            "invalid selected Slack file/message identity"
+        );
+        let pair = serde_json::to_vec(&(&decision.file_id, &decision.message_id))?;
+        anyhow::ensure!(
+            resolution.receipt.receipt_id == format!("tether:{}", durable::digest(&pair)),
+            "selected receipt differs from resolver decision"
+        );
+        let wire = WireTransport::new(store, request.clone(), filename, text, peer)?;
+        Ok(Self {
+            wire,
+            resolution,
+            decision,
+        })
+    }
+    fn observe(&mut self, action: &str) -> anyhow::Result<Option<DeliveryReceipt>> {
+        let wire = canonical(&json!({"version":RESOLUTION_VERSION,"action":action,
+            "envelope":self.wire.envelope,"payload":self.wire.payload,"decision":self.decision}))?;
+        let raw = self.wire.peer.exchange(&wire)?;
+        anyhow::ensure!(raw.len() <= 4096, "oversized resolution observation");
+        let response: ResolutionResponse = serde_json::from_slice(&raw)?;
+        anyhow::ensure!(
+            response.version == RESOLUTION_VERSION
+                && response.request_sha256 == durable::digest(&wire)
+                && response.evidence_class == "slack_wire_resolution_observation",
+            "unbound resolution observation"
+        );
+        if response.state == "unknown" {
+            anyhow::ensure!(
+                response.file_id.is_none()
+                    && response.message_id.is_none()
+                    && response.decision_sha256.is_none(),
+                "unknown resolution includes unsupported evidence"
+            );
+            return Ok(None);
+        }
+        anyhow::ensure!(
+            response.state == "independently_reconciled_under_decision"
+                && response.decision_sha256.as_deref()
+                    == Some(durable::digest(&canonical(&self.decision)?).as_str())
+                && response.file_id.as_ref() == Some(&self.decision.file_id)
+                && response.message_id.as_ref() == Some(&self.decision.message_id),
+            "resolution evidence mismatch"
+        );
+        Ok(Some(self.resolution.receipt.clone()))
+    }
+    /// Explicitly authorized append-only Tether decision, followed by a separate
+    /// fresh lookup inside Core's transactional resolution fence. No resend.
+    pub fn resolve<A: DeliveryAuthority, R: ResolutionAuthority>(
+        &mut self,
+        outbox: &mut Outbox,
+        authority: &A,
+        resolver: &R,
+    ) -> anyhow::Result<DeliverySnapshot> {
+        anyhow::ensure!(
+            authority.verify(&self.resolution.prior.request)
+                && resolver.verify_resolution(&self.resolution),
+            "dedicated resolution denied"
+        );
+        anyhow::ensure!(
+            outbox.resolution_applicable(&self.resolution)?,
+            "stale resolution before peer call"
+        );
+        anyhow::ensure!(
+            self.observe("resolve")?.as_ref() == Some(&self.resolution.receipt),
+            "resolution not independently observed"
+        );
+        anyhow::ensure!(
+            authority.verify(&self.resolution.prior.request)
+                && resolver.verify_resolution(&self.resolution),
+            "resolution authority changed"
+        );
+        let resolution = self.resolution.clone();
+        outbox.resolve(
+            &resolution,
+            authority,
+            resolver,
+            &mut ResolutionLookup(self),
+        )
+    }
+}
+struct ResolutionLookup<'a, P>(&'a mut ResolutionBridge<P>);
+impl<P: Peer> Transport for ResolutionLookup<'_, P> {
+    fn send(&mut self, _: &DeliveryRequest, _: &[u8]) -> anyhow::Result<Option<DeliveryReceipt>> {
+        anyhow::bail!("resolution cannot send")
+    }
+    fn lookup(&mut self, request: &DeliveryRequest) -> anyhow::Result<Vec<DeliveryReceipt>> {
+        anyhow::ensure!(
+            request == &self.0.resolution.prior.request,
+            "resolution lookup request changed"
+        );
+        Ok(self.0.observe("lookup_resolution")?.into_iter().collect())
+    }
+}

@@ -599,11 +599,24 @@ fn resolution_retains_evidence_bytes_and_never_resends_after_restart() {
     assert_eq!(done.acknowledgement, resolution.prior.acknowledgement);
     drop(outbox);
     let mut outbox = Outbox::open(t.db()).unwrap();
+    assert_eq!(
+        outbox
+            .resolve(
+                &resolution,
+                &Grant(r.clone()),
+                &resolver(&resolution),
+                &mut peer
+            )
+            .unwrap(),
+        done
+    );
+    let mut wrong_decision = resolution.clone();
+    wrong_decision.authorization_ref = "other-resolution-grant".into();
     assert!(outbox
         .resolve(
-            &resolution,
+            &wrong_decision,
             &Grant(r.clone()),
-            &resolver(&resolution),
+            &resolver(&wrong_decision),
             &mut peer
         )
         .is_err());
@@ -1551,4 +1564,444 @@ fn actual_tether_revocation_after_lost_ack_cannot_deliver_or_retry() {
     assert_eq!(state.state, DeliveryState::Unknown);
     assert!(state.receipt.is_none());
     wire_effect_counts(&temp);
+}
+
+struct ResolutionWirePeer {
+    mode: &'static str,
+    calls: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+}
+impl runspindle_core::tether_wire::Peer for ResolutionWirePeer {
+    fn exchange(&mut self, raw: &[u8]) -> anyhow::Result<Vec<u8>> {
+        let request: serde_json::Value = serde_json::from_slice(raw)?;
+        let action = request["action"].as_str().unwrap();
+        assert!(matches!(action, "resolve" | "lookup_resolution"));
+        self.calls.borrow_mut().push(action.into());
+        let unknown = self.mode == "unknown";
+        let mut reply = serde_json::json!({"version":runspindle_core::tether_wire::RESOLUTION_VERSION,
+            "request_sha256":digest(raw),"decision_sha256": if unknown { None } else { Some(digest(&serde_json::to_vec(&request["decision"])?)) },
+            "evidence_class":"slack_wire_resolution_observation","state": if unknown { "unknown" } else { "independently_reconciled_under_decision" },
+            "file_id":if unknown { serde_json::Value::Null } else { request["decision"]["file_id"].clone() },
+            "message_id":if unknown { serde_json::Value::Null } else { request["decision"]["message_id"].clone() }});
+        if self.mode == "wrong-decision" {
+            reply["decision_sha256"] = serde_json::json!("0".repeat(64));
+        }
+        Ok(serde_json::to_vec(&reply)?)
+    }
+}
+fn wire_decision(
+    resolution: &mut ConflictResolution,
+) -> runspindle_core::tether_wire::ResolutionDecision {
+    let file = "F100";
+    let message = "1700000002.000003";
+    resolution.receipt.receipt_id = format!(
+        "tether:{}",
+        digest(&serde_json::to_vec(&(file, message)).unwrap())
+    );
+    runspindle_core::tether_wire::ResolutionDecision {
+        version: "runspindle.wire-resolution.v1".into(),
+        decision_id: "decision-1".into(),
+        policy_ref: "policy-1".into(),
+        authorization_ref: resolution.authorization_ref.clone(),
+        conflict_sha256: "a".repeat(64),
+        core_resolution_sha256: digest(
+            &serde_json::to_vec(&serde_json::to_value(&*resolution).unwrap()).unwrap(),
+        ),
+        file_id: file.into(),
+        message_id: message.into(),
+    }
+}
+#[test]
+fn resolution_bridge_requires_separate_authority_and_reobserves_exact_decision() {
+    use runspindle_core::tether_wire::ResolutionBridge;
+    let temp = Temp::new();
+    let (request, mut resolution, _) = quarantine(&temp);
+    let decision = wire_decision(&mut resolution);
+    let store = Store::open(temp.db()).unwrap();
+    let calls = std::rc::Rc::new(std::cell::RefCell::new(vec![]));
+    let mut bridge = ResolutionBridge::new(
+        &store,
+        resolution.clone(),
+        decision,
+        "result.bin",
+        "accepted",
+        ResolutionWirePeer {
+            mode: "confirmed",
+            calls: calls.clone(),
+        },
+    )
+    .unwrap();
+    let mut outbox = Outbox::open(temp.db()).unwrap();
+    assert!(bridge
+        .resolve(&mut outbox, &Grant(request.clone()), &Deny)
+        .is_err());
+    assert!(calls.borrow().is_empty());
+    let first = bridge
+        .resolve(&mut outbox, &Grant(request.clone()), &resolver(&resolution))
+        .unwrap();
+    assert!(!first.conflict);
+    assert_eq!(first.state, DeliveryState::Delivered);
+    assert_eq!(*calls.borrow(), vec!["resolve", "lookup_resolution"]);
+    drop(outbox);
+    let mut outbox = Outbox::open(temp.db()).unwrap();
+    assert!(bridge
+        .resolve(&mut outbox, &Grant(request.clone()), &Deny)
+        .is_err());
+    assert_eq!(calls.borrow().len(), 2);
+    let second = bridge
+        .resolve(&mut outbox, &Grant(request), &resolver(&resolution))
+        .unwrap();
+    assert_eq!(first, second);
+    assert_eq!(
+        *calls.borrow(),
+        vec![
+            "resolve",
+            "lookup_resolution",
+            "resolve",
+            "lookup_resolution"
+        ]
+    );
+}
+#[test]
+fn resolution_bridge_rejects_unbound_or_unknown_evidence_without_clearing() {
+    use runspindle_core::tether_wire::ResolutionBridge;
+    for mode in ["unknown", "wrong-decision"] {
+        let temp = Temp::new();
+        let (request, mut resolution, _) = quarantine(&temp);
+        let decision = wire_decision(&mut resolution);
+        let mut bridge = ResolutionBridge::new(
+            &Store::open(temp.db()).unwrap(),
+            resolution.clone(),
+            decision,
+            "result.bin",
+            "accepted",
+            ResolutionWirePeer {
+                mode,
+                calls: Default::default(),
+            },
+        )
+        .unwrap();
+        let mut outbox = Outbox::open(temp.db()).unwrap();
+        assert!(bridge
+            .resolve(&mut outbox, &Grant(request.clone()), &resolver(&resolution))
+            .is_err());
+        assert_eq!(
+            outbox.snapshot(&request).unwrap().unwrap(),
+            resolution.prior
+        );
+    }
+}
+
+#[test]
+fn wire_resolution_child() {
+    use runspindle_core::tether_wire::{ResolutionBridge, ResolutionDecision};
+    let Ok(root) = std::env::var("CORE_WIRE_RESOLUTION_ROOT") else {
+        return;
+    };
+    let root = PathBuf::from(root);
+    let source = PathBuf::from(std::env::var("RUNSPINDLE_TETHER_WIRE_SOURCE").unwrap());
+    let resolution: ConflictResolution =
+        serde_json::from_slice(&std::fs::read(root.join("core-resolution.json")).unwrap()).unwrap();
+    let decision: ResolutionDecision =
+        serde_json::from_slice(&std::fs::read(root.join("resolution-decision.json")).unwrap())
+            .unwrap();
+    let store = Store::open(root.join("core.sqlite")).unwrap();
+    let mut bridge = ResolutionBridge::new(
+        &store,
+        resolution.clone(),
+        decision,
+        "result.bin",
+        "Synthetic accepted artifact",
+        PythonWirePeer {
+            source,
+            root: root.clone(),
+            expected: root.join("expected.json"),
+        },
+    )
+    .unwrap();
+    let mut outbox = Outbox::open(root.join("core.sqlite")).unwrap();
+    let result = if root.join("core-resolver-revoked").exists() {
+        bridge.resolve(&mut outbox, &Grant(resolution.prior.request.clone()), &Deny)
+    } else {
+        bridge.resolve(
+            &mut outbox,
+            &Grant(resolution.prior.request.clone()),
+            &resolver(&resolution),
+        )
+    };
+    if result.is_ok() && root.join("core-resolution-lost-response").exists() {
+        std::process::exit(32);
+    }
+    let snapshot = outbox.snapshot(&resolution.prior.request).unwrap().unwrap();
+    std::fs::write(
+        root.join("resolution-result.json"),
+        serde_json::to_vec(&serde_json::json!({"ok":result.is_ok(),"snapshot":snapshot})).unwrap(),
+    )
+    .unwrap();
+}
+fn resolution_step(temp: &Temp, source: &Path) -> (bool, DeliverySnapshot) {
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "wire_resolution_child", "--nocapture"])
+        .env("CORE_WIRE_RESOLUTION_ROOT", &temp.0)
+        .env("RUNSPINDLE_TETHER_WIRE_SOURCE", source)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(temp.0.join("resolution-result.json")).unwrap())
+            .unwrap();
+    (
+        result["ok"].as_bool().unwrap(),
+        serde_json::from_value(result["snapshot"].clone()).unwrap(),
+    )
+}
+fn resolution_seed(temp: &Temp, source: &Path) -> ConflictResolution {
+    let request = tether_request(temp);
+    wire_seed(temp, &request, "");
+    assert_eq!(wire_step(temp, source).1.state, DeliveryState::Delivered);
+    let peer = Connection::open(temp.0.join("service.db")).unwrap();
+    peer.execute("UPDATE files SET message='1700000002.000003'", [])
+        .unwrap();
+    drop(peer);
+    let (_, prior) = wire_step(temp, source);
+    assert!(prior.conflict);
+    let mut resolution = ConflictResolution {
+        prior,
+        receipt: DeliveryReceipt {
+            request,
+            receipt_id: "placeholder".into(),
+        },
+        authorization_ref: "resolver-1".into(),
+    };
+    let mut decision = wire_decision(&mut resolution);
+    let snapshot = Command::new("python3")
+        .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tether_wire_peer.py"))
+        .args([
+            "--root",
+            temp.0.to_str().unwrap(),
+            "--expected",
+            temp.0.join("expected.json").to_str().unwrap(),
+            "--conflict-snapshot",
+        ])
+        .env("PYTHONPATH", source)
+        .env("PYTHONDONTWRITEBYTECODE", "1")
+        .current_dir(source)
+        .output()
+        .unwrap();
+    assert!(
+        snapshot.status.success(),
+        "{}",
+        String::from_utf8_lossy(&snapshot.stderr)
+    );
+    decision.conflict_sha256 = digest(&snapshot.stdout);
+    std::fs::write(
+        temp.0.join("core-resolution.json"),
+        serde_json::to_vec(&resolution).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        temp.0.join("resolution-decision.json"),
+        serde_json::to_vec(&decision).unwrap(),
+    )
+    .unwrap();
+    resolution
+}
+fn retained_wire_conflicts(temp: &Temp) {
+    let outer = Connection::open(temp.0.join("wire.db")).unwrap();
+    let inner = Connection::open(temp.0.join("journal.db")).unwrap();
+    assert_eq!(
+        outer
+            .query_row("SELECT conflict FROM wire_deliveries", [], |r| r
+                .get::<_, u64>(0))
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        inner
+            .query_row("SELECT conflict FROM uploads", [], |r| r.get::<_, u64>(0))
+            .unwrap(),
+        1
+    );
+    let decisions = Connection::open(temp.0.join("resolution.db")).unwrap();
+    assert_eq!(
+        decisions
+            .query_row("SELECT count(*) FROM decisions", [], |r| r.get::<_, u64>(0))
+            .unwrap(),
+        1
+    );
+    wire_effect_counts(temp);
+}
+#[test]
+#[ignore = "requires exact Tether resolution source and isolated synthetic resolver authority"]
+fn actual_tether_resolution_restarts_lost_replies_and_retained_conflicts() {
+    let source = PathBuf::from(std::env::var("RUNSPINDLE_TETHER_WIRE_SOURCE").unwrap());
+    for lost in ["", "tether", "core"] {
+        let temp = Temp::new();
+        let resolution = resolution_seed(&temp, &source);
+        if lost == "tether" {
+            std::fs::write(temp.0.join("fault.txt"), "lost:resolution-response").unwrap();
+        }
+        if lost == "core" {
+            std::fs::write(temp.0.join("core-resolution-lost-response"), "").unwrap();
+            let output = Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "wire_resolution_child"])
+                .env("CORE_WIRE_RESOLUTION_ROOT", &temp.0)
+                .env("RUNSPINDLE_TETHER_WIRE_SOURCE", &source)
+                .output()
+                .unwrap();
+            assert_eq!(output.status.code(), Some(32));
+            std::fs::remove_file(temp.0.join("core-resolution-lost-response")).unwrap();
+        } else {
+            let (ok, snapshot) = resolution_step(&temp, &source);
+            if lost == "tether" {
+                assert!(!ok);
+                assert_eq!(snapshot, resolution.prior);
+            } else {
+                assert!(ok);
+                assert!(!snapshot.conflict);
+            }
+        }
+        std::fs::write(temp.0.join("fault.txt"), "").unwrap();
+        let (ok, done) = resolution_step(&temp, &source);
+        assert!(ok);
+        assert!(!done.conflict);
+        assert_eq!(done.receipt, Some(resolution.receipt.clone()));
+        assert_eq!(resolution_step(&temp, &source), (true, done));
+        retained_wire_conflicts(&temp);
+    }
+}
+#[test]
+#[ignore = "requires exact Tether resolution source and isolated synthetic resolver authority"]
+fn actual_tether_resolution_revocation_and_changed_bytes_fail_closed() {
+    let source = PathBuf::from(std::env::var("RUNSPINDLE_TETHER_WIRE_SOURCE").unwrap());
+    for reason in ["core-resolver-revoked", "resolver-revoked", "bytes"] {
+        let temp = Temp::new();
+        let resolution = resolution_seed(&temp, &source);
+        if reason == "bytes" {
+            Connection::open(temp.0.join("service.db"))
+                .unwrap()
+                .execute("UPDATE files SET content=x'00'", [])
+                .unwrap();
+        } else {
+            std::fs::write(temp.0.join(reason), "").unwrap();
+        }
+        let (ok, state) = resolution_step(&temp, &source);
+        assert!(!ok);
+        assert_eq!(state, resolution.prior);
+        assert_eq!(
+            Connection::open(temp.db())
+                .unwrap()
+                .query_row(
+                    "SELECT count(*) FROM outbox_evidence WHERE kind='resolution'",
+                    [],
+                    |r| r.get::<_, u64>(0)
+                )
+                .unwrap(),
+            0
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires exact Tether resolution source and isolated synthetic resolver authority"]
+fn actual_tether_concurrent_same_resolution_retains_one_decision() {
+    let source = PathBuf::from(std::env::var("RUNSPINDLE_TETHER_WIRE_SOURCE").unwrap());
+    let temp = Temp::new();
+    let resolution = resolution_seed(&temp, &source);
+    let spawn = || {
+        Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "wire_resolution_child"])
+            .env("CORE_WIRE_RESOLUTION_ROOT", &temp.0)
+            .env("RUNSPINDLE_TETHER_WIRE_SOURCE", &source)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::inherit())
+            .spawn()
+            .unwrap()
+    };
+    let mut first = spawn();
+    let mut second = spawn();
+    assert!(first.wait().unwrap().success());
+    assert!(second.wait().unwrap().success());
+    let (ok, state) = resolution_step(&temp, &source);
+    assert!(ok);
+    assert_eq!(state.receipt, Some(resolution.receipt));
+    assert!(!state.conflict);
+    let db = Connection::open(temp.db()).unwrap();
+    assert_eq!(
+        db.query_row(
+            "SELECT count(*) FROM outbox_evidence WHERE kind='resolution'",
+            [],
+            |r| r.get::<_, u64>(0)
+        )
+        .unwrap(),
+        1
+    );
+    retained_wire_conflicts(&temp);
+}
+
+#[test]
+fn resolution_bridge_rejects_oversized_refs_and_malformed_selected_identities() {
+    use runspindle_core::tether_wire::ResolutionBridge;
+    for field in ["decision", "policy", "file", "message"] {
+        let temp = Temp::new();
+        let (_, mut resolution, _) = quarantine(&temp);
+        let mut decision = wire_decision(&mut resolution);
+        match field {
+            "decision" => decision.decision_id = "x".repeat(129),
+            "policy" => decision.policy_ref = "x".repeat(129),
+            "file" => decision.file_id = "F_lowercase".into(),
+            "message" => decision.message_id = "1700000002.00003".into(),
+            _ => unreachable!(),
+        }
+        resolution.receipt.receipt_id = format!(
+            "tether:{}",
+            digest(&serde_json::to_vec(&(&decision.file_id, &decision.message_id)).unwrap())
+        );
+        decision.core_resolution_sha256 =
+            digest(&serde_json::to_vec(&serde_json::to_value(&resolution).unwrap()).unwrap());
+        let calls = std::rc::Rc::new(std::cell::RefCell::new(vec![]));
+        assert!(ResolutionBridge::new(
+            &Store::open(temp.db()).unwrap(),
+            resolution,
+            decision,
+            "result.bin",
+            "accepted",
+            ResolutionWirePeer {
+                mode: "confirmed",
+                calls: calls.clone()
+            }
+        )
+        .is_err());
+        assert!(calls.borrow().is_empty());
+    }
+}
+#[test]
+fn matching_resolved_receipt_without_exact_audit_cannot_authorize_replay() {
+    let temp = Temp::new();
+    let (request, resolution, mut peer) = quarantine(&temp);
+    let db = Connection::open(temp.db()).unwrap();
+    db.execute(
+        "UPDATE outbox SET state='delivered',conflict=0,receipt=?1,generation=?2",
+        params![
+            serde_json::to_string(&resolution.receipt).unwrap(),
+            resolution.prior.generation + 1
+        ],
+    )
+    .unwrap();
+    let mut outbox = Outbox::open(temp.db()).unwrap();
+    assert!(!outbox.resolution_applicable(&resolution).unwrap());
+    let before = peer.count("lookup");
+    assert!(outbox
+        .resolve(
+            &resolution,
+            &Grant(request),
+            &resolver(&resolution),
+            &mut peer
+        )
+        .is_err());
+    assert_eq!(peer.count("lookup"), before);
 }
