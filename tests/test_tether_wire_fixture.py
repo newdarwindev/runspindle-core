@@ -3,16 +3,17 @@
 import copy
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
+from typing import Any
 
 FIXTURE = Path(__file__).parent / "fixtures" / "tether_wire_peer.py"
 
 
-def canonical(value):
+def canonical(value: object) -> bytes:
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode()
@@ -23,10 +24,10 @@ def canonical(value):
     "explicit pinned Tether source required",
 )
 class ExpectedBinding(unittest.TestCase):
-    def test_input_cannot_broaden_independent_expected_authority(self):
+    def test_input_cannot_broaden_independent_expected_authority(self) -> None:
         source = os.environ.get("RUNSPINDLE_TETHER_WIRE_SOURCE")
         self.assertIsNotNone(source, "explicit pinned Tether source required")
-        expected = {
+        expected: dict[str, Any] = {
             "version": "runspindle.tether-wire-bridge.v1",
             "action": "send",
             "envelope": {

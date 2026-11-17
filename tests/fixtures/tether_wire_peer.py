@@ -7,6 +7,7 @@ connection is permitted. This program does not ship as a production adapter.
 
 import argparse
 import hashlib
+import importlib
 import json
 import os
 import socket
@@ -15,16 +16,35 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.test_admission import event, grant, proof
-from tests.test_slack_upload import StoredHTTP
-from tether.admission import Admission, Identity, canonical, pairs
-from tether.testing import Attachment, Destination, Payload
-from tether.wire_delivery import WireDeliveryJournal
+# Optional separately pinned repository: resolve only inside this explicit fixture.
+_admission_test = importlib.import_module("tests.test_admission")
+_slack_test = importlib.import_module("tests.test_slack_upload")
+_admission = importlib.import_module("tether.admission")
+_testing = importlib.import_module("tether.testing")
+_wire = importlib.import_module("tether.wire_delivery")
+event, grant, proof = (
+    _admission_test.event,
+    _admission_test.grant,
+    _admission_test.proof,
+)
+StoredHTTP = _slack_test.StoredHTTP
+Admission, Identity, canonical, pairs = (
+    _admission.Admission,
+    _admission.Identity,
+    _admission.canonical,
+    _admission.pairs,
+)
+Attachment, Destination, Payload = (
+    _testing.Attachment,
+    _testing.Destination,
+    _testing.Payload,
+)
+WireDeliveryJournal = _wire.WireDeliveryJournal
 
 VERSION = "runspindle.tether-wire-bridge.v1"
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--expected", type=Path, required=True)
@@ -84,7 +104,7 @@ def main():
     destination = Destination("T100", "C100", identity.thread_id)
     metadata = expected["envelope"]["payload"]
 
-    def active():
+    def active() -> bool:
         return not (args.root / "revoked").exists()
 
     journal = WireDeliveryJournal(
