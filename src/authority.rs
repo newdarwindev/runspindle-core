@@ -22,6 +22,7 @@ pub enum Action {
     Dispatch,
     Reconcile,
     Cancel,
+    Deliver,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -41,7 +42,11 @@ pub struct Assertion {
 }
 impl Assertion {
     pub fn signing_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        let mut bytes = DOMAIN.to_vec();
+        let mut bytes = match self.version.as_str() {
+            VERSION => DOMAIN.to_vec(),
+            crate::scoped_authority::ASSERTION_VERSION => crate::scoped_authority::DOMAIN.to_vec(),
+            _ => anyhow::bail!("unsupported assertion version"),
+        };
         bytes.extend(envelope::canonical(self)?);
         Ok(bytes)
     }
@@ -94,7 +99,20 @@ impl LocalHelper {
         Ok(serde_json::from_value(envelope::strict_json(&bytes)?)?)
     }
     fn check(&self, wire: &[u8], action: Action) -> anyhow::Result<()> {
-        let admission = request(wire)?;
+        self.check_bound(wire, action, false)
+    }
+    pub(crate) fn check_bound(
+        &self,
+        wire: &[u8],
+        action: Action,
+        scoped: bool,
+    ) -> anyhow::Result<()> {
+        let admission = if scoped {
+            crate::scoped_authority::ScopedAdmission::decode(wire)?.admission()?
+        } else {
+            anyhow::ensure!(action != Action::Deliver, "v1 grants no delivery authority");
+            request(wire)?
+        };
         anyhow::ensure!(
             [&self.issuer, &self.actor, &self.audience]
                 .iter()
@@ -137,7 +155,12 @@ impl LocalHelper {
         )?;
         let a: Assertion = serde_json::from_value(envelope::strict_json(assertion.as_bytes())?)?;
         anyhow::ensure!(
-            a.version == VERSION
+            a.version
+                == if scoped {
+                    crate::scoped_authority::ASSERTION_VERSION
+                } else {
+                    VERSION
+                }
                 && a.issuer == self.issuer
                 && a.actor == self.actor
                 && a.audience == self.audience
@@ -150,6 +173,7 @@ impl LocalHelper {
         );
         anyhow::ensure!(
             !a.actions.is_empty()
+                && (scoped || !a.actions.contains(&Action::Deliver))
                 && a.actions.windows(2).all(|w| w[0] < w[1])
                 && a.actions.iter().all(|v| self.allowed_actions.contains(v))
                 && a.actions.contains(&action),

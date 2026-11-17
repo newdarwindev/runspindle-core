@@ -84,10 +84,19 @@ impl Fixture {
         }
     }
     fn assertion(&self) -> Assertion {
-        let a = authority::request(self.wire.as_bytes()).unwrap();
+        let a = test_admission(self.wire.as_bytes());
         let now = authority::now_ms().unwrap();
         Assertion {
-            version: authority::VERSION.into(),
+            version: if runspindle_core::scoped_authority::ScopedAdmission::decode(
+                self.wire.as_bytes(),
+            )
+            .is_ok()
+            {
+                runspindle_core::scoped_authority::ASSERTION_VERSION
+            } else {
+                authority::VERSION
+            }
+            .into(),
             issuer: self.helper.issuer.clone(),
             key_id: "key-1".into(),
             actor: self.helper.actor.clone(),
@@ -102,7 +111,12 @@ impl Fixture {
         }
     }
     fn insert(&self, a: &Assertion, bad_signature: bool) {
-        let mut sig = self.key.sign(&a.signing_bytes().unwrap()).as_ref().to_vec();
+        let signing = a.signing_bytes().unwrap_or_else(|_| {
+            let mut bytes = authority::DOMAIN.to_vec();
+            bytes.extend(runspindle_core::envelope::canonical(a).unwrap());
+            bytes
+        });
+        let mut sig = self.key.sign(&signing).as_ref().to_vec();
         if bad_signature {
             sig[0] ^= 1;
         }
@@ -115,7 +129,7 @@ impl Fixture {
             .unwrap();
     }
     fn ports(&self) -> AuthenticatedPorts {
-        let a = authority::request(self.wire.as_bytes()).unwrap();
+        let a = test_admission(self.wire.as_bytes());
         let scripts = vec![SyntheticScript {
             admission: a,
             authorized: true,
@@ -141,7 +155,7 @@ impl Fixture {
         AuthenticatedCall {
             wire: self.wire.clone(),
             call: PortCall {
-                admission: authority::request(self.wire.as_bytes()).unwrap(),
+                admission: test_admission(self.wire.as_bytes()),
                 action,
                 native_session_id: None,
             },
@@ -158,8 +172,12 @@ impl Fixture {
 }
 #[test]
 fn signatures_binding_scope_time_and_actions_fail_closed_before_adapter() {
-    for case in 0..16 {
-        let f = Fixture::new();
+    for (scoped, case) in (0..16).flat_map(|case| [(false, case), (true, case)]) {
+        let f = if scoped {
+            Fixture::scoped()
+        } else {
+            Fixture::new()
+        };
         let mut a = f.assertion();
         match case {
             0 => a.actor = "forged".into(),
@@ -181,7 +199,11 @@ fn signatures_binding_scope_time_and_actions_fail_closed_before_adapter() {
         }
         f.insert(&a, case == 15);
         assert!(
-            !f.helper.verify(f.wire.as_bytes(), Action::Dispatch),
+            !(if scoped {
+                f.helper.verify_scoped(f.wire.as_bytes(), Action::Dispatch)
+            } else {
+                f.helper.verify(f.wire.as_bytes(), Action::Dispatch)
+            }),
             "case {case}"
         );
         let ports = f.ports();
@@ -438,4 +460,237 @@ fn duplicate_authoritative_identities_deny_even_with_valid_first_row() {
         );
         f.assert_zero_calls();
     }
+}
+
+fn test_admission(wire: &[u8]) -> runtime::Admission {
+    authority::request(wire)
+        .or_else(|_| {
+            runspindle_core::scoped_authority::ScopedAdmission::decode(wire)
+                .and_then(|s| s.admission())
+        })
+        .unwrap()
+}
+impl Fixture {
+    fn scoped() -> Self {
+        use runspindle_core::scoped_authority::*;
+        let mut f = Self::new();
+        f.helper.allowed_actions.push(Action::Deliver);
+        f.wire = String::from_utf8(
+            ScopedAdmission {
+                version: VERSION.into(),
+                request: Envelope::decode(f.wire.as_bytes()).unwrap(),
+                destination: Destination {
+                    account_id: "account-1".into(),
+                    destination_id: "workspace-1.channel-1.thread-1".into(),
+                    delivery_operation_id: "delivery-op-1".into(),
+                },
+            }
+            .encode()
+            .unwrap(),
+        )
+        .unwrap();
+        f
+    }
+}
+#[test]
+fn scoped_exact_destination_and_version_cannot_be_changed() {
+    use runspindle_core::scoped_authority::*;
+    let f = Fixture::scoped();
+    f.insert(&f.assertion(), false);
+    assert!(f.helper.verify_scoped(f.wire.as_bytes(), Action::Admit));
+    assert!(!f.helper.verify(f.wire.as_bytes(), Action::Admit));
+    for field in ["account_id", "destination_id", "delivery_operation_id"] {
+        let mut value: Value = serde_json::from_str(&f.wire).unwrap();
+        value["destination"][field] = "other".into();
+        let wire = runspindle_core::envelope::canonical(&value).unwrap();
+        assert!(!f.helper.verify_scoped(&wire, Action::Dispatch));
+        let mut call = f.call(PortAction::Launch, Action::Dispatch);
+        call.wire = String::from_utf8(wire).unwrap();
+        assert_eq!(f.ports().invoke(&call).unwrap().status, PortStatus::Denied);
+    }
+    let value = ScopedAdmission::decode(f.wire.as_bytes()).unwrap();
+    assert!(!f
+        .helper
+        .verify(&value.request.encode().unwrap(), Action::Admit));
+    f.assert_zero_calls();
+}
+#[test]
+fn legacy_authority_never_grants_scoped_delivery() {
+    let f = Fixture::new();
+    f.insert(&f.assertion(), false);
+    assert!(!f.helper.verify(f.wire.as_bytes(), Action::Deliver));
+    assert!(!f.helper.verify_scoped(f.wire.as_bytes(), Action::Deliver));
+}
+#[test]
+fn scoped_revocation_and_unavailable_helper_block_adapter_effects() {
+    let f = Fixture::scoped();
+    f.insert(&f.assertion(), false);
+    assert!(f.helper.verify_scoped(f.wire.as_bytes(), Action::Dispatch));
+    Connection::open(&f.helper.database)
+        .unwrap()
+        .execute("INSERT INTO revocations VALUES('grant-1')", [])
+        .unwrap();
+    assert_eq!(
+        f.ports()
+            .invoke(&f.call(PortAction::Launch, Action::Dispatch))
+            .unwrap()
+            .status,
+        PortStatus::Denied
+    );
+    let mut ports = f.ports();
+    ports.helper = None;
+    assert_eq!(
+        ports
+            .invoke(&f.call(PortAction::Launch, Action::Dispatch))
+            .unwrap()
+            .status,
+        PortStatus::Denied
+    );
+    f.assert_zero_calls();
+}
+#[test]
+fn scoped_fresh_process_verification() {
+    if let Ok(directory) = std::env::var("CORE16_SCOPED_TEST_DIRECTORY") {
+        let directory = PathBuf::from(directory);
+        let helper = LocalHelper::read(directory.join("helper.json")).unwrap();
+        let wire = std::fs::read(directory.join("wire.json")).unwrap();
+        let expected = std::env::var("CORE16_SCOPED_EXPECT").unwrap() == "true";
+        assert_eq!(helper.verify_scoped(&wire, Action::Dispatch), expected);
+        return;
+    }
+    let f = Fixture::scoped();
+    f.insert(&f.assertion(), false);
+    std::fs::write(
+        f.directory.join("helper.json"),
+        serde_json::to_vec(&f.helper).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(f.directory.join("wire.json"), &f.wire).unwrap();
+    for expected in [true, false] {
+        if !expected {
+            Connection::open(&f.helper.database)
+                .unwrap()
+                .execute("INSERT INTO revocations VALUES('grant-1')", [])
+                .unwrap();
+        }
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "scoped_fresh_process_verification",
+                "--nocapture",
+            ])
+            .env("CORE16_SCOPED_TEST_DIRECTORY", &f.directory)
+            .env("CORE16_SCOPED_EXPECT", expected.to_string())
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+    f.assert_zero_calls();
+}
+
+#[test]
+fn scoped_outbox_checks_exact_target_before_any_send_or_lookup() {
+    use runspindle_core::{durable::*, outbox::*, scoped_authority::ScopedDeliveryAuthority};
+    struct ValidatorOk;
+    impl Validator for ValidatorOk {
+        fn revision(&self) -> &str {
+            "validator-1"
+        }
+        fn validate(&self, _: &ArtifactRef, bytes: &[u8], _: &str) -> bool {
+            bytes == b"synthetic accepted bytes"
+        }
+    }
+    struct AcceptOk;
+    impl AcceptanceAuthority for AcceptOk {
+        fn verify(&self, v: &Validation) -> bool {
+            v.passed
+        }
+    }
+    struct Peer {
+        calls: usize,
+    }
+    impl Transport for Peer {
+        fn send(
+            &mut self,
+            r: &DeliveryRequest,
+            bytes: &[u8],
+        ) -> anyhow::Result<Option<DeliveryReceipt>> {
+            self.calls += 1;
+            assert_eq!(bytes, b"synthetic accepted bytes");
+            Ok(Some(DeliveryReceipt {
+                request: r.clone(),
+                receipt_id: "receipt-1".into(),
+            }))
+        }
+        fn lookup(&mut self, r: &DeliveryRequest) -> anyhow::Result<Vec<DeliveryReceipt>> {
+            self.calls += 1;
+            Ok(vec![DeliveryReceipt {
+                request: r.clone(),
+                receipt_id: "receipt-1".into(),
+            }])
+        }
+    }
+    let f = Fixture::scoped();
+    f.insert(&f.assertion(), false);
+    let path = f.directory.join("accepted.sqlite");
+    let mut store = Store::open(&path).unwrap();
+    let binding = test_admission(f.wire.as_bytes()).binding;
+    let artifact = store
+        .put(
+            VERSION,
+            binding,
+            "artifact-1".into(),
+            1,
+            b"synthetic accepted bytes",
+        )
+        .unwrap();
+    let validation = store
+        .validate(VERSION, &artifact, "policy-1", &ValidatorOk)
+        .unwrap();
+    let accepted = store.accept(VERSION, &validation, &AcceptOk).unwrap();
+    drop(store);
+    let request = DeliveryRequest {
+        version: VERSION.into(),
+        accepted,
+        account_id: "account-1".into(),
+        destination_id: "workspace-1.channel-1.thread-1".into(),
+        delivery_operation_id: "delivery-op-1".into(),
+    };
+    let grant = ScopedDeliveryAuthority {
+        helper: &f.helper,
+        wire: f.wire.as_bytes(),
+    };
+    let mut outbox = Outbox::open(&path).unwrap();
+    let mut peer = Peer { calls: 0 };
+    for field in 0..4 {
+        let mut wrong = request.clone();
+        match field {
+            0 => wrong.account_id = "other".into(),
+            1 => wrong.destination_id = "other".into(),
+            2 => wrong.delivery_operation_id = "other".into(),
+            _ => wrong.accepted.validation.artifact.binding.policy_revision = "other".into(),
+        }
+        assert!(outbox.deliver(&wrong, &grant, &mut peer).is_err());
+        assert!(outbox.reconcile(&wrong, &grant, &mut peer).is_err());
+    }
+    assert_eq!(peer.calls, 0);
+    let rows: i64 = Connection::open(&path)
+        .unwrap()
+        .query_row("SELECT count(*) FROM outbox", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(rows, 0);
+    let delivered = outbox.deliver(&request, &grant, &mut peer).unwrap();
+    assert_eq!(delivered.state, DeliveryState::Delivered);
+    assert!(peer.calls > 0);
+    let before = peer.calls;
+    Connection::open(&f.helper.database)
+        .unwrap()
+        .execute("INSERT INTO revocations VALUES('grant-1')", [])
+        .unwrap();
+    assert!(outbox.deliver(&request, &grant, &mut peer).is_err());
+    assert!(outbox.reconcile(&request, &grant, &mut peer).is_err());
+    assert_eq!(peer.calls, before);
+    drop(outbox);
+    let reopened = Outbox::open(&path).unwrap();
+    assert_eq!(reopened.snapshot(&request).unwrap().unwrap(), delivered);
 }
