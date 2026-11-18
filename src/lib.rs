@@ -73,3 +73,6 @@ pub mod browser_effect_wire;
 
 #[cfg(feature = "artifact-store")]
 pub mod browser_effect_registry;
+
+#[cfg(feature = "artifact-store")]
+pub mod browser_runtime;

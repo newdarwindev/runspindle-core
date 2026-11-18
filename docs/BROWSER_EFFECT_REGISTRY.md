@@ -2,7 +2,8 @@
 
 Partial Core #3 / Browser #8 work. `browser_effect_registry::BrowserRegistry`
 adds actual SQLite identity retention above the existing immutable wire client.
-This is not yet wired into a Temporal Browser operation workflow.
+A separate [synthetic Temporal workflow](BROWSER_TEMPORAL.md) coordinates it;
+actual Browser/site adapters remain separate.
 
 ## Identity, reservation and recovery
 
@@ -67,5 +68,6 @@ introduced.
 
 Exact candidate/tree, commands and results are recorded in the PR receipt. These
 are synthetic site effects and actual local persistence, not a live browser/site
-or production issuer. Temporal wiring, real site-specific observations/input,
+or production issuer. A separate [synthetic Temporal lane](BROWSER_TEMPORAL.md) now coordinates this
+registry. Actual site-specific observations/input, composition integration,
 distributed fencing and full Core #3 / Browser #8 acceptance remain open.
