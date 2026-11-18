@@ -39,6 +39,11 @@ def source_hashes() -> dict[str, str]:
             ROOT / "tests/fixtures/browser_effect_peer.py",
             ROOT / "tests/fixtures/browser_source_pin.json",
         ]
+    if (ROOT / "src/browser_chromium_fixture.rs").is_file():
+        paths += [
+            ROOT / "tests/fixtures/browser_chromium_peer.py",
+            ROOT / "tests/fixtures/browser_chromium_source_pin.json",
+        ]
     return {str(p.relative_to(ROOT)): sha(p) for p in paths}
 
 

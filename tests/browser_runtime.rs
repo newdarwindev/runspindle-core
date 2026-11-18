@@ -71,6 +71,7 @@ fn setup() -> (Temp, BrowserPorts) {
     let ports = BrowserPorts {
         directory: Some(temp.0.clone()),
         pinned_fixture: false,
+        chromium_fixture: false,
     };
     (temp, ports)
 }
@@ -103,7 +104,8 @@ fn counts(t: &Temp) -> (u64, u64, u64) {
 fn default_missing_expired_and_changed_grants_deny_without_peer() {
     assert!(BrowserPorts {
         directory: None,
-        pinned_fixture: false
+        pinned_fixture: false,
+        chromium_fixture: false
     }
     .invoke(call(false))
     .is_err());
@@ -166,6 +168,7 @@ fn lost_reply_and_reconstructed_ports_preserve_one_independent_effect() {
     let ports = BrowserPorts {
         directory: Some(temp.0.clone()),
         pinned_fixture: false,
+        chromium_fixture: false,
     };
     assert_eq!(ports.invoke(call(false)).unwrap().outcome, "unknown");
     assert_eq!(ports.invoke(call(true)).unwrap().outcome, "confirmed");
@@ -214,7 +217,8 @@ fn bounded_explicit_requests_reject_changed_target_pending_and_exhausted_budget(
 fn pinned_fixture_is_explicit_fixed_root_and_never_falls_back_to_synthetic() {
     assert!(BrowserPorts {
         directory: None,
-        pinned_fixture: true
+        pinned_fixture: true,
+        chromium_fixture: false
     }
     .invoke(call(false))
     .is_err());
@@ -222,8 +226,38 @@ fn pinned_fixture_is_explicit_fixed_root_and_never_falls_back_to_synthetic() {
     let ports = BrowserPorts {
         directory: Some(temp.0.clone()),
         pinned_fixture: true,
+        chromium_fixture: false,
     };
     assert!(ports.invoke(call(false)).is_err());
     assert!(!temp.0.join("browser-registry.sqlite").exists());
     assert!(!temp.0.join("browser-site.sqlite").exists());
+}
+
+#[test]
+fn chromium_fixture_cannot_use_caller_selected_directory() {
+    let (temp, _) = setup();
+    let ports = BrowserPorts {
+        directory: Some(temp.0.clone()),
+        pinned_fixture: false,
+        chromium_fixture: true,
+    };
+    assert!(ports.invoke(call(false)).is_err());
+    assert!(!temp.0.join("browser-registry.sqlite").exists());
+}
+
+#[test]
+fn engine_workflow_identity_is_separate_but_stable_for_same_intent() {
+    use runspindle_core::browser_runtime::{engine_workflow_id, workflow_id, ENGINE_QUEUE, QUEUE};
+    let original = call(false).target;
+    assert_ne!(
+        engine_workflow_id(&original).unwrap(),
+        workflow_id(&original).unwrap()
+    );
+    assert_ne!(ENGINE_QUEUE, QUEUE);
+    let mut changed = original.clone();
+    changed.binding.operation = "new-operation".into();
+    assert_eq!(
+        engine_workflow_id(&original).unwrap(),
+        engine_workflow_id(&changed).unwrap()
+    );
 }

@@ -88,6 +88,13 @@ provider/delivery authority or deployment. Read [runtime semantics](specs/runtim
 and [preparation/checks](docs/TEMPORAL_RUNTIME.md) for exact evidence and remaining gaps.
 The fixture schema remains a separate test format.
 
+The [versioned Chromium fixture lane](docs/BROWSER_CHROMIUM_TEMPORAL.md) now
+executes actual sandboxed Chromium through Temporal and the durable Browser
+receiver. In an isolated synthetic website scenario, a lost submission response
+survives worker/server restart without resending; explicit authorized readback
+then confirms the single independent effect. Account/profile authority and live
+website acceptance remain unqualified.
+
 This repository is one boundary of [Runspindle](https://github.com/newdarwindev/runspindle). Repository boundaries do not require one microservice each.
 
 - Read [specifications](specs/README.md), [agent guidance](AGENTS.md), [provenance](provenance.json), [status](STATUS.json) and [legal status](LEGAL.md).

@@ -37,6 +37,11 @@ def validate(root: pathlib.Path, prepared: str | pathlib.Path) -> dict[str, Any]
             root / "tests/fixtures/browser_effect_peer.py",
             root / "tests/fixtures/browser_source_pin.json",
         ]
+    if (root / "src/browser_chromium_fixture.rs").is_file():
+        paths += [
+            root / "tests/fixtures/browser_chromium_peer.py",
+            root / "tests/fixtures/browser_chromium_source_pin.json",
+        ]
     source_hashes = {
         str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
         for p in paths

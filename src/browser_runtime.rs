@@ -202,6 +202,7 @@ pub struct BrowserPorts {
     pub directory: Option<PathBuf>,
     /// Explicit development-only mode; never accepted from workflow input.
     pub pinned_fixture: bool,
+    pub chromium_fixture: bool,
 }
 impl BrowserPorts {
     pub fn invoke(&self, call: BrowserCall) -> anyhow::Result<BrowserObservation> {
@@ -215,7 +216,7 @@ impl BrowserPorts {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("browser defaults to deny"))?;
         anyhow::ensure!(
-            !self.pinned_fixture || directory == Path::new("/effects"),
+            !(self.pinned_fixture || self.chromium_fixture) || directory == Path::new("/effects"),
             "fixed pinned fixture root required"
         );
         let configuration = script(directory)?;
@@ -234,12 +235,13 @@ impl BrowserPorts {
         } else {
             Some(read(&directory.join("browser-payload.bin"), MAX_PAYLOAD)?)
         };
-        let result = if self.pinned_fixture {
+        let result = if self.pinned_fixture || self.chromium_fixture {
             anyhow::ensure!(
                 directory == Path::new("/effects"),
                 "fixed pinned fixture root required"
             );
             let mut peer = PinnedPeer {
+                chromium: self.chromium_fixture,
                 directory,
                 target: &call.target,
                 hash: &configuration.expected_sha256,
@@ -279,6 +281,7 @@ impl BrowserPorts {
     }
 }
 struct PinnedPeer<'a> {
+    chromium: bool,
     directory: &'a Path,
     target: &'a Target,
     hash: &'a str,
@@ -286,9 +289,12 @@ struct PinnedPeer<'a> {
 }
 impl Peer for PinnedPeer<'_> {
     fn exchange(&mut self, raw: &[u8]) -> anyhow::Result<Vec<u8>> {
-        crate::browser_fixture_peer::exchange(raw, self.action, || {
-            Grant(self.directory).verify(self.target, self.hash, self.action)
-        })
+        let current = || Grant(self.directory).verify(self.target, self.hash, self.action);
+        if self.chromium {
+            crate::browser_fixture_peer::exchange_chromium(raw, self.action, current)
+        } else {
+            crate::browser_fixture_peer::exchange(raw, self.action, current)
+        }
     }
 }
 #[activities]
@@ -405,6 +411,99 @@ impl BrowserWorkflow {
                             reconcile: true,
                         },
                         activity_options(),
+                    )
+                    .await;
+                ctx.state_mut(|s| {
+                    s.state.pending = false;
+                    s.state.historical = result.ok();
+                    s.state.completed_reconciles += 1;
+                });
+            } else {
+                ctx.timer(Duration::from_secs(1)).await;
+                ctx.state_mut(|s| s.state.idle_ticks += 1);
+            }
+        }
+    }
+    #[update]
+    pub fn request_reconcile(
+        &mut self,
+        _ctx: &mut SyncWorkflowContext<Self>,
+        target: Target,
+    ) -> bool {
+        self.state.request_reconcile(&target)
+    }
+    #[query]
+    pub fn snapshot(&self, _ctx: &WorkflowContextView) -> BrowserState {
+        self.state.clone()
+    }
+}
+
+// Separate workflow type fixes activity deadlines in history. Never select
+// workflow command timeouts from worker-local peer configuration.
+pub const ENGINE_QUEUE: &str = "runspindle-browser-engine-v1";
+pub fn engine_workflow_id(target: &Target) -> anyhow::Result<String> {
+    Ok(format!("browser-engine-v1-{}", workflow_id(target)?))
+}
+fn engine_activity_options() -> ActivityOptions {
+    ActivityOptions::with_start_to_close_timeout(Duration::from_secs(10))
+        .retry_policy(RetryPolicy::builder().maximum_attempts(3).build())
+        .build()
+}
+#[workflow]
+pub struct BrowserEngineWorkflowV1 {
+    state: BrowserState,
+}
+#[workflow_methods]
+impl BrowserEngineWorkflowV1 {
+    #[init]
+    fn new(_ctx: &WorkflowContextView, target: Target) -> Self {
+        Self {
+            state: BrowserState::new(target),
+        }
+    }
+    #[run]
+    pub async fn run(ctx: &mut WorkflowContext<Self>) -> WorkflowResult<BrowserState> {
+        let target = ctx.state(|s| s.state.target.clone());
+        if !target.valid() {
+            ctx.state_mut(|s| s.state.finished = true);
+            return Ok(ctx.state(|s| s.state.clone()));
+        }
+        ctx.state_mut(|s| s.state.attempts += 1);
+        let initial = ctx
+            .execute_activity(
+                BrowserPorts::coordinate,
+                BrowserCall {
+                    target: target.clone(),
+                    reconcile: false,
+                },
+                engine_activity_options(),
+            )
+            .await;
+        ctx.state_mut(|s| {
+            s.state.historical = initial.ok();
+            s.state.dispatch_finished = true;
+        });
+        loop {
+            if ctx.state(|s| {
+                s.state.terminal()
+                    || s.state.idle_ticks >= MAX_IDLE_TICKS
+                    || s.state.completed_reconciles >= MAX_RECONCILES
+            }) {
+                ctx.state_mut(|s| s.state.finished = true);
+                return Ok(ctx.state(|s| s.state.clone()));
+            }
+            if ctx.state(|s| s.state.pending) {
+                ctx.state_mut(|s| {
+                    s.state.attempts += 1;
+                });
+                let result = ctx
+                    .execute_activity(
+                        BrowserPorts::coordinate,
+                        BrowserCall {
+                            target: target.clone(),
+                            reconcile: true,
+                        },
+                        engine_activity_options(),
                     )
                     .await;
                 ctx.state_mut(|s| {

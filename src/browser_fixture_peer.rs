@@ -42,21 +42,42 @@ impl Drop for Process {
         }
     }
 }
-fn run(raw: &[u8], action: Action, current: impl Fn() -> bool) -> anyhow::Result<Vec<u8>> {
+fn run(
+    raw: &[u8],
+    action: Action,
+    chromium: bool,
+    current: impl Fn() -> bool,
+) -> anyhow::Result<Vec<u8>> {
     anyhow::ensure!(raw.len() <= MAX_REQUEST, "fixture request capacity");
     let mount = Path::new("/browser-fixture");
     anyhow::ensure!(
         std::fs::symlink_metadata(mount)?.is_dir(),
         "fixture mount unavailable"
     );
-    exact_file(&mount.join("browser_effect_peer.py"), HELPER)?;
-    exact_file(&mount.join("browser_source_pin.json"), PIN)?;
+    let (helper_name, pin_name, helper, pin) = if chromium {
+        (
+            "browser_chromium_peer.py",
+            "browser_chromium_source_pin.json",
+            crate::browser_chromium_fixture::HELPER,
+            crate::browser_chromium_fixture::PIN,
+        )
+    } else {
+        (
+            "browser_effect_peer.py",
+            "browser_source_pin.json",
+            HELPER,
+            PIN,
+        )
+    };
+    exact_file(&mount.join(helper_name), helper)?;
+    exact_file(&mount.join(pin_name), pin)?;
+    let helper_path = format!("/browser-fixture/{helper_name}");
     anyhow::ensure!(current(), "fixture authority denied");
     let child = Command::new("/usr/bin/python3")
         .args([
             "-I",
             "-B",
-            "/browser-fixture/browser_effect_peer.py",
+            &helper_path,
             "--source",
             "/browser-source",
             "--root",
@@ -105,7 +126,7 @@ fn run(raw: &[u8], action: Action, current: impl Fn() -> bool) -> anyhow::Result
                 Ok(bytes)
             })?,
     );
-    let end = Instant::now() + Duration::from_secs(2);
+    let end = Instant::now() + Duration::from_secs(if chromium { 8 } else { 2 });
     let status = loop {
         if let Some(status) = process.child.try_wait()? {
             break status;
@@ -136,8 +157,19 @@ pub(crate) fn exchange(
     action: Action,
     current: impl Fn() -> bool,
 ) -> anyhow::Result<Vec<u8>> {
-    run(raw, action, current).map_err(|_| anyhow::anyhow!("pinned browser fixture unavailable"))
+    run(raw, action, false, current)
+        .map_err(|_| anyhow::anyhow!("pinned browser fixture unavailable"))
 }
+
+pub(crate) fn exchange_chromium(
+    raw: &[u8],
+    action: Action,
+    current: impl Fn() -> bool,
+) -> anyhow::Result<Vec<u8>> {
+    run(raw, action, true, current)
+        .map_err(|_| anyhow::anyhow!("pinned Chromium fixture unavailable"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

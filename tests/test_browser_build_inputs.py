@@ -49,6 +49,23 @@ class EmbeddedBrowserInputs(unittest.TestCase):
                     (root / name).write_bytes(b"changed")
                     self.assertNotEqual(build.source_hashes()[name], sealed[name])
                 self.assertEqual({name: sealed[name] for name in original}, original)
+                (root / "src/browser_chromium_fixture.rs").write_bytes(b"chromium")
+                with self.assertRaises(FileNotFoundError):
+                    build.source_hashes()
+                extra = (
+                    "tests/fixtures/browser_chromium_peer.py",
+                    "tests/fixtures/browser_chromium_source_pin.json",
+                )
+                for name in extra:
+                    (root / name).write_bytes(b"chromium-pinned")
+                updated = build.source_hashes()
+                self.assertEqual(len(updated), 10)
+                for name in extra:
+                    self.assertEqual(
+                        updated[name], hashlib.sha256(b"chromium-pinned").hexdigest()
+                    )
+                    (root / name).write_bytes(b"changed")
+                    self.assertNotEqual(build.source_hashes()[name], updated[name])
 
 
 if __name__ == "__main__":

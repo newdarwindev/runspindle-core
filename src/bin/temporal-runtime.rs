@@ -41,6 +41,19 @@ enum Command {
         workflow_id: String,
         target: runspindle_core::browser_effect_wire::Target,
     },
+    #[cfg(feature = "artifact-store")]
+    StartBrowserEngine {
+        target: runspindle_core::browser_effect_wire::Target,
+    },
+    #[cfg(feature = "artifact-store")]
+    BrowserEngine {
+        workflow_id: String,
+    },
+    #[cfg(feature = "artifact-store")]
+    ReconcileBrowserEngine {
+        workflow_id: String,
+        target: runspindle_core::browser_effect_wire::Target,
+    },
     #[cfg(feature = "verified-authority")]
     StartIntent {
         wire: String,
@@ -253,10 +266,13 @@ async fn main() -> anyhow::Result<()> {
             .register_workflow::<runspindle_core::intent_runtime::IntentWorkflowV1>()?;
         #[cfg(feature = "artifact-store")]
         let replay_options = replay_options
-            .register_workflow::<runspindle_core::browser_runtime::BrowserWorkflow>()?;
+            .register_workflow::<runspindle_core::browser_runtime::BrowserWorkflow>()?
+            .register_workflow::<runspindle_core::browser_runtime::BrowserEngineWorkflowV1>()?;
         let replayer = WorkflowReplayer::new(replay_options.build())?;
         replayer.replay_workflow(history).await?;
-        println!("{{\"status\":\"passed\",\"evidence_class\":\"isolated_integration\",\"check\":\"history_replay\"}}");
+        println!(
+            "{{\"status\":\"passed\",\"evidence_class\":\"isolated_integration\",\"check\":\"history_replay\"}}"
+        );
         return Ok(());
     }
     #[cfg(feature = "delivery-runtime")]
@@ -278,7 +294,12 @@ async fn main() -> anyhow::Result<()> {
     anyhow::ensure!(
         matches!(mode, "worker" | "client")
             || (cfg!(feature = "artifact-store")
-                && matches!(mode, "browser-worker" | "browser-worker-pinned-fixture"))
+                && matches!(
+                    mode,
+                    "browser-worker"
+                        | "browser-worker-pinned-fixture"
+                        | "browser-worker-chromium-fixture"
+                ))
             || (cfg!(feature = "verified-authority")
                 && matches!(
                     mode,
@@ -402,18 +423,30 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
     #[cfg(feature = "artifact-store")]
-    if matches!(mode, "browser-worker" | "browser-worker-pinned-fixture") {
-        use runspindle_core::browser_runtime::{BrowserPorts, BrowserWorkflow};
+    if matches!(
+        mode,
+        "browser-worker" | "browser-worker-pinned-fixture" | "browser-worker-chromium-fixture"
+    ) {
+        use runspindle_core::browser_runtime::{
+            BrowserEngineWorkflowV1, BrowserPorts, BrowserWorkflow,
+        };
         anyhow::ensure!(
             args.len() <= 4 && args.get(3).is_none_or(|p| p == "/effects"),
             "explicit synthetic /effects directory required"
         );
         let runtime = Runtime::from_current_tokio(Default::default())?;
-        let options = WorkerOptions::new(runspindle_core::browser_runtime::QUEUE)
-            .register_workflow::<BrowserWorkflow>()?
+        let options = if mode == "browser-worker-chromium-fixture" {
+            WorkerOptions::new(runspindle_core::browser_runtime::ENGINE_QUEUE)
+                .register_workflow::<BrowserEngineWorkflowV1>()?
+        } else {
+            WorkerOptions::new(runspindle_core::browser_runtime::QUEUE)
+                .register_workflow::<BrowserWorkflow>()?
+        };
+        let options = options
             .register_activities(BrowserPorts {
                 directory: args.get(3).map(PathBuf::from),
                 pinned_fixture: mode == "browser-worker-pinned-fixture",
+                chromium_fixture: mode == "browser-worker-chromium-fixture",
             })
             .build();
         Worker::new(&runtime, client, options)?
@@ -508,6 +541,48 @@ async fn main() -> anyhow::Result<()> {
                 "browser workflow identity mismatch"
             );
             serde_json::json!({"accepted":client.get_workflow_handle::<runspindle_core::browser_runtime::BrowserWorkflow>(workflow_id).execute_update(runspindle_core::browser_runtime::BrowserWorkflow::request_reconcile,target,Default::default()).await?})
+        }
+
+        #[cfg(feature = "artifact-store")]
+        Command::StartBrowserEngine { target } => {
+            use runspindle_core::browser_runtime::{engine_workflow_id, BrowserEngineWorkflowV1};
+            let id = engine_workflow_id(&target)?;
+            let options = WorkflowStartOptions::new(
+                runspindle_core::browser_runtime::ENGINE_QUEUE,
+                id.clone(),
+            )
+            .id_reuse_policy(temporalio_client::WorkflowIdReusePolicy::RejectDuplicate)
+            .id_conflict_policy(temporalio_client::WorkflowIdConflictPolicy::Fail)
+            .execution_timeout(Duration::from_secs(600))
+            .build();
+            let h = client
+                .start_workflow(BrowserEngineWorkflowV1::run, target, options)
+                .await?;
+            serde_json::json!({"workflow_id":id,"run_id":h.run_id()})
+        }
+        #[cfg(feature = "artifact-store")]
+        Command::BrowserEngine { workflow_id } => serde_json::to_value(
+            client
+                .get_workflow_handle::<runspindle_core::browser_runtime::BrowserEngineWorkflowV1>(
+                    workflow_id,
+                )
+                .query(
+                    runspindle_core::browser_runtime::BrowserEngineWorkflowV1::snapshot,
+                    (),
+                    Default::default(),
+                )
+                .await?,
+        )?,
+        #[cfg(feature = "artifact-store")]
+        Command::ReconcileBrowserEngine {
+            workflow_id,
+            target,
+        } => {
+            anyhow::ensure!(
+                workflow_id == runspindle_core::browser_runtime::engine_workflow_id(&target)?,
+                "browser workflow identity mismatch"
+            );
+            serde_json::json!({"accepted":client.get_workflow_handle::<runspindle_core::browser_runtime::BrowserEngineWorkflowV1>(workflow_id).execute_update(runspindle_core::browser_runtime::BrowserEngineWorkflowV1::request_reconcile,target,Default::default()).await?})
         }
 
         #[cfg(feature = "verified-authority")]
