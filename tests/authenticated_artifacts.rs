@@ -636,21 +636,28 @@ fn interrupted_acceptance_child() {
 fn fresh_process_precommit_exit_recovers_without_partial_acceptance() {
     let f = Fixture::new();
     for (mode, expected) in [("crash", 96), ("recover", 0)] {
+        let diagnostic = f.dir.join(format!("{mode}.stderr"));
         let mut child = BoundedChild(
             Command::new(std::env::current_exe().unwrap())
                 .args(["--exact", "interrupted_acceptance_child", "--nocapture"])
                 .env("CORE_AUTH_INTERRUPTED_DIR", &f.dir)
                 .env("CORE_AUTH_INTERRUPTED_MODE", mode)
-                // Keep the parent test-result line machine-readable. Child
-                // assertion diagnostics remain on inherited stderr.
+                // Capture child diagnostics so they cannot split the parent's
+                // machine-readable result line; retain them on assertion failure.
                 .stdout(std::process::Stdio::null())
+                .stderr(std::fs::File::create(&diagnostic).unwrap())
                 .spawn()
                 .unwrap(),
         );
         let end = std::time::Instant::now() + std::time::Duration::from_secs(15);
         loop {
             if let Some(status) = child.0.try_wait().unwrap() {
-                assert_eq!(status.code(), Some(expected), "{mode}");
+                assert_eq!(
+                    status.code(),
+                    Some(expected),
+                    "{mode}: {}",
+                    std::fs::read_to_string(&diagnostic).unwrap()
+                );
                 break;
             }
             assert!(std::time::Instant::now() < end, "{mode} child timeout");
