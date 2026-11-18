@@ -43,9 +43,11 @@ struct PythonPeer {
     root: PathBuf,
     action: &'static str,
     discard: bool,
+    calls: usize,
 }
 impl Peer for PythonPeer {
     fn exchange(&mut self, request: &[u8]) -> anyhow::Result<Vec<u8>> {
+        self.calls += 1;
         anyhow::ensure!(request.len() < 4096, "fixture request bound");
         let mut child = Child(
             Command::new("python3")
@@ -123,6 +125,7 @@ fn setup(temp: &Temp) -> PythonPeer {
         root: temp.0.clone(),
         action: "dispatch",
         discard: false,
+        calls: 0,
     }
 }
 fn counts(temp: &Temp) -> (u64, u64) {
@@ -212,4 +215,55 @@ fn actual_browser_wrong_target_digest_or_action_has_no_site_effect() {
         assert_eq!(outcome.unwrap(), Outcome::Unknown);
         assert_eq!(counts(&temp), (0, 0));
     }
+}
+
+#[test]
+#[ignore = "requires explicit pinned Browser package"]
+fn durable_core_registry_and_actual_browser_keep_one_effect_across_reconstruction() {
+    use runspindle_core::browser_effect_registry::BrowserRegistry;
+    let temp = Temp::new();
+    let mut peer = setup(&temp);
+    let mut registry = BrowserRegistry::open(temp.0.join("core-browser.sqlite")).unwrap();
+    peer.discard = true;
+    assert_eq!(
+        registry
+            .dispatch(target(), b"x", &Allow, &mut peer)
+            .unwrap(),
+        Outcome::Unknown
+    );
+    assert_eq!(counts(&temp), (1, 0));
+    drop(registry);
+    let mut registry = BrowserRegistry::open(temp.0.join("core-browser.sqlite")).unwrap();
+    peer.discard = false;
+    peer.calls = 0;
+    let mut rebound = target();
+    rebound.binding.operation = "replacement-operation".into();
+    assert!(registry.dispatch(rebound, b"x", &Allow, &mut peer).is_err());
+    assert_eq!(
+        registry
+            .dispatch(target(), b"x", &Allow, &mut peer)
+            .unwrap(),
+        Outcome::Unknown
+    );
+    assert_eq!(peer.calls, 0);
+    peer.action = "reconcile";
+    assert_eq!(
+        registry.reconcile(&target(), &Allow, &mut peer).unwrap(),
+        Outcome::Confirmed
+    );
+    assert_eq!(peer.calls, 1);
+    assert_eq!(counts(&temp), (1, 1));
+    std::fs::write(temp.0.join("revoked"), b"").unwrap();
+    assert_eq!(
+        registry.reconcile(&target(), &Allow, &mut peer).unwrap(),
+        Outcome::Unknown
+    );
+    assert_eq!(counts(&temp), (1, 1));
+    assert_eq!(
+        registry
+            .dispatch(target(), b"x", &Allow, &mut peer)
+            .unwrap(),
+        Outcome::Unknown
+    );
+    assert_eq!(peer.calls, 2); // Duplicate never returns stale confirmation or calls peer.
 }

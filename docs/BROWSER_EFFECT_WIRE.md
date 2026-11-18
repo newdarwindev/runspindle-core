@@ -27,7 +27,9 @@ fields, unsupported versions/classes/outcomes, oversize data and a hash differen
 from the exact raw request. Confirmed/rejected are only scoped observations from
 the configured trusted peer, never provider receipts, credentials or permissions.
 
-The client contains **no durable Core registry**. Callers must retain/reconstruct
+The standalone client contains **no durable Core registry**. The optional
+[BrowserRegistry](BROWSER_EFFECT_REGISTRY.md) now supplies durable identity and
+single-dispatch reservation above it. Direct client callers must retain/reconstruct
 the same original operation, target and payload across restart. They must not
 invent another operation ID to retry unknown. The pinned Browser Journal owns
 its durable reservation and no-resend rule; request hashes do not authenticate
@@ -57,7 +59,8 @@ bytes and submit/readback counts. No socket access is permitted. The tests cover
 
 This is Core client reconstruction **within the Rust test process** and fresh
 Browser processes, not a Core process-crash or Temporal workflow qualification.
-The two opt-in tests are ignored in the default suite; run them explicitly with
+The two original client tests and the separate registry integration test are
+opt-in and ignored in the default suite; run them explicitly with
 `--include-ignored` and the pinned read-only Browser source. They never substitute
 for missing live adapters. The literal Browser request/response vector is also
 checked independently in Rust unit tests. Source-fence negatives and responsehash/
@@ -65,8 +68,9 @@ post-exchange-authority mutants require behavioral failures against clean baseli
 
 ## Remaining work
 
-No Temporal Browser operation workflow or durable Core-side identity registry is
-wired to this client yet. Production Browser/site-specific observation and input
+The separate [BrowserRegistry](BROWSER_EFFECT_REGISTRY.md) now retains Core
+identity and exact payload across process exits. No Temporal Browser operation
+workflow is wired to it yet. Production Browser/site-specific observation and input
 adapters, issuer custody, distributed fencing and full F03/F07 acceptance remain
 open. Earlier runtime-image/Temporal receipts keep their original source pins;
 this client-level verification does not relabel those images as rebuilt.
