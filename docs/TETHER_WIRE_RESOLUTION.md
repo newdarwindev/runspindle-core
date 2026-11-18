@@ -86,3 +86,15 @@ compiled and ran all features; this does not relabel the earlier PR #37 disk-ful
 attempt as passing. No fleet, network, security or production settings were
 changed by this qualification. This branch is stacked on reviewed but unmerged
 PR #37, whose required GitHub validation check remains a separate merge gate.
+
+## Current-store preflight and rejection diagnostics
+
+A bridge holds immutable accepted bytes, but construction-time verification is
+not sufficient for a later resolver effect. Applicability now rechecks the actual
+Core accepted store before the first Tether decision call, including exact replay
+of a completed resolution. Corruption after bridge construction rejects without
+additional peer calls or outbox mutation. Normal transactional authority checks
+and independent readback still run; this is not a distributed atomicity claim.
+Peer and response-decoder failures return fixed error categories without retaining
+callback/parser cause chains. Synthetic regressions verify both diagnostic paths
+and first-call/replay store corruption; no live credential or provider is used.

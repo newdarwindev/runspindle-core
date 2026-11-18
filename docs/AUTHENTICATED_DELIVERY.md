@@ -1,7 +1,7 @@
 # Current artifact evidence at the delivery boundary
 
-Bounded Core #4 follow-up, stacked on the explicit-resolution PR #38 rather than
-merged main. It adds no signer, native provenance issuer, provider, credential,
+Bounded Core #4 follow-up, reconciled with merged explicit-resolution PR #38
+(main `89c659c`). It adds no signer, native provenance issuer, provider, credential,
 service, workflow activation or delivery permission. Host #8 producer custody is
 still a separate prerequisite. Existing legacy APIs and synthetic script CLI keep
 their prior meaning; this opt-in lane does not silently upgrade those callers.

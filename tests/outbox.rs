@@ -2006,3 +2006,133 @@ fn matching_resolved_receipt_without_exact_audit_cannot_authorize_replay() {
         .is_err());
     assert_eq!(peer.count("lookup"), before);
 }
+#[test]
+fn tether_wire_errors_do_not_retain_peer_or_parser_content() {
+    struct RejectedPeer(bool);
+    impl runspindle_core::tether_wire::Peer for RejectedPeer {
+        fn exchange(&mut self, _: &[u8]) -> anyhow::Result<Vec<u8>> {
+            if self.0 {
+                Err(anyhow::anyhow!("synthetic-private-peer-canary").context("private-context"))
+            } else {
+                Ok(br#"{"synthetic-private-peer-canary":"private-value"}"#.to_vec())
+            }
+        }
+    }
+    for callback in [false, true] {
+        let temp = Temp::new();
+        let request = request(&temp);
+        let mut adapter = runspindle_core::tether_wire::WireTransport::new(
+            &Store::open(temp.db()).unwrap(),
+            request.clone(),
+            "result.bin",
+            "accepted",
+            RejectedPeer(callback),
+        )
+        .unwrap();
+        let error = adapter.lookup(&request).unwrap_err();
+        assert_eq!(error.chain().count(), 1);
+        assert_eq!(
+            error.to_string(),
+            if callback {
+                "wire peer exchange failed"
+            } else {
+                "invalid wire peer observation"
+            }
+        );
+        assert!(!format!("{error:?}").contains("private"));
+        assert!(Outbox::open(temp.db())
+            .unwrap()
+            .snapshot(&request)
+            .unwrap()
+            .is_none());
+    }
+}
+
+#[test]
+fn resolution_peer_rejections_are_fixed_and_preserve_quarantine() {
+    struct RejectedPeer(bool);
+    impl runspindle_core::tether_wire::Peer for RejectedPeer {
+        fn exchange(&mut self, _: &[u8]) -> anyhow::Result<Vec<u8>> {
+            if self.0 {
+                Err(anyhow::anyhow!("synthetic-private-resolution").context("private-context"))
+            } else {
+                Ok(br#"{"synthetic-private-resolution":"private-value"}"#.to_vec())
+            }
+        }
+    }
+    for callback in [false, true] {
+        let temp = Temp::new();
+        let (request, mut resolution, _) = quarantine(&temp);
+        let decision = wire_decision(&mut resolution);
+        let mut bridge = runspindle_core::tether_wire::ResolutionBridge::new(
+            &Store::open(temp.db()).unwrap(),
+            resolution.clone(),
+            decision,
+            "result.bin",
+            "accepted",
+            RejectedPeer(callback),
+        )
+        .unwrap();
+        let mut outbox = Outbox::open(temp.db()).unwrap();
+        let error = bridge
+            .resolve(&mut outbox, &Grant(request.clone()), &resolver(&resolution))
+            .unwrap_err();
+        assert_eq!(error.chain().count(), 1);
+        assert_eq!(
+            error.to_string(),
+            if callback {
+                "resolution peer exchange failed"
+            } else {
+                "invalid resolution peer observation"
+            }
+        );
+        assert!(!format!("{error:?}").contains("private"));
+        assert_eq!(
+            outbox.snapshot(&request).unwrap().unwrap(),
+            resolution.prior
+        );
+    }
+}
+
+#[test]
+fn changed_accepted_store_blocks_resolution_before_peer_effects() {
+    for replay in [false, true] {
+        let temp = Temp::new();
+        let (request, mut resolution, _) = quarantine(&temp);
+        let decision = wire_decision(&mut resolution);
+        let calls = std::rc::Rc::new(std::cell::RefCell::new(vec![]));
+        let mut bridge = runspindle_core::tether_wire::ResolutionBridge::new(
+            &Store::open(temp.db()).unwrap(),
+            resolution.clone(),
+            decision,
+            "result.bin",
+            "accepted",
+            ResolutionWirePeer {
+                mode: "confirmed",
+                calls: calls.clone(),
+            },
+        )
+        .unwrap();
+        let mut outbox = Outbox::open(temp.db()).unwrap();
+        if replay {
+            bridge
+                .resolve(&mut outbox, &Grant(request.clone()), &resolver(&resolution))
+                .unwrap();
+        }
+        let before = outbox.snapshot(&request).unwrap();
+        let count = calls.borrow().len();
+        let corrupt = rusqlite::Connection::open(temp.db()).unwrap();
+        corrupt
+            .execute_batch("DROP TRIGGER artifacts_immutable;")
+            .unwrap();
+        corrupt
+            .execute("UPDATE artifacts SET bytes=?1", [b"corrupted".as_slice()])
+            .unwrap();
+        corrupt.execute_batch("CREATE TRIGGER artifacts_immutable BEFORE UPDATE ON artifacts BEGIN SELECT RAISE(ABORT,'immutable artifact');END;").unwrap();
+        assert!(bridge
+            .resolve(&mut outbox, &Grant(request.clone()), &resolver(&resolution))
+            .is_err());
+        assert_eq!(calls.borrow().len(), count);
+        assert_eq!(outbox.snapshot(&request).unwrap(), before);
+    }
+}

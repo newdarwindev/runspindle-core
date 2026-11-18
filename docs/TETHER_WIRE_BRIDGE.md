@@ -91,3 +91,10 @@ Earlier receipts remain in Git history, not counted as final-head evidence.
 The later [explicit resolution lane](TETHER_WIRE_RESOLUTION.md) adds bounded
 append-only decision recovery. The earlier receipt above remains historical;
 only the separately pinned resolution receipt covers that additional behavior.
+## Reconciliation with current ingress hardening
+
+The bridge discards callback and response-parser diagnostic content at its public
+boundary. Peer failures and malformed observations return fixed categories without
+retaining the original cause chain. A synthetic canary regression exercises both
+paths. This does not redact valid payloads or qualify an arbitrary injected peer;
+the trusted-peer, explicit authorization and exact-readback requirements remain.
