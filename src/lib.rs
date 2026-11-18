@@ -76,3 +76,6 @@ pub mod browser_effect_registry;
 
 #[cfg(feature = "artifact-store")]
 pub mod browser_runtime;
+
+#[cfg(feature = "artifact-store")]
+mod browser_fixture_peer;

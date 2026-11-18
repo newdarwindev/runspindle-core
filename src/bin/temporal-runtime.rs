@@ -277,7 +277,8 @@ async fn main() -> anyhow::Result<()> {
     let mode = args.get(1).map(String::as_str).unwrap_or("");
     anyhow::ensure!(
         matches!(mode, "worker" | "client")
-            || (cfg!(feature = "artifact-store") && mode == "browser-worker")
+            || (cfg!(feature = "artifact-store")
+                && matches!(mode, "browser-worker" | "browser-worker-pinned-fixture"))
             || (cfg!(feature = "verified-authority")
                 && matches!(
                     mode,
@@ -401,7 +402,7 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
     #[cfg(feature = "artifact-store")]
-    if mode == "browser-worker" {
+    if matches!(mode, "browser-worker" | "browser-worker-pinned-fixture") {
         use runspindle_core::browser_runtime::{BrowserPorts, BrowserWorkflow};
         anyhow::ensure!(
             args.len() <= 4 && args.get(3).is_none_or(|p| p == "/effects"),
@@ -412,6 +413,7 @@ async fn main() -> anyhow::Result<()> {
             .register_workflow::<BrowserWorkflow>()?
             .register_activities(BrowserPorts {
                 directory: args.get(3).map(PathBuf::from),
+                pinned_fixture: mode == "browser-worker-pinned-fixture",
             })
             .build();
         Worker::new(&runtime, client, options)?

@@ -34,6 +34,11 @@ def sha(path: pathlib.Path) -> str:
 def source_hashes() -> dict[str, str]:
     paths = [ROOT / "Cargo.toml", ROOT / "Cargo.lock", ROOT / "temporal/toolchain.json"]
     paths += sorted((ROOT / "src").rglob("*.rs"))
+    if (ROOT / "src/browser_fixture_peer.rs").is_file():
+        paths += [
+            ROOT / "tests/fixtures/browser_effect_peer.py",
+            ROOT / "tests/fixtures/browser_source_pin.json",
+        ]
     return {str(p.relative_to(ROOT)): sha(p) for p in paths}
 
 
