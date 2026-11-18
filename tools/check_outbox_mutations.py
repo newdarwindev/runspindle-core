@@ -44,7 +44,7 @@ expected_anchors = {
     "durable::require_schema(&tx, OUTBOX_SCHEMA)?;": 1,
     "if observed.len() == 1 && observed[0] == reply {": 1,
     "resolver.verify_resolution(resolution)": 4,
-    "authority.verify(request)": 11,
+    "authority.verify(request)": 12,
     "authority.verify(&old.request)": 1,
 }
 observed = []
