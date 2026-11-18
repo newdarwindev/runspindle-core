@@ -2171,3 +2171,125 @@ fn missing_retained_validation_blocks_delivery_without_transport() {
         BYTES
     );
 }
+
+#[test]
+fn forged_receipt_bindings_for_unchanged_request_never_establish_delivery() {
+    struct Forged {
+        peer: Peer,
+        field: usize,
+        stage: usize,
+    }
+    impl Forged {
+        fn corrupt(&self, mut receipt: DeliveryReceipt) -> DeliveryReceipt {
+            match self.field {
+                0 => receipt.request.accepted.validation.artifact.sha256 = "a".repeat(64),
+                1 => {
+                    receipt
+                        .request
+                        .accepted
+                        .validation
+                        .artifact
+                        .artifact_revision += 1
+                }
+                2 => {
+                    receipt
+                        .request
+                        .accepted
+                        .validation
+                        .artifact
+                        .binding
+                        .revision += 1
+                }
+                3 => receipt.request.destination_id = "wrong-thread".into(),
+                _ => receipt.request.account_id = "wrong-account".into(),
+            }
+            receipt
+        }
+    }
+    impl Transport for Forged {
+        fn send(
+            &mut self,
+            request: &DeliveryRequest,
+            bytes: &[u8],
+        ) -> anyhow::Result<Option<DeliveryReceipt>> {
+            let reply = self.peer.send(request, bytes)?;
+            Ok(reply.map(|r| if self.stage != 1 { self.corrupt(r) } else { r }))
+        }
+        fn lookup(&mut self, request: &DeliveryRequest) -> anyhow::Result<Vec<DeliveryReceipt>> {
+            let observed = self.peer.lookup(request)?;
+            Ok(observed
+                .into_iter()
+                .map(|r| if self.stage != 0 { self.corrupt(r) } else { r })
+                .collect())
+        }
+    }
+    for field in 0..5 {
+        // Corrupt send only, readback only, or both with the same forged binding.
+        for stage in 0..3 {
+            let t = Temp::new();
+            let r = request(&t);
+            let original = serde_json::to_vec(&r).unwrap();
+            let mut peer = Forged {
+                peer: Peer::open(&t.0.join("peer.sqlite")),
+                field,
+                stage,
+            };
+            let mut outbox = Outbox::open(t.db()).unwrap();
+            let first = outbox.deliver(&r, &Grant(r.clone()), &mut peer);
+            assert!(
+                first.is_err() || first.unwrap().state != DeliveryState::Delivered,
+                "forged receipt promoted for field {field}, stage {stage}"
+            );
+            assert_ne!(
+                outbox.snapshot(&r).unwrap().unwrap().state,
+                DeliveryState::Delivered
+            );
+            drop(outbox);
+            let mut outbox = Outbox::open(t.db()).unwrap();
+            let recovered = outbox.deliver(&r, &Grant(r.clone()), &mut peer);
+            if stage == 0 {
+                // A later independent *correct* readback can resolve an invalid ack.
+                let recovered = recovered.unwrap();
+                assert_eq!(recovered.state, DeliveryState::Delivered);
+                assert_eq!(recovered.receipt.unwrap().request, r);
+            } else {
+                assert!(recovered.is_err());
+                assert_ne!(
+                    outbox.snapshot(&r).unwrap().unwrap().state,
+                    DeliveryState::Delivered
+                );
+            }
+            assert_eq!(peer.peer.count("send"), 1, "no resend after reopening");
+            assert!(peer.peer.count("lookup") >= 1);
+            let (receipt, bytes): (String, Vec<u8>) = peer
+                .peer
+                .db
+                .query_row("SELECT receipt,bytes FROM receipts", [], |row| {
+                    Ok((row.get(0)?, row.get(1)?))
+                })
+                .unwrap();
+            assert_eq!(
+                serde_json::from_str::<DeliveryReceipt>(&receipt)
+                    .unwrap()
+                    .request,
+                r
+            );
+            assert_eq!(bytes, BYTES);
+            assert_eq!(digest(&bytes), r.accepted.artifact().sha256);
+            let db = Connection::open(t.db()).unwrap();
+            assert_eq!(
+                db.query_row("SELECT count(*) FROM artifacts", [], |row| row
+                    .get::<_, u64>(0))
+                    .unwrap(),
+                1
+            );
+            assert_eq!(
+                db.query_row("SELECT bytes FROM artifacts", [], |row| row
+                    .get::<_, Vec<u8>>(0))
+                    .unwrap(),
+                BYTES
+            );
+            assert_eq!(serde_json::to_vec(&r).unwrap(), original);
+        }
+    }
+}
