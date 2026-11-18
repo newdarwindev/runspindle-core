@@ -1,0 +1,18 @@
+{
+  "source_sha": "b3edadf12af74cd5b5d27a486ef0a4a64d5a1594",
+  "files": {
+    "browser_runtime/__init__.py": "7a6bb51d38d0a5c9234a49e7a92419b3b1cb91173c7b1da8c848da5bd568e7ee",
+    "browser_runtime/control_leases.py": "6aac8a60136a85dff9bc061e9ed41f57177c16736a78135445fe6b6a241de4d4",
+    "browser_runtime/credentials.py": "d237655dce633788c5d2c0d1c6417164fc5715a2e9f399ab5295219fcd2e7161",
+    "browser_runtime/effect_schema.py": "32f7f737923e7ed7457a0e4dcf1470e4be93201a104a201741155d0d10099d34",
+    "browser_runtime/effect_wire.py": "d072728fc2cb2e7a4fab6976064dec75e0262fcc779c9a63294fc90656f885d3",
+    "browser_runtime/effects.py": "9e6c3e06b4f5b8cc66b985f4e43a2d7dd01871ab9c332fca117ea795bfe86ea9",
+    "browser_runtime/guarded_effects.py": "72273f67bc874d31f45ad4d1a3dd1738fedb88959295ec96713fd30248403a68",
+    "browser_runtime/openbao.py": "9a2403e36cb9a8418f97e5fdd130ade9e25cdd356e6f57549def4ba78bfe37da",
+    "browser_runtime/profile_custody_schema.py": "0b7323ee12545eec6a362a73ee4c6e4e06b38998d65adb7e0c413af6702a3680",
+    "browser_runtime/profile_directory.py": "ea8c47e12ed5c8975f8d6bd0038800a94e5e22a8f1dfef3df505e8ad1511e18e",
+    "browser_runtime/profile_keys.py": "20bbeb2b005a80e33e3b135ec3eb06049b84387ab2584c9d3656b1f64829a66d",
+    "browser_runtime/profile_schema.py": "078c45da6db546215166dbb6151f7c161977468bb4da73cd5876a86f2cffac7f",
+    "browser_runtime/profile_store.py": "4726442eb38421ac6c07c20e323f8a9df850328de6494b95ee28dd2c783212b2"
+  }
+}
