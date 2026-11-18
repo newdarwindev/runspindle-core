@@ -2,7 +2,7 @@
   "schema_version": 1,
   "features": "verified-authority,authenticated-artifacts",
   "evidence_class": "prepared_dependency_artifacts",
-  "image_id": "sha256:20bf6ea28d3132a62c2d26842914706df4742bf1f0f86301852248939fe8191b",
+  "image_id": "sha256:eafaef8007b905b171b994fb6b2e8eae6823a8b85c6d7f490bf7f06f052f38ee",
   "builder_image_id": "sha256:58997199116d9c2d765803753fce17a910d9b1c0f92b8c1519b5e9f64d1dbdcb",
   "builder_architecture": "linux/x86_64",
   "source_hashes": {
@@ -39,10 +39,10 @@
     "tests/fixtures/browser_effect_peer.py": "c14e5f2a783ca33077d26980fba457b7319855acf8263ef8bd5a4b660887d7a8",
     "tests/fixtures/browser_source_pin.json": "4dbe00b79d3a14d60b2f6337d209c510f2cd4d9ee0cf03fe1a8483dc5a98bd8e",
     "tests/fixtures/browser_chromium_peer.py": "cb238b3f922fa5b44143a19d4ad18442f8218cf920e1d4ee42305b0380063ccb",
-    "tests/fixtures/browser_chromium_source_pin.json": "2b7c7d9a9a09445100cfdb392b98d4e59ef16fb42cf5ab2d628aa3b2b231e08d"
+    "tests/fixtures/browser_chromium_source_pin.json": "48cf77df54d451c5ff95b6b052a304ce1bfe1f92f62f37b71ff2fe67c5cea743"
   },
-  "source_sha256": "cd50077b96980d7ad3de37996deb1baffdda71e9b73dd247c282630b2172c4e3",
-  "binary_sha256": "4726a4c02548eb294f13cfd3bab7da574f1cf6387ceac7e330269bc062a0c847",
+  "source_sha256": "cd4fc10cbd7d5bea5537392fd801de909b35e85f63fa4b954f211a074d43fae7",
+  "binary_sha256": "9d03b0aaf881bcbdc7cd8610f5e61151a14ed1f7a1810d34c6321b6aaddbda5a",
   "cargo_lock_sha256": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
   "sdk_revision": "c675c32469af707e1c979a7b808c70b4a0608b82",
   "sdk_version": "1.2.0",
