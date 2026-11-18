@@ -1,0 +1,291 @@
+{
+  "ci_qualification": false,
+  "cleanup": {
+    "confirmed_after_positive_controls": true,
+    "owned_containers_remaining": 0,
+    "owned_mutation_targets_remaining": 0
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": 2,
+    "CARGO_INCREMENTAL": 0,
+    "builder_image": "sha256:58997199116d9c2d765803753fce17a910d9b1c0f92b8c1519b5e9f64d1dbdcb",
+    "cpu_limit": 2,
+    "interleaving": "warm1,cold1,warm2,cold2,warm3,cold3",
+    "memory_gib": 6,
+    "network": "none",
+    "os_page_cache_cold": false,
+    "python": "3.14.8",
+    "unprivileged_uid": true
+  },
+  "evidence_class": "local-complete-runtime-mutation-workload",
+  "instrumentation_sha256": {
+    "bin/docker": "b9758314c299b3cf9f9ced8c9d18763679d1b05586e1ed5fff5a5ea545a7cd34",
+    "positive_controls.py": "cc373ebc246343ced94d4b6d3bedf5d19ad9d538657aba90c50a4c8e69150249"
+  },
+  "measured_tree": "ab4144e993e5d46b487f2f522b4c8f96585779d7",
+  "measurement": {
+    "excluded": "fleet boot, GitHub checkout/registration, other CI partitions, aggregation; preparation is separately measured",
+    "included": "complete existing four-mutant command, builder/dependency/seed validation, private materialization, compilation, behavioral assertions and owned cleanup"
+  },
+  "positive_controls": {
+    "cases": [
+      {
+        "case": "known_duplicates_reconcile_at_capacity_without_eviction_or_new_delivery",
+        "passed": true,
+        "returncode": 0
+      },
+      {
+        "case": "conflicts_revisions_and_malformed_inputs_preserve_state",
+        "passed": true,
+        "returncode": 0
+      },
+      {
+        "case": "any_prior_operation_id_reuse_is_rejected_after_terminal_revisions",
+        "passed": true,
+        "returncode": 0
+      },
+      {
+        "case": "concurrent_stale_actor_never_inherits_current_launch_or_cancel",
+        "passed": true,
+        "returncode": 0
+      }
+    ],
+    "seed_key": "7e614b808313369e1245ff5cd67da43fe0ca437c8b84e1b6b89d8169c6a2d13d",
+    "source": "fca966cf1d5b5d29b61becaff348774d99407cfc",
+    "status": "passed"
+  },
+  "published_implementation": "ffff0f51f41bf6e7448cbe2c8a1512481b8d6261",
+  "regressions": {
+    "normal_tests": 134,
+    "opt_in_skips_each": 3,
+    "optimized_tests": 134,
+    "static_existing_debt": 286,
+    "static_new_diagnostics": 0
+  },
+  "schema_version": 1,
+  "seed": {
+    "bytes": 1826362458,
+    "ci_qualified": false,
+    "files": 2527,
+    "key": "7e614b808313369e1245ff5cd67da43fe0ca437c8b84e1b6b89d8169c6a2d13d",
+    "preparation_seconds": 113.38574380194768,
+    "tests_executed": false
+  },
+  "source_sha256": {
+    "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+    "temporal/toolchain.json": "d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7",
+    "tests/test_compiler_cache.py": "1fbb50ae2aec3e4dfb3f2e829be813a627253cbf9ddcb8e4ce1efe4f50243354",
+    "tools/check_runtime_mutations.py": "7230ced2db581f60cd8b807a0c9ae2a463cabfae4caaa4e64da7f03b7921bce7",
+    "tools/compiler_cache.py": "5f21e05d0e0c04ddc71acd2a2583d773d084654a5b815175dd4246893329e93e",
+    "tools/mutation_target.py": "2e3e104e419cb7f953adb08c7ca3b316ec577a1d8a7ccf6f49cd76a8f057927d",
+    "tools/prepared_builder.py": "f5c44e40d1e82605d764f9e1240199688f321a965b59a302054e6d869b3a9915"
+  },
+  "summary": {
+    "cold_median_seconds": 294.4918789360672,
+    "single_run_reduction_including_preparation_percent": 41.165629471352524,
+    "three_run_reduction_including_preparation_percent": 66.56261803545374,
+    "warm_median_seconds": 59.87669942807406,
+    "warm_reduction_percent": 79.66779265886888
+  },
+  "total_ci_50_percent_target_verified": false,
+  "trials": [
+    {
+      "ci_end_to_end": false,
+      "iteration": 1,
+      "mode": "warm",
+      "mutations": [
+        {
+          "detected": true,
+          "mutation": "capacity_disabled",
+          "test": "known_duplicates_reconcile_at_capacity_without_eviction_or_new_delivery"
+        },
+        {
+          "detected": true,
+          "mutation": "delivery_conflict_ignored",
+          "test": "conflicts_revisions_and_malformed_inputs_preserve_state"
+        },
+        {
+          "detected": true,
+          "mutation": "old_operation_reused",
+          "test": "any_prior_operation_id_reuse_is_rejected_after_terminal_revisions"
+        },
+        {
+          "detected": true,
+          "mutation": "stale_actor_rebound",
+          "test": "concurrent_stale_actor_never_inherits_current_launch_or_cancel"
+        }
+      ],
+      "result_sha256": "6fdc60cec114c04afed30e01d1ed82638c4dec0e2554b2d5047d0382b2d5af34",
+      "returncode": 0,
+      "seconds": 59.87669942807406,
+      "seed_key": "7e614b808313369e1245ff5cd67da43fe0ca437c8b84e1b6b89d8169c6a2d13d",
+      "source": "fca966cf1d5b5d29b61becaff348774d99407cfc",
+      "workload": "complete 4 runtime mutants"
+    },
+    {
+      "ci_end_to_end": false,
+      "iteration": 1,
+      "mode": "cold",
+      "mutations": [
+        {
+          "detected": true,
+          "mutation": "capacity_disabled",
+          "test": "known_duplicates_reconcile_at_capacity_without_eviction_or_new_delivery"
+        },
+        {
+          "detected": true,
+          "mutation": "delivery_conflict_ignored",
+          "test": "conflicts_revisions_and_malformed_inputs_preserve_state"
+        },
+        {
+          "detected": true,
+          "mutation": "old_operation_reused",
+          "test": "any_prior_operation_id_reuse_is_rejected_after_terminal_revisions"
+        },
+        {
+          "detected": true,
+          "mutation": "stale_actor_rebound",
+          "test": "concurrent_stale_actor_never_inherits_current_launch_or_cancel"
+        }
+      ],
+      "result_sha256": "6fdc60cec114c04afed30e01d1ed82638c4dec0e2554b2d5047d0382b2d5af34",
+      "returncode": 0,
+      "seconds": 286.2850727539044,
+      "seed_key": "7e614b808313369e1245ff5cd67da43fe0ca437c8b84e1b6b89d8169c6a2d13d",
+      "source": "fca966cf1d5b5d29b61becaff348774d99407cfc",
+      "workload": "complete 4 runtime mutants"
+    },
+    {
+      "ci_end_to_end": false,
+      "iteration": 2,
+      "mode": "warm",
+      "mutations": [
+        {
+          "detected": true,
+          "mutation": "capacity_disabled",
+          "test": "known_duplicates_reconcile_at_capacity_without_eviction_or_new_delivery"
+        },
+        {
+          "detected": true,
+          "mutation": "delivery_conflict_ignored",
+          "test": "conflicts_revisions_and_malformed_inputs_preserve_state"
+        },
+        {
+          "detected": true,
+          "mutation": "old_operation_reused",
+          "test": "any_prior_operation_id_reuse_is_rejected_after_terminal_revisions"
+        },
+        {
+          "detected": true,
+          "mutation": "stale_actor_rebound",
+          "test": "concurrent_stale_actor_never_inherits_current_launch_or_cancel"
+        }
+      ],
+      "result_sha256": "6fdc60cec114c04afed30e01d1ed82638c4dec0e2554b2d5047d0382b2d5af34",
+      "returncode": 0,
+      "seconds": 58.13336330500897,
+      "seed_key": "7e614b808313369e1245ff5cd67da43fe0ca437c8b84e1b6b89d8169c6a2d13d",
+      "source": "fca966cf1d5b5d29b61becaff348774d99407cfc",
+      "workload": "complete 4 runtime mutants"
+    },
+    {
+      "ci_end_to_end": false,
+      "iteration": 2,
+      "mode": "cold",
+      "mutations": [
+        {
+          "detected": true,
+          "mutation": "capacity_disabled",
+          "test": "known_duplicates_reconcile_at_capacity_without_eviction_or_new_delivery"
+        },
+        {
+          "detected": true,
+          "mutation": "delivery_conflict_ignored",
+          "test": "conflicts_revisions_and_malformed_inputs_preserve_state"
+        },
+        {
+          "detected": true,
+          "mutation": "old_operation_reused",
+          "test": "any_prior_operation_id_reuse_is_rejected_after_terminal_revisions"
+        },
+        {
+          "detected": true,
+          "mutation": "stale_actor_rebound",
+          "test": "concurrent_stale_actor_never_inherits_current_launch_or_cancel"
+        }
+      ],
+      "result_sha256": "6fdc60cec114c04afed30e01d1ed82638c4dec0e2554b2d5047d0382b2d5af34",
+      "returncode": 0,
+      "seconds": 297.0805568200303,
+      "seed_key": "7e614b808313369e1245ff5cd67da43fe0ca437c8b84e1b6b89d8169c6a2d13d",
+      "source": "fca966cf1d5b5d29b61becaff348774d99407cfc",
+      "workload": "complete 4 runtime mutants"
+    },
+    {
+      "ci_end_to_end": false,
+      "iteration": 3,
+      "mode": "warm",
+      "mutations": [
+        {
+          "detected": true,
+          "mutation": "capacity_disabled",
+          "test": "known_duplicates_reconcile_at_capacity_without_eviction_or_new_delivery"
+        },
+        {
+          "detected": true,
+          "mutation": "delivery_conflict_ignored",
+          "test": "conflicts_revisions_and_malformed_inputs_preserve_state"
+        },
+        {
+          "detected": true,
+          "mutation": "old_operation_reused",
+          "test": "any_prior_operation_id_reuse_is_rejected_after_terminal_revisions"
+        },
+        {
+          "detected": true,
+          "mutation": "stale_actor_rebound",
+          "test": "concurrent_stale_actor_never_inherits_current_launch_or_cancel"
+        }
+      ],
+      "result_sha256": "6fdc60cec114c04afed30e01d1ed82638c4dec0e2554b2d5047d0382b2d5af34",
+      "returncode": 0,
+      "seconds": 62.13676168990787,
+      "seed_key": "7e614b808313369e1245ff5cd67da43fe0ca437c8b84e1b6b89d8169c6a2d13d",
+      "source": "fca966cf1d5b5d29b61becaff348774d99407cfc",
+      "workload": "complete 4 runtime mutants"
+    },
+    {
+      "ci_end_to_end": false,
+      "iteration": 3,
+      "mode": "cold",
+      "mutations": [
+        {
+          "detected": true,
+          "mutation": "capacity_disabled",
+          "test": "known_duplicates_reconcile_at_capacity_without_eviction_or_new_delivery"
+        },
+        {
+          "detected": true,
+          "mutation": "delivery_conflict_ignored",
+          "test": "conflicts_revisions_and_malformed_inputs_preserve_state"
+        },
+        {
+          "detected": true,
+          "mutation": "old_operation_reused",
+          "test": "any_prior_operation_id_reuse_is_rejected_after_terminal_revisions"
+        },
+        {
+          "detected": true,
+          "mutation": "stale_actor_rebound",
+          "test": "concurrent_stale_actor_never_inherits_current_launch_or_cancel"
+        }
+      ],
+      "result_sha256": "6fdc60cec114c04afed30e01d1ed82638c4dec0e2554b2d5047d0382b2d5af34",
+      "returncode": 0,
+      "seconds": 294.4918789360672,
+      "seed_key": "7e614b808313369e1245ff5cd67da43fe0ca437c8b84e1b6b89d8169c6a2d13d",
+      "source": "fca966cf1d5b5d29b61becaff348774d99407cfc",
+      "workload": "complete 4 runtime mutants"
+    }
+  ]
+}
