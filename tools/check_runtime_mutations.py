@@ -57,6 +57,12 @@ def main():
             "any_prior_operation_id_reuse_is_rejected_after_terminal_revisions",
         ),
     ]
+    mutations.append((
+        "stale_actor_rebound",
+        'let script = read_script(&dir.join("native-script.json"))?;\n        anyhow::ensure!(\n            script.request.version',
+        'let script = read_script(&dir.join("native-script.json"))?;\n        let call = HostCall { request: script.request.clone(), action: call.action };\n        anyhow::ensure!(\n            script.request.version',
+        "concurrent_stale_actor_never_inherits_current_launch_or_cancel",
+    ))
     observed = []
     for name, old, new, test in mutations:
         with (
@@ -79,7 +85,8 @@ def main():
                 'required-features = ["mutation-no-cli"]',
             )
             cargo.write_text(text)
-            path = directory / "src/runtime.rs"
+            host_case = name == "stale_actor_rebound"
+            path = directory / ("src/integration.rs" if host_case else "src/runtime.rs")
             original = path.read_text()
             if original.count(old) != 1:
                 raise RuntimeError(f"mutation anchor changed: {name}")
@@ -108,11 +115,11 @@ def main():
                 "--locked",
                 "--offline",
                 "--features",
-                "temporal-runtime",
+                "host-runtime" if host_case else "temporal-runtime",
                 "--target-dir",
                 "/work/local/linux-target",
                 "--test",
-                "runtime",
+                "host_runtime" if host_case else "runtime",
                 test,
                 "--",
                 "--exact",
