@@ -162,7 +162,7 @@ impl IntentAdmission {
         envelope::canonical(self)
     }
     pub fn decode(bytes: &[u8]) -> anyhow::Result<Self> {
-        let value: Self = serde_json::from_value(envelope::strict_json(bytes)?)?;
+        let value: Self = envelope::typed_json(envelope::strict_json(bytes)?)?;
         anyhow::ensure!(value.encode()? == bytes, "noncanonical intent");
         Ok(value)
     }
@@ -239,7 +239,7 @@ impl IntentBatch {
         Ok(bytes)
     }
     pub fn decode(bytes: &[u8]) -> anyhow::Result<Self> {
-        let value: Self = serde_json::from_value(envelope::strict_json(bytes)?)?;
+        let value: Self = envelope::typed_json(envelope::strict_json(bytes)?)?;
         anyhow::ensure!(value.encode()? == bytes, "noncanonical intent batch");
         Ok(value)
     }
