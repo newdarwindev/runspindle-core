@@ -87,3 +87,11 @@ No alternative peer is used to manufacture that missing evidence.
 The final Python-only typing/import-discovery correction passed strict mypy and
 Ruff with isolated import sorting; the full isolated checks were rerun after it.
 Earlier receipts remain in Git history, not counted as final-head evidence.
+
+## Reconciliation with current ingress hardening
+
+The bridge discards callback and response-parser diagnostic content at its public
+boundary. Peer failures and malformed observations return fixed categories without
+retaining the original cause chain. A synthetic canary regression exercises both
+paths. This does not redact valid payloads or qualify an arbitrary injected peer;
+the trusted-peer, explicit authorization and exact-readback requirements remain.

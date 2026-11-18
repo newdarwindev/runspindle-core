@@ -25,6 +25,13 @@ from tools.prepared_builder import select  # noqa: E402
 FEATURES = "verified-authority,authenticated-artifacts"
 mutations = [
     (
+        "untrusted-parser-diagnostic",
+        "malformed_evidence_diagnostics_do_not_echo_untrusted_members_or_values",
+        {
+            'let evidence: Self = serde_json::from_slice(bytes)\n            .map_err(|_| anyhow::anyhow!("invalid artifact evidence encoding"))?;': "let evidence: Self = serde_json::from_slice(bytes)?;",
+        },
+    ),
+    (
         "forged-validator",
         "forged_same_revision_validator_and_producer_signatures_are_rejected",
         {

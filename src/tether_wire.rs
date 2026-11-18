@@ -76,9 +76,13 @@ impl<P: Peer> WireTransport<P> {
         let wire = serde_json::to_vec(
             &json!({"version":VERSION,"action":action,"envelope":self.envelope,"payload":self.payload}),
         )?;
-        let raw = self.peer.exchange(&wire)?;
+        let raw = self
+            .peer
+            .exchange(&wire)
+            .map_err(|_| anyhow::anyhow!("wire peer exchange failed"))?;
         anyhow::ensure!(raw.len() <= 4096, "oversized bridge observation");
-        let observation: Response = serde_json::from_slice(&raw)?;
+        let observation: Response = serde_json::from_slice(&raw)
+            .map_err(|_| anyhow::anyhow!("invalid wire peer observation"))?;
         anyhow::ensure!(
             observation.version == VERSION
                 && observation.request_sha256 == durable::digest(&wire)

@@ -1552,3 +1552,45 @@ fn actual_tether_revocation_after_lost_ack_cannot_deliver_or_retry() {
     assert!(state.receipt.is_none());
     wire_effect_counts(&temp);
 }
+
+#[test]
+fn tether_wire_errors_do_not_retain_peer_or_parser_content() {
+    struct RejectedPeer(bool);
+    impl runspindle_core::tether_wire::Peer for RejectedPeer {
+        fn exchange(&mut self, _: &[u8]) -> anyhow::Result<Vec<u8>> {
+            if self.0 {
+                Err(anyhow::anyhow!("synthetic-private-peer-canary").context("private-context"))
+            } else {
+                Ok(br#"{"synthetic-private-peer-canary":"private-value"}"#.to_vec())
+            }
+        }
+    }
+    for callback in [false, true] {
+        let temp = Temp::new();
+        let request = request(&temp);
+        let mut adapter = runspindle_core::tether_wire::WireTransport::new(
+            &Store::open(temp.db()).unwrap(),
+            request.clone(),
+            "result.bin",
+            "accepted",
+            RejectedPeer(callback),
+        )
+        .unwrap();
+        let error = adapter.lookup(&request).unwrap_err();
+        assert_eq!(error.chain().count(), 1);
+        assert_eq!(
+            error.to_string(),
+            if callback {
+                "wire peer exchange failed"
+            } else {
+                "invalid wire peer observation"
+            }
+        );
+        assert!(!format!("{error:?}").contains("private"));
+        assert!(Outbox::open(temp.db())
+            .unwrap()
+            .snapshot(&request)
+            .unwrap()
+            .is_none());
+    }
+}
