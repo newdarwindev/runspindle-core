@@ -1,0 +1,334 @@
+   Compiling runspindle-core v0.0.0 (/tmp/core17-wire-resolution-20261117)
+    Finished `test` profile [unoptimized] target(s) in 11.46s
+     Running unittests src/lib.rs (/home/standard/.cache/core17-resolution-target/debug/deps/runspindle_core-0e7bab0e4e4a67da)
+
+running 1 test
+test tests::unimplemented_activation_fails_closed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/temporal-runtime.rs (/home/standard/.cache/core17-resolution-target/debug/deps/temporal_runtime-3b666ddc1ab85025)
+
+running 4 tests
+test admission_checkpoints::tests::launch_selector_requires_actual_namespaced_sdk_activity_and_action ... ok
+test admission_checkpoints::tests::replay_or_unknown_completion_cannot_trigger_checkpoint ... ok
+test admission_checkpoints::tests::unsupported_checkpoint_combinations_fail_closed ... ok
+test admission_checkpoints::tests::exact_scope_does_not_stop_other_workflows ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/authenticated_artifacts.rs (/home/standard/.cache/core17-resolution-target/debug/deps/authenticated_artifacts-a2ea2416a8ca50a7)
+
+running 19 tests
+test authenticated_artifact_child ... ok
+
+running 1 test
+test evidence_wire_and_missing_journal_fail_closed ... ok
+test independent_literal_canonical_and_signature_vector ... ok
+test revocation_at_final_commit_check_rolls_back_all_new_rows ... ok
+test byte_replacement_length_mismatch_and_failed_validation_never_accept ... ok
+test legacy_acceptance_cannot_be_upgraded_or_inherit_authenticated_read ... ok
+test authenticated_acceptance_is_not_a_delivery_grant ... ok
+test forged_same_revision_validator_and_producer_signatures_are_rejected ... ok
+test signed_native_identity_policy_principal_and_epoch_need_exact_authority ... ok
+test signatures_bind_real_bytes_and_preserve_exact_acceptance ... ok
+test roles_epochs_revocation_audience_and_lifetimes_fail_closed ... ok
+test evidence_failure_rolls_back_validation_and_acceptance_together ... ok
+test retained_read_rechecks_authority_and_clock_after_byte_read ... ok
+test conflicting_prior_validation_and_corrupt_retained_evidence_are_denied ... ok
+test fresh_process_reopens_exact_evidence_and_rechecks_revocation ... ok
+test conflicting_authenticated_acceptances_race_without_mixed_evidence ... ok
+test expiry_clock_rollback_and_post_read_authority_loss_fail_closed ... ok
+test valid_changed_evidence_cannot_replace_an_existing_acceptance ... ok
+test duplicate_acceptance_denies_missing_or_corrupt_validation_without_repair ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/authority.rs (/home/standard/.cache/core17-resolution-target/debug/deps/authority-dfa553ea8a30c553)
+
+running 13 tests
+test absent_helper_cannot_use_script_authorized_flag ... ok
+test legacy_authority_never_grants_scoped_delivery ... ok
+test assertion_is_immutable_and_revocation_is_retained ... ok
+
+running 1 test
+test scoped_fresh_process_verification ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+running 1 test
+test scoped_revocation_and_unavailable_helper_block_adapter_effects ... ok
+test scoped_fresh_process_verification ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+test scoped_fresh_process_verification ... ok
+test cancellation_permission_does_not_require_reconciliation_permission ... ok
+test separate_actions_exact_wire_and_replayed_request_keep_identity ... ok
+test scoped_exact_destination_and_version_cannot_be_changed ... ok
+test altered_assertion_and_missing_domain_are_not_valid_signatures ... ok
+test scoped_outbox_checks_exact_target_before_any_send_or_lookup ... ok
+test duplicate_authoritative_identities_deny_even_with_valid_first_row ... ok
+test current_revocation_stale_missing_and_conflicting_authoritative_state_deny ... ok
+test signatures_binding_scope_time_and_actions_fail_closed_before_adapter ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/contracts.rs (/home/standard/.cache/core17-resolution-target/debug/deps/contracts-abf6980f9fa346dd)
+
+running 16 tests
+test a_delivered_receipt_cannot_be_replaced_or_regressed_to_uncertain ... ok
+test acceptance_of_a_previous_validation_is_rejected ... ok
+test admission_distinguishes_transport_replay_revision_and_intent ... ok
+test conflicting_payload_host_workspace_policy_and_revision_reuse_are_rejected ... ok
+test host_pin_never_fails_over_and_unknown_is_not_eligible ... ok
+test an_old_acceptance_cannot_accept_a_new_revision_with_identical_bytes ... ok
+test duplicate_delivery_is_not_a_new_reservation ... ok
+test lifecycle_requires_validation_acceptance_and_observed_receipt ... ok
+test delivery_before_acceptance_rejects_without_mutation ... ok
+test all_transitions_reject_changed_digest_identity_revision_or_policy ... ok
+test delivery_id_and_destination_conflicts_reject_in_every_reserved_state ... ok
+test receipt_or_uncertainty_before_reservation_is_rejected ... ok
+test state_transition_matrix_rejects_skip_repeat_and_regression ... ok
+test opaque_ids_reject_empty_whitespace_urls_and_overlong_values ... ok
+test transport_namespaces_do_not_alias_event_ids ... ok
+test uncertain_delivery_requires_reconciliation_not_blind_retry ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/durable_artifacts.rs (/home/standard/.cache/core17-resolution-target/debug/deps/durable_artifacts-c903d46fa81717e2)
+
+running 11 tests
+test child ... ok
+
+running 1 test
+test corrupt_file_and_unversioned_schema_block_without_initialization ... ok
+test invalid_validation_metadata_never_invokes_validator ... ok
+test validation_cannot_be_skipped_forged_overwritten_or_inherited ... ok
+test actual_bytes_are_hashed_and_changed_identity_or_bytes_conflict ... ok
+test fresh_process_after_acceptance_commit_reuses_exact_bytes ... ok
+test stored_byte_tampering_cannot_inherit_acceptance ... ok
+test conflicting_concurrent_acceptances_are_atomic ... ok
+test missing_primary_key_token_boundary_blocks_artifact_reopen ... ok
+test versioned_artifact_store_requires_original_tables_and_safety_triggers ... ok
+test bounded_validations_reconcile_known_entries_at_capacity ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/envelopes.rs (/home/standard/.cache/core17-resolution-target/debug/deps/envelopes-3cf59d5271d6dcfb)
+
+running 2 tests
+test vectors_map_existing_component_types_and_roundtrip ... ok
+test malformed_and_mismatched_context_never_reaches_adapter ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/executable_smoke.rs (/home/standard/.cache/core17-resolution-target/debug/deps/executable_smoke-67199ad0d7b8911c)
+
+running 1 test
+test installed_entrypoint_checks_storage_and_rejects_configuration ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/host_runtime.rs (/home/standard/.cache/core17-resolution-target/debug/deps/host_runtime-dd0b2a5699dd2ca4)
+
+running 5 tests
+test accepted_cancellation_survives_a_terminal_observation_return ... ok
+test invalid_version_default_denial_and_complete_binding_mapping ... ok
+test revoked_authority_and_changed_epoch_have_no_effects ... ok
+test expired_or_revoked_grant_cannot_prepare_dispatch_or_restore_authority ... ok
+test real_host_rejects_ambiguous_stale_rebound_observations_and_preserves_terminal ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/intent.rs (/home/standard/.cache/core17-resolution-target/debug/deps/intent-7b3ad409c58f5a74)
+
+running 11 tests
+test source_cannot_choose_parallel_task_or_actor_intake ... ok
+test canonical_vectors_and_semantic_tampering ... ok
+test latest_edit_batch_executes_latest_only_and_rejects_active_or_bad_prefix ... ok
+test ordering_tombstone_and_conflicts_preserve_history ... ok
+test atomic_chain_never_schedules_superseded_creates_or_edits ... ok
+test delete_cannot_launch_even_with_dispatch_permission ... ok
+test valid_dispatch_then_revocation_has_independent_effect_observation ... ok
+test current_delete_grant_cancels_exact_prior_even_when_original_is_revoked ... ok
+test latest_delete_authorizes_only_proven_same_scope_active_ancestor ... ok
+test signatures_scope_time_and_unavailable_trust_deny_before_effect ... ok
+test full_capacity_reserves_terminal_delete_and_never_reopens ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/outbox.rs (/home/standard/.cache/core17-resolution-target/debug/deps/outbox-41b308e7abd3de47)
+
+running 41 tests
+test child_process ... ok
+
+running 1 test
+
+running 1 test
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+test fabricated_delivery_receipts_do_not_pass_readback ... ok
+test authority_rechecked_after_settlement_lock ... ok
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+test contradictory_acknowledgement_and_readback_are_fenced_across_restart ... ok
+test authority_version_destination_and_operation_bindings_fail_closed ... ok
+test child_process ... test conflict_resolution_requires_separate_authority_and_exact_readback ... okok
+
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+test explicit_readback_conflict_is_durable_without_fake_receipts ... ok
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.01s
+
+
+running 1 test
+
+running 1 test
+test ambiguous_wrong_and_conflicting_receipts_never_overwrite_delivery ... ok
+test existing_v1_evidence_is_retained_but_partial_audit_schema_is_denied ... ok
+test schema_reopen_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.01s
+
+
+running 1 test
+test failed_resolution_commit_rolls_back_audit_and_state ... ok
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+
+running 1 test
+
+running 1 test
+test lost_reply_reconciles_exact_bytes_without_another_send ... ok
+
+running 1 test
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.01s
+
+test schema_reopen_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+test schema_reopen_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+test schema_reopen_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+test matching_resolved_receipt_without_exact_audit_cannot_authorize_replay ... ok
+
+running 1 test
+test schema_reopen_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.02s
+
+test fresh_process_reservation_and_lost_ack_never_resend ... ok
+test resolution_authority_rechecked_after_write_lock ... ok
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.01s
+
+test concurrent_process_owners_send_at_most_once ... ok
+test failed_schema_upgrade_rolls_back_before_fresh_process_retry ... ok
+test missing_primary_key_token_boundary_blocks_outbox_reopen ... ok
+test schema_reopen_child ... ok
+test missing_journal_blocks_fresh_process_without_resend ... ok
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.02s
+
+test legacy_migration_preserves_reservation_across_concurrent_processes ... ok
+test wire_integration_child ... ok
+test wire_resolution_child ... ok
+test fresh_process_resolution_crash_and_racing_resolvers_never_send ... ok
+test resolution_revocation_during_readback_leaves_quarantine_unchanged ... ok
+test resolution_bridge_requires_separate_authority_and_reobserves_exact_decision ... ok
+test resolution_retains_evidence_bytes_and_never_resends_after_restart ... ok
+test tether_wire_exact_readback_and_reconstruction ... ok
+test resolution_bridge_rejects_unbound_or_unknown_evidence_without_clearing ... ok
+test revocation_during_readback_cannot_settle_delivery ... ok
+test full_evidence_table_cannot_erase_observed_conflict ... ok
+test oversized_evidence_cannot_erase_observed_conflict ... ok
+test tether_wire_unbound_unknown_and_synthetic_never_deliver ... ok
+test resolution_bridge_rejects_oversized_refs_and_malformed_selected_identities ... FAILED
+test incomplete_or_incompatible_outbox_schemas_are_never_repaired ... ok
+test actual_tether_revocation_after_lost_ack_cannot_deliver_or_retry ... ok
+test bounded_outbox_preserves_unknown_work_and_duplicate_never_resends ... ok
+test actual_tether_wrong_thread_and_conflict_never_retarget ... ok
+test actual_tether_concurrent_same_resolution_retains_one_decision ... ok
+test actual_tether_journals_wire_readback_and_lost_ack ... ok
+test actual_tether_resolution_revocation_and_changed_bytes_fail_closed ... ok
+test actual_tether_resolution_restarts_lost_replies_and_retained_conflicts ... ok
+
+failures:
+
+---- resolution_bridge_rejects_oversized_refs_and_malformed_selected_identities stdout ----
+
+thread 'resolution_bridge_rejects_oversized_refs_and_malformed_selected_identities' (2977256) panicked at tests/outbox.rs:1968:9:
+assertion failed: ResolutionBridge::new(&Store::open(temp.db()).unwrap(), resolution, decision,
+        "result.bin", "accepted",
+        ResolutionWirePeer {
+            mode: "confirmed",
+            calls: calls.clone(),
+        }).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    resolution_bridge_rejects_oversized_refs_and_malformed_selected_identities
+
+test result: FAILED. 40 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.47s
+
+error: test failed, to rerun pass `--test outbox`

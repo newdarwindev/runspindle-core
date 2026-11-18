@@ -411,6 +411,44 @@ impl Outbox {
         )?;
         Ok(())
     }
+    fn completed_resolution(
+        connection: &rusqlite::Connection,
+        resolution: &ConflictResolution,
+    ) -> anyhow::Result<Option<DeliverySnapshot>> {
+        let Some(current) = Self::read(connection, &resolution.prior.request)? else {
+            return Ok(None);
+        };
+        if current.conflict
+            || current.state != DeliveryState::Delivered
+            || current.receipt.as_ref() != Some(&resolution.receipt)
+            || resolution.prior.generation.checked_add(1) != Some(current.generation)
+        {
+            return Ok(None);
+        }
+        let record: Option<String> = connection.query_row(
+            "SELECT record FROM outbox_evidence WHERE operation=?1 AND generation=?2 AND kind='resolution'",
+            params![resolution.prior.request.delivery_operation_id, resolution.prior.generation], |r| r.get(0)
+        ).optional()?;
+        let Some(record) = record else {
+            return Ok(None);
+        };
+        anyhow::ensure!(
+            serde_json::from_str::<ConflictResolution>(&record)? == *resolution,
+            "resolution decision conflict"
+        );
+        Ok(Some(current))
+    }
+    /// Read-only applicability, not authorization: exact prior or exact retained
+    /// completed decision. A receipt alone never proves the decision was committed.
+    pub fn resolution_applicable(&self, resolution: &ConflictResolution) -> anyhow::Result<bool> {
+        // A cached bridge cannot authorize a resolver effect after retained
+        // accepted bytes/evidence have become invalid, including exact replay.
+        self.store.accepted(&resolution.prior.request.accepted)?;
+        Ok(
+            self.snapshot(&resolution.prior.request)?.as_ref() == Some(&resolution.prior)
+                || Self::completed_resolution(&self.store.connection, resolution)?.is_some(),
+        )
+    }
     /// Resolve quarantine using independent readback only. Never calls send.
     /// Authority callbacks must be fresh, bounded and non-reentrant; a remote
     /// provider must enforce its own atomic authority/route fence.
@@ -436,7 +474,7 @@ impl Outbox {
         );
         self.store.accepted(&request.accepted)?;
         anyhow::ensure!(
-            self.snapshot(request)?.as_ref() == Some(prior),
+            self.resolution_applicable(resolution)?,
             "stale resolution generation"
         );
         anyhow::ensure!(
@@ -458,14 +496,19 @@ impl Outbox {
             .store
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let current = Self::read(&tx, request)?;
+        let completed = Self::completed_resolution(&tx, resolution)?;
         anyhow::ensure!(
-            Self::read(&tx, request)?.as_ref() == Some(prior),
+            current.as_ref() == Some(prior) || completed.is_some(),
             "stale resolution owner"
         );
         anyhow::ensure!(
             authority.verify(request) && resolver.verify_resolution(resolution),
             "resolution authority unavailable after lock"
         );
+        if let Some(completed) = completed {
+            return Ok(completed);
+        }
         let next = prior
             .generation
             .checked_add(1)

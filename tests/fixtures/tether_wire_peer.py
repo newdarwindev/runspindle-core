@@ -48,17 +48,39 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--expected", type=Path, required=True)
+    parser.add_argument("--conflict-snapshot", action="store_true")
     args = parser.parse_args()
     expected = json.loads(args.expected.read_bytes(), object_pairs_hook=pairs)
-    raw = sys.stdin.buffer.read(3_145_729)
+    raw = (
+        canonical(expected)
+        if args.conflict_snapshot
+        else sys.stdin.buffer.read(3_145_729)
+    )
     if len(raw) > 3_145_728:
         raise ValueError("oversize request")
     request = json.loads(raw, object_pairs_hook=pairs)
+    resolving = request.get("version") == "runspindle.tether-wire-resolution-bridge.v1"
+    trusted_decision = (
+        json.loads(
+            (args.root / "resolution-decision.json").read_bytes(),
+            object_pairs_hook=pairs,
+        )
+        if resolving
+        else None
+    )
     if (
         canonical(request) != raw
-        or set(request) != {"version", "action", "envelope", "payload"}
-        or request["version"] != VERSION
-        or request["action"] not in {"send", "lookup"}
+        or set(request)
+        != (
+            {"version", "action", "envelope", "payload", "decision"}
+            if resolving
+            else {"version", "action", "envelope", "payload"}
+        )
+        or request["version"]
+        != ("runspindle.tether-wire-resolution-bridge.v1" if resolving else VERSION)
+        or request["action"]
+        not in ({"resolve", "lookup_resolution"} if resolving else {"send", "lookup"})
+        or (resolving and request["decision"] != trusted_decision)
         or request["envelope"] != expected["envelope"]
         or request["payload"] != expected["payload"]
     ):
@@ -121,6 +143,47 @@ def main() -> None:
         lambda _: active(),
     )
     try:
+        if resolving or args.conflict_snapshot:
+            module = importlib.import_module("tether.wire_resolution")
+            resolution = module.ResolutionJournal(
+                str(args.root / "resolution.db"),
+                journal,
+                lambda value, digest, decision: active()
+                and not (args.root / "resolver-revoked").exists()
+                and value == envelope
+                and digest == payload.digest()
+                and decision == canonical(trusted_decision),
+            )
+            try:
+                if args.conflict_snapshot:
+                    sys.stdout.buffer.write(
+                        resolution.conflict_snapshot(envelope, payload)
+                    )
+                    return
+                result = resolution.resolve(
+                    envelope, payload, module.ResolutionDecision(**trusted_decision)
+                )
+                if (
+                    fault == "lost:resolution-response"
+                    and request["action"] == "resolve"
+                ):
+                    os._exit(32)
+                sys.stdout.buffer.write(
+                    canonical(
+                        {
+                            "version": request["version"],
+                            "request_sha256": hashlib.sha256(raw).hexdigest(),
+                            "decision_sha256": result.decision_sha256,
+                            "evidence_class": result.evidence_class,
+                            "state": result.state,
+                            "file_id": result.file_id,
+                            "message_id": result.message_id,
+                        }
+                    )
+                )
+                return
+            finally:
+                resolution.close()
         result = getattr(journal, request["action"])(envelope, payload)
         if fault == "lost:bridge-response" and request["action"] == "send":
             os._exit(32)
