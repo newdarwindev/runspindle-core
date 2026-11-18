@@ -67,3 +67,6 @@ pub mod tether_wire;
 
 #[cfg(all(feature = "authenticated-artifacts", feature = "delivery-runtime"))]
 pub mod authenticated_delivery;
+
+#[cfg(feature = "artifact-store")]
+pub mod browser_effect_wire;
