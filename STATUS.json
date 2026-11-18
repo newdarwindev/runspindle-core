@@ -141,5 +141,16 @@
     "top_level_tests_each": 144,
     "live_acceptance": "not_run",
     "parent_issue_closure": "not_claimed"
+  },
+  "browser_control_owner": {
+    "status": "synthetic_component_candidate",
+    "canonical_owner": "existing Core BrowserRegistry file; head pointer references retained transition",
+    "tests": "15 control + 29 adjacent native tests pass; scaffold passed",
+    "not_qualified": [
+      "native drain/fence adapter",
+      "legacy import and one-way owner cutover",
+      "operational schema migration",
+      "Actions CI"
+    ]
   }
 }

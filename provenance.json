@@ -102,5 +102,11 @@
     "source_commit": "e283957d80aebc48fb0bd3b6e2a600850ff6dc97",
     "pin": "fixtures/shared-v1.pin.json",
     "runtime_qualification": "unchanged_not_inferred"
+  },
+  "browser_control_owner_source": {
+    "classification": "original typed Core state coordination and synthetic tests",
+    "dependencies": "existing pinned rusqlite/serde; no new packages or service",
+    "legacy_source_import": "none; legacy Browser storage untouched",
+    "contract": "docs/BROWSER_CONTROL_OWNER.md"
   }
 }

@@ -7,7 +7,7 @@ use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBeha
 use std::{path::Path, time::Duration};
 
 pub const CAPACITY: u64 = 1024;
-const APPLICATION_ID: u32 = 0x42524547;
+pub(crate) const APPLICATION_ID: u32 = 0x42524547;
 const SCHEMA: &[SchemaObject] = &[
     ("table", "browser_operations", "CREATE TABLE IF NOT EXISTS browser_operations(identity TEXT PRIMARY KEY,operation TEXT NOT NULL UNIQUE,target TEXT NOT NULL CHECK(length(target)<=8192),payload BLOB NOT NULL CHECK(length(payload)>0 AND length(payload)<=1048576),digest TEXT NOT NULL CHECK(length(digest)=64),observation TEXT NOT NULL CHECK(observation IN ('unknown','confirmed','rejected')),conflict INTEGER NOT NULL CHECK(conflict IN (0,1)),generation INTEGER NOT NULL CHECK(generation>=0));"),
     ("trigger", "browser_binding_immutable", "CREATE TRIGGER IF NOT EXISTS browser_binding_immutable BEFORE UPDATE OF identity,operation,target,payload,digest ON browser_operations BEGIN SELECT RAISE(ABORT,'immutable browser binding');END;"),
@@ -23,14 +23,14 @@ pub struct HistoricalSnapshot {
     pub conflict: bool,
     pub generation: u64,
 }
-struct Record {
-    snapshot: HistoricalSnapshot,
-    payload: Vec<u8>,
+pub(crate) struct Record {
+    pub(crate) snapshot: HistoricalSnapshot,
+    pub(crate) payload: Vec<u8>,
 }
 pub struct BrowserRegistry {
-    connection: Connection,
+    pub(crate) connection: Connection,
 }
-fn identity(target: &Target) -> anyhow::Result<String> {
+pub(crate) fn identity(target: &Target) -> anyhow::Result<String> {
     Ok(serde_json::to_string(&(
         &target.binding.principal,
         &target.binding.intent,
@@ -52,26 +52,51 @@ fn label(value: Outcome) -> &'static str {
         Outcome::Rejected => "rejected",
     }
 }
-fn schema(connection: &Connection) -> anyhow::Result<()> {
+pub(crate) fn schema(connection: &Connection) -> anyhow::Result<()> {
     let app: u32 = connection.pragma_query_value(None, "application_id", |r| r.get(0))?;
     let version: u32 = connection.pragma_query_value(None, "user_version", |r| r.get(0))?;
     anyhow::ensure!(
-        app == APPLICATION_ID && version == 1,
+        app == APPLICATION_ID && (version == 1 || version == 2),
         "unsupported browser registry"
     );
     require_schema(connection, SCHEMA)?;
+    if version == 2 {
+        require_schema(connection, crate::browser_control::SCHEMA)?;
+        let heads: u64 =
+            connection.query_row("SELECT count(*) FROM browser_control_heads", [], |r| {
+                r.get(0)
+            })?;
+        anyhow::ensure!(
+            heads <= crate::browser_control::CAPACITY,
+            "control head capacity"
+        );
+    }
     let objects: u64 = connection.query_row(
         "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'",
         [],
         |r| r.get(0),
     )?;
     anyhow::ensure!(
-        objects == SCHEMA.len() as u64,
+        objects
+            == (SCHEMA.len()
+                + if version == 2 {
+                    crate::browser_control::SCHEMA.len()
+                } else {
+                    0
+                }) as u64,
         "unexpected browser registry schema"
     );
     let rows: u64 =
         connection.query_row("SELECT count(*) FROM browser_operations", [], |r| r.get(0))?;
-    anyhow::ensure!(rows <= CAPACITY, "browser registry capacity");
+    anyhow::ensure!(
+        rows <= CAPACITY
+            + if version == 2 {
+                crate::browser_control::CAPACITY
+            } else {
+                0
+            },
+        "browser registry capacity"
+    );
     Ok(())
 }
 fn empty(connection: &Connection) -> anyhow::Result<bool> {
@@ -81,13 +106,11 @@ fn empty(connection: &Connection) -> anyhow::Result<bool> {
         connection.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get(0))?;
     Ok(app == 0 && version == 0 && objects == 0)
 }
-fn read(connection: &Connection, target: &Target) -> anyhow::Result<Option<Record>> {
-    anyhow::ensure!(target.valid(), "invalid browser target");
+pub(crate) fn validated_targets(connection: &Connection) -> anyhow::Result<Vec<Target>> {
     schema(connection)?;
-    let key = identity(target)?;
     // Scan only bounded metadata before trusting absence. Corrupting both SQL
     // keys must not hide an old reservation and permit a second dispatch.
-    let mut metadata=connection.prepare("SELECT CASE WHEN length(CAST(identity AS BLOB))<=1024 THEN identity END,CASE WHEN length(CAST(operation AS BLOB))<=128 THEN operation END,CASE WHEN length(CAST(target AS BLOB))<=8192 THEN target END FROM browser_operations")?;
+    let mut metadata=connection.prepare("SELECT CASE WHEN typeof(identity)='text' AND length(CAST(identity AS BLOB))<=1024 THEN identity END,CASE WHEN typeof(operation)='text' AND length(CAST(operation AS BLOB))<=128 THEN operation END,CASE WHEN typeof(target)='text' AND length(CAST(target AS BLOB))<=8192 THEN target END FROM browser_operations")?;
     let rows = metadata.query_map([], |r| {
         Ok((
             r.get::<_, Option<String>>(0)?,
@@ -95,6 +118,7 @@ fn read(connection: &Connection, target: &Target) -> anyhow::Result<Option<Recor
             r.get::<_, Option<String>>(2)?,
         ))
     })?;
+    let mut targets = Vec::new();
     for row in rows {
         let (Some(key), Some(op), Some(raw)) = row? else {
             anyhow::bail!("invalid browser metadata bounds")
@@ -105,8 +129,16 @@ fn read(connection: &Connection, target: &Target) -> anyhow::Result<Option<Recor
             retained.valid() && key == identity(&retained)? && op == retained.binding.operation,
             "invalid browser metadata binding"
         );
+        targets.push(retained);
     }
-    let row=connection.query_row("SELECT CASE WHEN length(CAST(identity AS BLOB))<=1024 THEN identity END,CASE WHEN length(CAST(operation AS BLOB))<=128 THEN operation END,CASE WHEN length(CAST(target AS BLOB))<=8192 THEN target END,CASE WHEN length(payload)<=1048576 THEN payload END,CASE WHEN length(CAST(digest AS BLOB))=64 THEN digest END,CASE WHEN length(CAST(observation AS BLOB))<=9 THEN observation END,conflict,generation FROM browser_operations WHERE identity=?1 OR operation=?2",params![key,target.binding.operation],|r|Ok((r.get::<_,Option<String>>(0)?,r.get::<_,Option<String>>(1)?,r.get::<_,Option<String>>(2)?,r.get::<_,Option<Vec<u8>>>(3)?,r.get::<_,Option<String>>(4)?,r.get::<_,Option<String>>(5)?,r.get::<_,i64>(6)?,r.get::<_,i64>(7)?))).optional()?;
+    Ok(targets)
+}
+pub(crate) fn read(connection: &Connection, target: &Target) -> anyhow::Result<Option<Record>> {
+    anyhow::ensure!(target.valid(), "invalid browser target");
+    schema(connection)?;
+    let key = identity(target)?;
+    validated_targets(connection)?;
+    let row=connection.query_row("SELECT CASE WHEN length(CAST(identity AS BLOB))<=1024 THEN identity END,CASE WHEN length(CAST(operation AS BLOB))<=128 THEN operation END,CASE WHEN length(CAST(target AS BLOB))<=8192 THEN target END,CASE WHEN typeof(payload)='blob' AND length(payload)<=?3 THEN payload END,CASE WHEN length(CAST(digest AS BLOB))=64 THEN digest END,CASE WHEN length(CAST(observation AS BLOB))<=9 THEN observation END,conflict,generation FROM browser_operations WHERE identity=?1 OR operation=?2",params![key,target.binding.operation,if crate::browser_control::reserved(target) {16384} else {1048576}],|r|Ok((r.get::<_,Option<String>>(0)?,r.get::<_,Option<String>>(1)?,r.get::<_,Option<String>>(2)?,r.get::<_,Option<Vec<u8>>>(3)?,r.get::<_,Option<String>>(4)?,r.get::<_,Option<String>>(5)?,r.get::<_,i64>(6)?,r.get::<_,i64>(7)?))).optional()?;
     let Some(row) = row else { return Ok(None) };
     let (
         Some(stored_key),
@@ -197,6 +229,10 @@ impl BrowserRegistry {
         &self,
         target: &Target,
     ) -> anyhow::Result<Option<HistoricalSnapshot>> {
+        anyhow::ensure!(
+            !crate::browser_control::reserved(target),
+            "control requires typed admission"
+        );
         let tx = self.connection.unchecked_transaction()?;
         let result = read(&tx, target)?.map(|r| r.snapshot);
         tx.commit()?;
@@ -215,6 +251,10 @@ impl BrowserRegistry {
         authority: &A,
         peer: &mut P,
     ) -> anyhow::Result<Outcome> {
+        anyhow::ensure!(
+            !crate::browser_control::reserved(&target),
+            "control requires typed admission"
+        );
         let client = Client::new(target.clone(), payload)?;
         match action {
             Action::Dispatch => self.dispatch(target, payload, authority, peer),
@@ -237,6 +277,10 @@ impl BrowserRegistry {
         authority: &A,
         peer: &mut P,
     ) -> anyhow::Result<Outcome> {
+        anyhow::ensure!(
+            !crate::browser_control::reserved(&target),
+            "control requires typed admission"
+        );
         let client = Client::new(target.clone(), payload)?;
         anyhow::ensure!(
             authority.verify(&target, client.payload_digest(), Action::Dispatch),
@@ -255,8 +299,10 @@ impl BrowserRegistry {
             tx.commit()?;
             return Ok(Outcome::Unknown);
         }
-        let count: u64 =
-            tx.query_row("SELECT count(*) FROM browser_operations", [], |r| r.get(0))?;
+        let count = validated_targets(&tx)?
+            .iter()
+            .filter(|t| !crate::browser_control::reserved(t))
+            .count() as u64;
         anyhow::ensure!(count < CAPACITY, "browser registry capacity");
         let raw = serde_json::to_string(&target)
             .map_err(|_| anyhow::anyhow!("invalid browser target"))?;
@@ -282,6 +328,10 @@ impl BrowserRegistry {
         authority: &A,
         peer: &mut P,
     ) -> anyhow::Result<Outcome> {
+        anyhow::ensure!(
+            !crate::browser_control::reserved(target),
+            "control requires typed admission"
+        );
         let tx = self.connection.unchecked_transaction()?;
         let retained =
             read(&tx, target)?.ok_or_else(|| anyhow::anyhow!("missing browser reservation"))?;
