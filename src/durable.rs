@@ -400,19 +400,41 @@ impl Store {
         Ok(accepted)
     }
     pub fn accepted(&self, accepted: &Accepted) -> anyhow::Result<Vec<u8>> {
+        // Keep acceptance, validation and bytes in one read snapshot. Outbox callers
+        // already inside a transaction retain their existing snapshot.
+        if self.connection.is_autocommit() {
+            let tx = self.connection.unchecked_transaction()?;
+            Self::read_accepted(&tx, accepted)
+        } else {
+            Self::read_accepted(&self.connection, accepted)
+        }
+    }
+    fn read_accepted(connection: &Connection, accepted: &Accepted) -> anyhow::Result<Vec<u8>> {
         anyhow::ensure!(
             accepted.validation.valid() && accepted.validation.passed,
             "invalid acceptance"
         );
-        let stored: String = self.connection.query_row(
-            "SELECT record FROM acceptances WHERE identity=?1",
+        let artifact_key = accepted.artifact().key()?;
+        let (stored, artifact_identity): (String, String) = connection.query_row(
+            "SELECT record,artifact_identity FROM acceptances WHERE identity=?1",
             [accepted.key()?],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )?;
         anyhow::ensure!(
-            serde_json::from_str::<Accepted>(&stored)? == *accepted,
+            serde_json::from_str::<Accepted>(&stored)? == *accepted
+                && artifact_identity == artifact_key,
             "accepted reference conflict"
         );
-        self.bytes(accepted.artifact())
+        let (validation_record, validation_artifact): (String, String) = connection.query_row(
+            "SELECT record,artifact_identity FROM validations WHERE identity=?1",
+            [accepted.validation.key()?],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        anyhow::ensure!(
+            serde_json::from_str::<Validation>(&validation_record)? == accepted.validation
+                && validation_artifact == artifact_key,
+            "retained validation conflict"
+        );
+        Self::read_bytes(connection, accepted.artifact())
     }
 }

@@ -424,3 +424,138 @@ fn missing_primary_key_token_boundary_blocks_artifact_reopen() {
         );
     }
 }
+
+#[test]
+fn retained_validation_child() {
+    let Ok(root) = std::env::var("CORE_RETAINED_VALIDATION_ROOT") else {
+        return;
+    };
+    let root = PathBuf::from(root);
+    let accepted: Accepted =
+        serde_json::from_slice(&std::fs::read(root.join("accepted.json")).unwrap()).unwrap();
+    let store = Store::open(root.join("core.sqlite")).unwrap();
+    assert!(
+        store.accepted(&accepted).is_err(),
+        "corrupt retained validation released accepted bytes"
+    );
+}
+
+#[test]
+fn corrupt_retained_validation_blocks_fresh_process_byte_release() {
+    for mode in [
+        "missing",
+        "malformed",
+        "changed",
+        "binding",
+        "acceptance-binding",
+    ] {
+        let t = Temp::new();
+        let mut store = Store::open(t.db()).unwrap();
+        let (_, validation) = prepare(&mut store, "artifact");
+        let accepted = store.accept(VERSION, &validation, &Grant).unwrap();
+        std::fs::write(
+            t.0.join("accepted.json"),
+            serde_json::to_vec(&accepted).unwrap(),
+        )
+        .unwrap();
+        drop(store);
+        let db = rusqlite::Connection::open(t.db()).unwrap();
+        let before: String = db
+            .query_row("SELECT record FROM acceptances", [], |r| r.get(0))
+            .unwrap();
+        let triggers: Vec<String> = db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name IN ('validations_immutable','validations_retained','acceptances_immutable')").unwrap().query_map([], |r| r.get(0)).unwrap().collect::<Result<_,_>>().unwrap();
+        // Controlled corruption injection, not a supported application write.
+        db.execute_batch("PRAGMA foreign_keys=OFF; DROP TRIGGER validations_immutable; DROP TRIGGER validations_retained; DROP TRIGGER acceptances_immutable;").unwrap();
+        match mode {
+            "missing" => {
+                db.execute("DELETE FROM validations", []).unwrap();
+            }
+            "malformed" => {
+                db.execute("UPDATE validations SET record='{'", []).unwrap();
+            }
+            "changed" => {
+                let mut changed = validation.clone();
+                changed.passed = false;
+                db.execute(
+                    "UPDATE validations SET record=?1",
+                    [serde_json::to_string(&changed).unwrap()],
+                )
+                .unwrap();
+            }
+            "acceptance-binding" => {
+                db.execute(
+                    "UPDATE acceptances SET artifact_identity='wrong-artifact'",
+                    [],
+                )
+                .unwrap();
+            }
+            _ => {
+                db.execute(
+                    "UPDATE validations SET artifact_identity='wrong-artifact'",
+                    [],
+                )
+                .unwrap();
+            }
+        }
+        for sql in triggers {
+            db.execute_batch(&sql).unwrap();
+        }
+        let acceptance_link: String = db
+            .query_row("SELECT artifact_identity FROM acceptances", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        let corrupt: Vec<(String, String)> = db
+            .prepare("SELECT record,artifact_identity FROM validations")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "retained_validation_child", "--nocapture"])
+            .env("CORE_RETAINED_VALIDATION_ROOT", &t.0)
+            .spawn()
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        let status = loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                break status;
+            }
+            if std::time::Instant::now() >= deadline {
+                child.kill().unwrap();
+                child.wait().unwrap();
+                panic!("retained-validation child timed out");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        };
+        assert!(status.success(), "mode {mode}");
+        assert_eq!(
+            db.query_row("SELECT record FROM acceptances", [], |r| r
+                .get::<_, String>(0))
+                .unwrap(),
+            before
+        );
+        assert_eq!(
+            db.query_row("SELECT bytes FROM artifacts", [], |r| r
+                .get::<_, Vec<u8>>(0))
+                .unwrap(),
+            BYTES
+        );
+        let after: Vec<(String, String)> = db
+            .prepare("SELECT record,artifact_identity FROM validations")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(after, corrupt, "no implicit repair");
+        assert_eq!(
+            db.query_row("SELECT artifact_identity FROM acceptances", [], |r| r
+                .get::<_, String>(0))
+                .unwrap(),
+            acceptance_link,
+            "no acceptance-link repair"
+        );
+    }
+}

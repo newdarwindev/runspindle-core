@@ -99,3 +99,16 @@ or evidence completeness. Logical row corruption, admission/Temporal history
 recovery, storage-device faults, upgrade compatibility beyond these layouts,
 authenticated Tether transport and production/native/live acceptance remain
 separate open work. No detected corruption is interpreted as permission to resend.
+
+## Retained validation read invariant
+
+Accepted-byte reads additionally require the exact retained validation and the
+matching artifact identity on both validation and acceptance rows, in one SQLite
+read snapshot. Missing/malformed/changed validation or either misbound artifact
+link blocks byte release without repair. A bounded fresh-process regression
+injects these five logical corruptions behind restored schema triggers; a
+separate outbox regression independently observes zero send/lookup calls when
+validation is missing. The controlled injector disables foreign keys for invalid
+links; this is not a supported application write or filesystem fault simulation.
+Generic acceptance remains distinct from cryptographic/current-authority checks.
+This does not complete admission-store, filesystem or power-loss qualification.

@@ -17,7 +17,14 @@ from tools.prepared_builder import select  # noqa: E402
 source = (ROOT / "src/durable.rs").read_text()
 start = source.index("        let stored: String = tx.query_row(")
 end = source.index("        anyhow::ensure!(", start)
+retained_start = source.index("        let (validation_record, validation_artifact):")
+retained_end = source.index("        anyhow::ensure!(", retained_start)
 mutations = {
+    "retained_validation": (
+        source[retained_start:retained_end],
+        "        let (validation_record, validation_artifact) = "
+        "(serde_json::to_string(&accepted.validation)?, artifact_key.clone());\n",
+    ),
     "schema_token_boundary": ("normalized.push(' ');", ""),
     "skipped_validation": (
         source[start:end],
@@ -98,6 +105,11 @@ for name, (old, new) in mutations.items():
             and "test result: FAILED" in run.stdout
             and "could not compile" not in run.stdout
         ), run.stdout[-5000:]
+        if name == "retained_validation":
+            assert (
+                "corrupt_retained_validation_blocks_fresh_process_byte_release ... FAILED"
+                in run.stdout
+            ), run.stdout[-5000:]
         results.append({"mutation": name, "behavioral_failure_observed": True})
 print(
     json.dumps(
