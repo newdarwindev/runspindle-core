@@ -28,6 +28,19 @@ use temporalio_sdk::{
 #[derive(Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
+    #[cfg(feature = "artifact-store")]
+    StartBrowser {
+        target: runspindle_core::browser_effect_wire::Target,
+    },
+    #[cfg(feature = "artifact-store")]
+    Browser {
+        workflow_id: String,
+    },
+    #[cfg(feature = "artifact-store")]
+    ReconcileBrowser {
+        workflow_id: String,
+        target: runspindle_core::browser_effect_wire::Target,
+    },
     #[cfg(feature = "verified-authority")]
     StartIntent {
         wire: String,
@@ -238,6 +251,9 @@ async fn main() -> anyhow::Result<()> {
             .register_workflow::<runspindle_core::scoped_authenticated::ScopedRegistryV1>()?
             .register_workflow::<runspindle_core::scoped_authenticated::ScopedOperationV1>()?
             .register_workflow::<runspindle_core::intent_runtime::IntentWorkflowV1>()?;
+        #[cfg(feature = "artifact-store")]
+        let replay_options = replay_options
+            .register_workflow::<runspindle_core::browser_runtime::BrowserWorkflow>()?;
         let replayer = WorkflowReplayer::new(replay_options.build())?;
         replayer.replay_workflow(history).await?;
         println!("{{\"status\":\"passed\",\"evidence_class\":\"isolated_integration\",\"check\":\"history_replay\"}}");
@@ -261,6 +277,7 @@ async fn main() -> anyhow::Result<()> {
     let mode = args.get(1).map(String::as_str).unwrap_or("");
     anyhow::ensure!(
         matches!(mode, "worker" | "client")
+            || (cfg!(feature = "artifact-store") && mode == "browser-worker")
             || (cfg!(feature = "verified-authority")
                 && matches!(
                     mode,
@@ -383,6 +400,25 @@ async fn main() -> anyhow::Result<()> {
             .await?;
         return Ok(());
     }
+    #[cfg(feature = "artifact-store")]
+    if mode == "browser-worker" {
+        use runspindle_core::browser_runtime::{BrowserPorts, BrowserWorkflow};
+        anyhow::ensure!(
+            args.len() <= 4 && args.get(3).is_none_or(|p| p == "/effects"),
+            "explicit synthetic /effects directory required"
+        );
+        let runtime = Runtime::from_current_tokio(Default::default())?;
+        let options = WorkerOptions::new(runspindle_core::browser_runtime::QUEUE)
+            .register_workflow::<BrowserWorkflow>()?
+            .register_activities(BrowserPorts {
+                directory: args.get(3).map(PathBuf::from),
+            })
+            .build();
+        Worker::new(&runtime, client, options)?
+            .run_until(tokio::signal::ctrl_c())
+            .await?;
+        return Ok(());
+    }
     if mode == "worker" {
         let runtime = Runtime::from_current_tokio(Default::default())?;
         let script_directory = args.get(3).map(PathBuf::from);
@@ -432,6 +468,46 @@ async fn main() -> anyhow::Result<()> {
     anyhow::ensure!(input.len() <= 1_048_576, "oversized input");
     let command: Command = serde_json::from_str(&input)?;
     let result = match command {
+        #[cfg(feature = "artifact-store")]
+        Command::StartBrowser { target } => {
+            use runspindle_core::browser_runtime::{workflow_id, BrowserWorkflow};
+            let id = workflow_id(&target)?;
+            let options =
+                WorkflowStartOptions::new(runspindle_core::browser_runtime::QUEUE, id.clone())
+                    .id_reuse_policy(temporalio_client::WorkflowIdReusePolicy::RejectDuplicate)
+                    .id_conflict_policy(temporalio_client::WorkflowIdConflictPolicy::Fail)
+                    .execution_timeout(Duration::from_secs(600))
+                    .build();
+            let h = client
+                .start_workflow(BrowserWorkflow::run, target, options)
+                .await?;
+            serde_json::json!({"workflow_id":id,"run_id":h.run_id()})
+        }
+        #[cfg(feature = "artifact-store")]
+        Command::Browser { workflow_id } => serde_json::to_value(
+            client
+                .get_workflow_handle::<runspindle_core::browser_runtime::BrowserWorkflow>(
+                    workflow_id,
+                )
+                .query(
+                    runspindle_core::browser_runtime::BrowserWorkflow::snapshot,
+                    (),
+                    Default::default(),
+                )
+                .await?,
+        )?,
+        #[cfg(feature = "artifact-store")]
+        Command::ReconcileBrowser {
+            workflow_id,
+            target,
+        } => {
+            anyhow::ensure!(
+                workflow_id == runspindle_core::browser_runtime::workflow_id(&target)?,
+                "browser workflow identity mismatch"
+            );
+            serde_json::json!({"accepted":client.get_workflow_handle::<runspindle_core::browser_runtime::BrowserWorkflow>(workflow_id).execute_update(runspindle_core::browser_runtime::BrowserWorkflow::request_reconcile,target,Default::default()).await?})
+        }
+
         #[cfg(feature = "verified-authority")]
         Command::StartAuthenticated { registry_id } => {
             use runspindle_core::authenticated::*;

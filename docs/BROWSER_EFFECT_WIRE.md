@@ -69,8 +69,8 @@ post-exchange-authority mutants require behavioral failures against clean baseli
 ## Remaining work
 
 The separate [BrowserRegistry](BROWSER_EFFECT_REGISTRY.md) now retains Core
-identity and exact payload across process exits. No Temporal Browser operation
-workflow is wired to it yet. Production Browser/site-specific observation and input
+identity and exact payload across process exits. The [synthetic Temporal Browser workflow](BROWSER_TEMPORAL.md) coordinates it
+with a scripted peer. Production Browser/site-specific observation and input
 adapters, issuer custody, distributed fencing and full F03/F07 acceptance remain
 open. Earlier runtime-image/Temporal receipts keep their original source pins;
 this client-level verification does not relabel those images as rebuilt.
