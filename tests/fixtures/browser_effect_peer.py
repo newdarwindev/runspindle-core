@@ -9,10 +9,12 @@ import hashlib
 import importlib
 import importlib.util
 import json
+import os
 import socket
 import sqlite3
 import sys
 from contextlib import contextmanager
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Iterator
 from unittest.mock import patch
@@ -74,8 +76,9 @@ def main() -> None:
     grant = guarded.Grant(target, digest, args.action, 20.0)
     ledger = sqlite3.connect(args.root / "site.sqlite")
     ledger.executescript(
-        "CREATE TABLE IF NOT EXISTS calls(action TEXT); CREATE TABLE IF NOT EXISTS effects(operation TEXT PRIMARY KEY,payload BLOB NOT NULL);"
+        "CREATE TABLE IF NOT EXISTS exchanges(action TEXT); CREATE TABLE IF NOT EXISTS calls(action TEXT); CREATE TABLE IF NOT EXISTS effects(operation TEXT PRIMARY KEY,payload BLOB NOT NULL,target TEXT NOT NULL);"
     )
+    ledger.execute("INSERT INTO exchanges VALUES(?)", (args.action,))
     ledger.commit()
 
     class Trusted:
@@ -104,8 +107,16 @@ def main() -> None:
             if not self.current(value) or guard is not self or data != payload:
                 raise ValueError("invalid trusted submission")
             ledger.execute("INSERT INTO calls VALUES('submit')")
+            ledger.commit()
+            if (args.root / "crash-before-site").exists():
+                os._exit(94)
             ledger.execute(
-                "INSERT INTO effects VALUES(?,?)", (target.binding.operation, data)
+                "INSERT INTO effects VALUES(?,?,?)",
+                (
+                    target.binding.operation,
+                    data,
+                    json.dumps(asdict(target), sort_keys=True),
+                ),
             )
             ledger.commit()
             raise RuntimeError("synthetic accepted response lost")

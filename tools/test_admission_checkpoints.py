@@ -5,6 +5,7 @@ No file/network test checkpoint executes inside deterministic workflow logic.
 Admission mutation and child intent can be one workflow-task transaction; the
 pre-commit cases explicitly do not claim a separately durable mutation gap.
 """
+
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
@@ -264,6 +265,11 @@ def prior_image(root, prepared):
         root / "temporal/toolchain.json",
         *sorted((root / "src").rglob("*.rs")),
     ]
+    if (root / "src/browser_fixture_peer.rs").is_file():
+        paths += [
+            root / "tests/fixtures/browser_effect_peer.py",
+            root / "tests/fixtures/browser_source_pin.json",
+        ]
     require(
         {str(p.relative_to(root)): sha(p) for p in paths} == declared["source_hashes"],
         "prior source bytes changed",

@@ -200,6 +200,8 @@ pub struct BrowserObservation {
 }
 pub struct BrowserPorts {
     pub directory: Option<PathBuf>,
+    /// Explicit development-only mode; never accepted from workflow input.
+    pub pinned_fixture: bool,
 }
 impl BrowserPorts {
     pub fn invoke(&self, call: BrowserCall) -> anyhow::Result<BrowserObservation> {
@@ -212,6 +214,10 @@ impl BrowserPorts {
             .directory
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("browser defaults to deny"))?;
+        anyhow::ensure!(
+            !self.pinned_fixture || directory == Path::new("/effects"),
+            "fixed pinned fixture root required"
+        );
         let configuration = script(directory)?;
         let action = if call.reconcile {
             Action::Reconcile
@@ -223,12 +229,44 @@ impl BrowserPorts {
             "browser denied"
         );
         let mut registry = BrowserRegistry::open(directory.join("browser-registry.sqlite"))?;
-        let mut peer = SyntheticPeer(directory);
-        let result = if call.reconcile {
-            registry.reconcile(&call.target, &Grant(directory), &mut peer)?
+        let payload = if call.reconcile {
+            None
         } else {
-            let payload = read(&directory.join("browser-payload.bin"), MAX_PAYLOAD)?;
-            registry.dispatch(call.target, &payload, &Grant(directory), &mut peer)?
+            Some(read(&directory.join("browser-payload.bin"), MAX_PAYLOAD)?)
+        };
+        let result = if self.pinned_fixture {
+            anyhow::ensure!(
+                directory == Path::new("/effects"),
+                "fixed pinned fixture root required"
+            );
+            let mut peer = PinnedPeer {
+                directory,
+                target: &call.target,
+                hash: &configuration.expected_sha256,
+                action,
+            };
+            if call.reconcile {
+                registry.reconcile(&call.target, &Grant(directory), &mut peer)?
+            } else {
+                registry.dispatch(
+                    call.target.clone(),
+                    payload.as_deref().expect("dispatch payload"),
+                    &Grant(directory),
+                    &mut peer,
+                )?
+            }
+        } else {
+            let mut peer = SyntheticPeer(directory);
+            if call.reconcile {
+                registry.reconcile(&call.target, &Grant(directory), &mut peer)?
+            } else {
+                registry.dispatch(
+                    call.target,
+                    payload.as_deref().expect("dispatch payload"),
+                    &Grant(directory),
+                    &mut peer,
+                )?
+            }
         };
         Ok(BrowserObservation {
             outcome: match result {
@@ -237,6 +275,19 @@ impl BrowserPorts {
                 Outcome::Rejected => "rejected",
             }
             .into(),
+        })
+    }
+}
+struct PinnedPeer<'a> {
+    directory: &'a Path,
+    target: &'a Target,
+    hash: &'a str,
+    action: Action,
+}
+impl Peer for PinnedPeer<'_> {
+    fn exchange(&mut self, raw: &[u8]) -> anyhow::Result<Vec<u8>> {
+        crate::browser_fixture_peer::exchange(raw, self.action, || {
+            Grant(self.directory).verify(self.target, self.hash, self.action)
         })
     }
 }

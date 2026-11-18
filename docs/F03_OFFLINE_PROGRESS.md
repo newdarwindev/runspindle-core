@@ -31,3 +31,8 @@ the durable registry to a distinct workflow/activity family. Actual site adapter
 and full composition acceptance remain open. The standalone actual Browser
 receiver tests and scripted Temporal peer lane are separate evidence, not a claim
 that a real browser was exercised through Temporal.
+
+The [pinned actual Browser receiver mode](BROWSER_TEMPORAL_PINNED.md) additionally
+connects Temporal through Core to the real Browser guarded journal. Synthetic
+site effects and authority remain explicit; real browser/site adapters and full
+acceptance are still outstanding.

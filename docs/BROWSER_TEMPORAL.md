@@ -72,3 +72,11 @@ explicit reconciliation and request bounds.
 `docs/runtime-build.json` now describes this freshly built executable; older
 Temporal/admission reports remain evidence for their original images only. The
 full prior 53-phase admission checkpoint was not rerun for this change.
+
+## Pinned actual Browser receiver variant
+
+The separate [pinned receiver mode](BROWSER_TEMPORAL_PINNED.md) now connects this
+workflow to the actual Browser guarded journal and receiver, while retaining a
+synthetic site and synthetic authority. This is distinct from the scripted-peer
+results above and still does not automate a real browser/site. Each report remains
+bound to its own runtime image and inputs.

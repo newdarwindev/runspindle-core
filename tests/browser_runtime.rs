@@ -70,6 +70,7 @@ fn setup() -> (Temp, BrowserPorts) {
     std::fs::write(temp.0.join("browser-payload.bin"), b"x").unwrap();
     let ports = BrowserPorts {
         directory: Some(temp.0.clone()),
+        pinned_fixture: false,
     };
     (temp, ports)
 }
@@ -100,9 +101,12 @@ fn counts(t: &Temp) -> (u64, u64, u64) {
 }
 #[test]
 fn default_missing_expired_and_changed_grants_deny_without_peer() {
-    assert!(BrowserPorts { directory: None }
-        .invoke(call(false))
-        .is_err());
+    assert!(BrowserPorts {
+        directory: None,
+        pinned_fixture: false
+    }
+    .invoke(call(false))
+    .is_err());
     for mode in 0..5 {
         let (temp, ports) = setup();
         let mut s = script();
@@ -161,6 +165,7 @@ fn lost_reply_and_reconstructed_ports_preserve_one_independent_effect() {
     drop(ports);
     let ports = BrowserPorts {
         directory: Some(temp.0.clone()),
+        pinned_fixture: false,
     };
     assert_eq!(ports.invoke(call(false)).unwrap().outcome, "unknown");
     assert_eq!(ports.invoke(call(true)).unwrap().outcome, "confirmed");
@@ -203,4 +208,22 @@ fn bounded_explicit_requests_reject_changed_target_pending_and_exhausted_budget(
     assert!(state.historical.is_none());
     assert_eq!(state.attempts, 0);
     assert!(!state.dispatch_finished);
+}
+
+#[test]
+fn pinned_fixture_is_explicit_fixed_root_and_never_falls_back_to_synthetic() {
+    assert!(BrowserPorts {
+        directory: None,
+        pinned_fixture: true
+    }
+    .invoke(call(false))
+    .is_err());
+    let (temp, _) = setup();
+    let ports = BrowserPorts {
+        directory: Some(temp.0.clone()),
+        pinned_fixture: true,
+    };
+    assert!(ports.invoke(call(false)).is_err());
+    assert!(!temp.0.join("browser-registry.sqlite").exists());
+    assert!(!temp.0.join("browser-site.sqlite").exists());
 }

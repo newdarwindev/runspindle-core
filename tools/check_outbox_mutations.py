@@ -20,7 +20,9 @@ mutations = [
     (
         "receipt-request-binding",
         "forged_receipt_bindings_for_unchanged_request_never_establish_delivery",
-        {"&self.request == request && valid_id(&self.receipt_id)": "valid_id(&self.receipt_id)"},
+        {
+            "&self.request == request && valid_id(&self.receipt_id)": "valid_id(&self.receipt_id)"
+        },
     ),
     (
         "missing-journal-recreated",

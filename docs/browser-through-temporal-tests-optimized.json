@@ -1,0 +1,132 @@
+{
+  "status": "passed",
+  "evidence_class": "isolated_integration",
+  "checks": [
+    "after_fresh_worker_and_server_recovery",
+    "after_reservation_stops_retry",
+    "after_fresh_authority_required",
+    "after_exact_target_required",
+    "after_explicit_reconcile_only",
+    "after_actual_history_replay_zero_peer_calls",
+    "before_fresh_worker_and_server_recovery",
+    "before_reservation_stops_retry",
+    "before_fresh_authority_required",
+    "before_exact_target_required",
+    "before_explicit_reconcile_only",
+    "before_actual_history_replay_zero_peer_calls"
+  ],
+  "cases": {
+    "after": {
+      "exit_code": 95,
+      "peer_calls": 2,
+      "site_effects": 1,
+      "final": {
+        "attempts": 4,
+        "completed_reconciles": 3,
+        "dispatch_finished": true,
+        "finished": true,
+        "historical": {
+          "outcome": "confirmed"
+        },
+        "idle_ticks": 4,
+        "pending": false,
+        "target": {
+          "binding": {
+            "account": "account",
+            "browser": "browser",
+            "epoch": 1,
+            "intent": "intent",
+            "operation": "operation",
+            "origin": "https://example.invalid",
+            "principal": "principal",
+            "revision": 1,
+            "tab": "tab"
+          },
+          "frame": "frame",
+          "frame_origin": "https://example.invalid",
+          "native_session": "session"
+        }
+      },
+      "browser_exchanges": 3,
+      "history_sha256": "90b45c3c951e1b718d2d7ff4f99002ad5970a1b518854964440d11efa6f1e9a6"
+    },
+    "before": {
+      "exit_code": 95,
+      "peer_calls": 2,
+      "site_effects": 0,
+      "final": {
+        "attempts": 4,
+        "completed_reconciles": 3,
+        "dispatch_finished": true,
+        "finished": false,
+        "historical": {
+          "outcome": "unknown"
+        },
+        "idle_ticks": 5,
+        "pending": false,
+        "target": {
+          "binding": {
+            "account": "account",
+            "browser": "browser",
+            "epoch": 1,
+            "intent": "intent",
+            "operation": "operation",
+            "origin": "https://example.invalid",
+            "principal": "principal",
+            "revision": 1,
+            "tab": "tab"
+          },
+          "frame": "frame",
+          "frame_origin": "https://example.invalid",
+          "native_session": "session"
+        }
+      },
+      "browser_exchanges": 3,
+      "history_sha256": "45431f6c11bdc11172969e224399dac22af036c0375125827902e7feffb17324"
+    }
+  },
+  "image_id": "sha256:3e10dad5586bfc169c3da6296e63ae194f9fe64978322ef6ba65944d4e92a477",
+  "source_hashes": {
+    "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+    "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+    "temporal/toolchain.json": "d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7",
+    "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+    "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+    "src/authenticated_artifacts.rs": "c8e4b83373e2245681badb037b2838a54914ee2f7679cbb0e7696c473e6a6cc5",
+    "src/authenticated_delivery.rs": "8c833fce7cca5486104233c6d57f60ab736b158300a47eeb695117fb91b3759e",
+    "src/authority.rs": "1743074ff355bcf2018119d1682f16b05d8973227c1e763e4659589be6002f78",
+    "src/bin/checkpoints/mod.rs": "a3078621891e89ad3514d456db345d4b232945c352141d14ca5c924a04652f14",
+    "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+    "src/bin/synthetic_authority.rs": "2139b832b71b7d90136d7ed40de3db3232ee28775964242d36d4be781fc51e15",
+    "src/bin/temporal-runtime.rs": "d9f65abd7193a7780b551fec3e2fb3c0bde1026e13a38f6b2edac91792f268a8",
+    "src/browser_effect_registry.rs": "f32eda379796f9e3ab208fce0cd2329f969f6c97ddc03af7aea52a17d4feaf7f",
+    "src/browser_effect_wire.rs": "5ee2572691a89adbdbdd7e0f5fc66cb73cda3bcab85eaec5d563cf4547cc8b03",
+    "src/browser_fixture_peer.rs": "991554190a5fd65cd1a15cf7089994394d6485582d45e18f24cfbdd593117b9f",
+    "src/browser_runtime.rs": "91bbb8937e4ccc670e56ea75667add00f380245a32de86681eea34944f5337cd",
+    "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+    "src/durable.rs": "47de529d43290c1d75369b17d043786b7a1e781f1934513a50f1bad1e0457b91",
+    "src/envelope.rs": "37358cfda2699e7c0f08f64f7b50c83ab0cfbc197ba67079bf86f84ec1d3ddd0",
+    "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+    "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+    "src/intent.rs": "0a75cfd7b72e476dd0350662f1ce3983bfc6906cef7e6abdc228cd79a0b5dd59",
+    "src/intent_runtime.rs": "cfa44be310daa141cd21afe83722c3d5c83857243b2d9d89f8902c3983396a34",
+    "src/lib.rs": "b96c9cbb2832f32a51099857b2ab86958eb2954b19bb60673d20499c3b6fa1af",
+    "src/outbox.rs": "a3544afd9d72707811595d79937ca9f5fd3ca8e3a56fbcc687c4ec6a335ba423",
+    "src/runtime.rs": "264126aa0b25d35f20c6c6c0eeee7df06dbbacc1e398215b47d8fd367afc7257",
+    "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+    "src/scoped_authority.rs": "a894e05b721b752b882accbadc42393d2aac52afc5565325b0a9f5f210306a48",
+    "src/tether_wire.rs": "5203c5c5ea09913eac9f02c9fcab3bf69a72f2b9f23eb84d10956243e05b7790",
+    "tests/fixtures/browser_effect_peer.py": "c14e5f2a783ca33077d26980fba457b7319855acf8263ef8bd5a4b660887d7a8",
+    "tests/fixtures/browser_source_pin.json": "4dbe00b79d3a14d60b2f6337d209c510f2cd4d9ee0cf03fe1a8483dc5a98bd8e"
+  },
+  "boundary_matrix": {
+    "core": "real_registry_and_sdk",
+    "temporal": "real_dev_database",
+    "browser": "pinned_real_guarded_journal_receiver",
+    "site": "independent_synthetic_sqlite",
+    "authority": "explicit_synthetic_script",
+    "provider": "not_exercised"
+  },
+  "live_acceptance": "not_run",
+  "cleanup": "passed"
+}
