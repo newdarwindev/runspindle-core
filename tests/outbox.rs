@@ -2136,3 +2136,38 @@ fn changed_accepted_store_blocks_resolution_before_peer_effects() {
         assert_eq!(outbox.snapshot(&request).unwrap(), before);
     }
 }
+
+#[test]
+fn missing_retained_validation_blocks_delivery_without_transport() {
+    let t = Temp::new();
+    let r = request(&t);
+    let db = Connection::open(t.db()).unwrap();
+    let trigger: String = db
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE name='validations_retained'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    db.execute_batch("DROP TRIGGER validations_retained; DELETE FROM validations;")
+        .unwrap();
+    db.execute_batch(&trigger).unwrap();
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+    assert!(outbox.deliver(&r, &Grant(r.clone()), &mut peer).is_err());
+    assert_eq!(peer.count("send"), 0);
+    assert_eq!(peer.count("lookup"), 0);
+    assert!(outbox.snapshot(&r).unwrap().is_none());
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM validations", [], |row| row
+            .get::<_, u64>(0))
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        db.query_row("SELECT bytes FROM artifacts", [], |row| row
+            .get::<_, Vec<u8>>(0))
+            .unwrap(),
+        BYTES
+    );
+}
