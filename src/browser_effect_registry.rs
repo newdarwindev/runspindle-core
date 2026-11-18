@@ -202,6 +202,34 @@ impl BrowserRegistry {
         tx.commit()?;
         Ok(result)
     }
+    /// Application-owned entry point for a stateless Browser executor.
+    /// The supplied operation is retained by the existing semantic identity map;
+    /// neither a new operation nor changed bytes can retry an unknown intent.
+    /// Reconciliation additionally binds the caller's current payload commitment
+    /// before any peer call. This is not a new store or an authority grant.
+    pub fn execute<A: Authority, P: Peer>(
+        &mut self,
+        target: Target,
+        payload: &[u8],
+        action: Action,
+        authority: &A,
+        peer: &mut P,
+    ) -> anyhow::Result<Outcome> {
+        let client = Client::new(target.clone(), payload)?;
+        match action {
+            Action::Dispatch => self.dispatch(target, payload, authority, peer),
+            Action::Reconcile => {
+                let retained = self
+                    .historical_snapshot(&target)?
+                    .ok_or_else(|| anyhow::anyhow!("missing browser reservation"))?;
+                anyhow::ensure!(
+                    retained.payload_digest == client.payload_digest(),
+                    "browser payload conflict"
+                );
+                self.reconcile(&target, authority, peer)
+            }
+        }
+    }
     pub fn dispatch<A: Authority, P: Peer>(
         &mut self,
         target: Target,

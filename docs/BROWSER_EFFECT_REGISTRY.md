@@ -71,3 +71,35 @@ are synthetic site effects and actual local persistence, not a live browser/site
 or production issuer. A separate [synthetic Temporal lane](BROWSER_TEMPORAL.md) now coordinates this
 registry. Actual site-specific observations/input, composition integration,
 distributed fencing and full Core #3 / Browser #8 acceptance remain open.
+
+## External application owner compatibility
+
+`BrowserRegistry::execute(target, payload, action, authority, peer)` is a narrow
+application entry point over the SAME registry and schema. Dispatch retains the
+existing semantic identity reservation. Reconcile compares the supplied payload
+commitment against the retained original before any peer call; it cannot create a
+reservation. The peer may be a stateless Browser submit/observe implementation,
+but it must retain its own current target/lease/authority checks. Caller-provided
+fields and callback outcomes are not authenticated grants.
+
+The application selects an operation once for the logical
+`(principal, intent, revision)` and reuses it. The registry rejects a replacement
+operation for that identity, including after process restart. Account credential
+save and later page actions need distinct preauthorized sub-intents; inventing a
+new sub-intent to retry an unknown effect is not authorized by this API.
+
+Browser autosave's secret-free commitment includes the exact granted target,
+opaque credential reference and expected comparison value. Its target digest is
+the SHA-256 of those payload bytes. The application must bind the full Core Target
+(native session/frame included) and the authenticated Browser target to that
+payload; this method does not parse or confer credential authority.
+
+This entry point supplies no new database, generic always-authorized CLI, Python
+IPC bridge, service or migration. Existing Browser journal files remain untouched
+and are NOT imported, deleted or reclassified as Core history. Retained unknown
+operations must remain on their established owner/reconciliation path until an
+explicit reviewed migration binds identical target, payload and operation without
+replay. A fresh empty Core registry cannot be used to re-send a legacy unknown.
+The existing dual-journal integration fixtures remain historical evidence, not
+proof of the new stateless peer path. Python facade/real browser composition and
+fresh-process cross-language qualification are still separate work.

@@ -417,3 +417,59 @@ fn authority_loss_at_final_persistence_leaves_only_unknown_reservation() {
     );
     assert_eq!(peer.calls, 1);
 }
+
+#[test]
+fn external_owner_entrypoint_retains_identity_and_exact_reconcile_bytes() {
+    let temp = Temp::new();
+    let t = target();
+    let mut peer = Spy::new("unknown");
+    let mut registry = BrowserRegistry::open(temp.db()).unwrap();
+    assert_eq!(
+        registry
+            .execute(t.clone(), b"payload", Action::Dispatch, &Allow, &mut peer)
+            .unwrap(),
+        Outcome::Unknown
+    );
+    assert_eq!(peer.calls, 1);
+    drop(registry);
+    let mut registry = BrowserRegistry::open(temp.db()).unwrap();
+    assert_eq!(
+        registry
+            .execute(t.clone(), b"payload", Action::Dispatch, &Allow, &mut peer)
+            .unwrap(),
+        Outcome::Unknown
+    );
+    assert_eq!(peer.calls, 1);
+    let mut replacement = t.clone();
+    replacement.binding.operation = "replacement".into();
+    assert!(registry
+        .execute(replacement, b"payload", Action::Dispatch, &Allow, &mut peer)
+        .is_err());
+    assert!(registry
+        .execute(t.clone(), b"changed", Action::Reconcile, &Allow, &mut peer)
+        .is_err());
+    assert!(registry
+        .execute(t.clone(), b"payload", Action::Reconcile, &Deny, &mut peer)
+        .is_err());
+    assert_eq!(peer.calls, 1);
+    peer.outcome = "confirmed";
+    assert_eq!(
+        registry
+            .execute(t, b"payload", Action::Reconcile, &Allow, &mut peer)
+            .unwrap(),
+        Outcome::Confirmed
+    );
+    assert_eq!(peer.actions, vec!["dispatch", "reconcile"]);
+}
+
+#[test]
+fn external_owner_reconcile_does_not_create_reservation() {
+    let temp = Temp::new();
+    let mut registry = BrowserRegistry::open(temp.db()).unwrap();
+    let mut peer = Spy::new("confirmed");
+    assert!(registry
+        .execute(target(), b"payload", Action::Reconcile, &Allow, &mut peer)
+        .is_err());
+    assert_eq!(peer.calls, 0);
+    assert!(registry.historical_snapshot(&target()).unwrap().is_none());
+}
