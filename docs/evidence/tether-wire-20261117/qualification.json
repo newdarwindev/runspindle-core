@@ -1,0 +1,67 @@
+{
+  "schema": "runspindle.core-tether-wire-qualification.v1",
+  "status": "passed",
+  "core_commit": "da1980bff4a0c9b926e7abbfd2089a4e3ed3bf08",
+  "compiled_rust_source_commit": "98a8f621d53b90e7022700640967fbcd634e8f2e",
+  "tether_commit": "d6138a833773691009863f686f235283d7a82723",
+  "binary_sha256": "06cf2339402d9e1c2c66854f2bcfb7b01b6f970893a9cc4309f7890c1ead403f",
+  "source_sha256": {
+    "src/artifact.rs": "ec8ba59c519b0a845a207db455e8bbde94b8fcc8e48c83b0977be9b8edcf6de7",
+    "src/authenticated.rs": "6b2ea70beb7758abb35f015676fdd3f3fb81d58efa288520c010700410bc0884",
+    "src/authenticated_artifacts.rs": "c79a66f9e3657d9b0b9b57459a2ba319aad38699e0eee8c7e8f8853b634cf637",
+    "src/authority.rs": "1743074ff355bcf2018119d1682f16b05d8973227c1e763e4659589be6002f78",
+    "src/bin/checkpoints/mod.rs": "a3078621891e89ad3514d456db345d4b232945c352141d14ca5c924a04652f14",
+    "src/bin/smoke/mod.rs": "a9c75b6b28c95f9ec5ca226b12d89f6522e4e73b3a3b5245763fa33aa5605040",
+    "src/bin/synthetic_authority.rs": "2139b832b71b7d90136d7ed40de3db3232ee28775964242d36d4be781fc51e15",
+    "src/bin/temporal-runtime.rs": "038c3a1f6ded54875bae1df7c40d1ceab6e9fb1bfa0508e78bc0e1ca21b4ea5a",
+    "src/delivery_runtime.rs": "e1d364a052cb0701f785a19bd795eb96e18dddc8bac7d218cb75990ace03c4b7",
+    "src/durable.rs": "1e8333ba9df96bf1b65032e3c1afbf076b28c8921ff65c53e35c41758c3ae214",
+    "src/envelope.rs": "12751e7b707955d1bb218d5c37c13b19db16d5711d0b9709bc92e603d61b96ce",
+    "src/identity.rs": "bb8b23a9a614a974c05a4f329d4e4da8565a28af6008a95e40591ced1ec9da25",
+    "src/integration.rs": "22fc4214a3a93d6974e68f55a61ae08b76e7950fd9c03a297b37a68083c989ad",
+    "src/intent.rs": "b23db4e239ab97d0bf15b77aac0b64581918e1a42a95b34c7abb1166bc67ca71",
+    "src/intent_runtime.rs": "cfa44be310daa141cd21afe83722c3d5c83857243b2d9d89f8902c3983396a34",
+    "src/lib.rs": "e1f370a48f56d45b20e35bb9d08e5565e2091970dba73735cc230f76f2541f4c",
+    "src/outbox.rs": "e7621bc17e0cee4c34e816c21303b1001836dc237908f7ceaa5d2effcb7512fc",
+    "src/runtime.rs": "264126aa0b25d35f20c6c6c0eeee7df06dbbacc1e398215b47d8fd367afc7257",
+    "src/scoped_authenticated.rs": "b78cbb91eb510b514071690bd72e22687e6ab4d7a0c2a1dc776a875978644b39",
+    "src/scoped_authority.rs": "45606eee88b45d937c75cb746929b0546b4a3d1a8fe1b3663e4a5c611f6e1e97",
+    "src/tether_wire.rs": "b40fef41d723443a542f4815b1784f18780faa2b91d8187b9e721fb7f89327d9",
+    "Cargo.toml": "3c0f6cc81f3d34cdd7469f30b470f6a7d37368e74afa8584eedfbfd3b4f31359",
+    "Cargo.lock": "1b7cd1ba74866f0348cf0560b8253dcb7afd9b8ba88fa2a92370e9bc5596bd5b",
+    "tests/outbox.rs": "0e754eb83a2af254ed6efacc4e1d4bb21b9e2d158e5d2674edf1bd42927939ec",
+    "tests/fixtures/tether_wire_peer.py": "1cc10f5de21114736671bddc06e8fadf48b78ff1cde713007a21aef554411f77",
+    "tests/test_tether_wire_fixture.py": "f7d097f27f865c5c698f6cfb42791398af8f4a4ac6c60c566c796b8db4359bca"
+  },
+  "logs": {
+    "outbox-normal": {
+      "path": "core17-qualified-outbox-normal.log",
+      "sha256": "ddba10f8bce44d70a2022e77a4af5a94fdad9d8128c138b0b8f3c182d236b2d7"
+    },
+    "outbox-python-optimized": {
+      "path": "core17-qualified-outbox-python-optimized.log",
+      "sha256": "11bfb2e6bb45eedea5da01c4cd4df2723b1d365f7d7795013c6f8251f91fae87"
+    },
+    "negative-normal": {
+      "path": "core17-qualified-negative-normal.log",
+      "sha256": "5b3901a3b3a873f740da53192224074ef7fc8d2df140ab76efde9a2df2e0fcb4"
+    },
+    "negative-optimized": {
+      "path": "core17-qualified-negative-optimized.log",
+      "sha256": "c685f4fd0344a86dd45a1a175abb63930eb1cda120b84892722445036204ca21"
+    }
+  },
+  "counts": {
+    "outbox_each": 33,
+    "negative_test_each": 1,
+    "negative_mutations_each": 6
+  },
+  "exclusions": [
+    "live provider",
+    "production authority wiring",
+    "OS network isolation",
+    "all-features build (failed disk capacity)",
+    "power-loss durability"
+  ],
+  "source_unchanged_before_after": true
+}

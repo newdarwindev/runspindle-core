@@ -61,3 +61,6 @@ pub mod intent;
 
 #[cfg(feature = "verified-authority")]
 pub mod intent_runtime;
+
+#[cfg(feature = "delivery-runtime")]
+pub mod tether_wire;

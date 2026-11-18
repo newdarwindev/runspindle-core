@@ -1,0 +1,146 @@
+
+running 33 tests
+test child_process ... ok
+
+running 1 test
+
+running 1 test
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+test contradictory_acknowledgement_and_readback_are_fenced_across_restart ... ok
+test fabricated_delivery_receipts_do_not_pass_readback ... ok
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+test ambiguous_wrong_and_conflicting_receipts_never_overwrite_delivery ... ok
+test explicit_readback_conflict_is_durable_without_fake_receipts ... ok
+test authority_rechecked_after_settlement_lock ... ok
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+
+running 1 test
+
+running 1 test
+test authority_version_destination_and_operation_bindings_fail_closed ... ok
+test conflict_resolution_requires_separate_authority_and_exact_readback ... ok
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.01s
+
+
+running 1 test
+test existing_v1_evidence_is_retained_but_partial_audit_schema_is_denied ... ok
+
+running 1 test
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.01s
+
+test schema_reopen_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+test schema_reopen_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+test schema_reopen_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+test failed_resolution_commit_rolls_back_audit_and_state ... ok
+test schema_reopen_child ... ok
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.01s
+
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.01s
+
+
+running 1 test
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+test lost_reply_reconciles_exact_bytes_without_another_send ... ok
+
+running 1 test
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.01s
+
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.01s
+
+test concurrent_process_owners_send_at_most_once ... ok
+test wire_integration_child ... ok
+test schema_reopen_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+
+running 1 test
+test resolution_authority_rechecked_after_write_lock ... ok
+test schema_reopen_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+test child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.01s
+
+test resolution_revocation_during_readback_leaves_quarantine_unchanged ... ok
+test fresh_process_reservation_and_lost_ack_never_resend ... ok
+test legacy_migration_preserves_reservation_across_concurrent_processes ... ok
+test fresh_process_resolution_crash_and_racing_resolvers_never_send ... ok
+test revocation_during_readback_cannot_settle_delivery ... ok
+test resolution_retains_evidence_bytes_and_never_resends_after_restart ... ok
+test failed_schema_upgrade_rolls_back_before_fresh_process_retry ... ok
+test tether_wire_exact_readback_and_reconstruction ... ok
+test missing_primary_key_token_boundary_blocks_outbox_reopen ... ok
+test missing_journal_blocks_fresh_process_without_resend ... ok
+test full_evidence_table_cannot_erase_observed_conflict ... ok
+test tether_wire_unbound_unknown_and_synthetic_never_deliver ... ok
+test oversized_evidence_cannot_erase_observed_conflict ... ok
+test incomplete_or_incompatible_outbox_schemas_are_never_repaired ... ok
+test bounded_outbox_preserves_unknown_work_and_duplicate_never_resends ... ok
+test actual_tether_revocation_after_lost_ack_cannot_deliver_or_retry ... ok
+test actual_tether_wrong_thread_and_conflict_never_retarget ... ok
+test actual_tether_journals_wire_readback_and_lost_ack ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.95s
+

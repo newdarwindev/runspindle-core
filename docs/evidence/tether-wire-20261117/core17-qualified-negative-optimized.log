@@ -1,0 +1,6 @@
+test_input_cannot_broaden_independent_expected_authority (test_tether_wire_fixture.ExpectedBinding.test_input_cannot_broaden_independent_expected_authority) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 1.956s
+
+OK
