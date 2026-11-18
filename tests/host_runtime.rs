@@ -248,3 +248,88 @@ fn accepted_cancellation_survives_a_terminal_observation_return() {
     assert_eq!(snapshot.cancellation, h::Cancellation::ObservedTerminal);
     assert!(!snapshot.cancel_dispatched);
 }
+
+#[test]
+fn concurrent_stale_actor_never_inherits_current_launch_or_cancel() {
+    let t = Temp::new();
+    let mut script = script();
+    script.request.admission.binding.lease_epoch = 2;
+    write(&t, &script);
+    let ports = HostPorts {
+        directory: Some(t.0.clone()),
+    };
+    let current = script.request.clone();
+    ports
+        .invoke(HostCall {
+            request: current.clone(),
+            action: HostAction::Prepare,
+        })
+        .unwrap();
+    for action in [HostAction::Dispatch, HostAction::Cancel] {
+        let workers = [request(), current.clone()]
+            .into_iter()
+            .map(|request| {
+                let directory = t.0.clone();
+                let (start, ready) = std::sync::mpsc::channel();
+                let action = action.clone();
+                let worker = std::thread::spawn(move || {
+                    ready
+                        .recv_timeout(std::time::Duration::from_secs(5))
+                        .unwrap();
+                    HostPorts {
+                        directory: Some(directory),
+                    }
+                    .invoke(HostCall { request, action })
+                });
+                (start, worker)
+            })
+            .collect::<Vec<_>>();
+        for (start, _) in &workers {
+            start.send(()).unwrap();
+        }
+        // Join both actors before any expected mutant failure can unwind and
+        // delete the shared temporary directory.
+        let joined = workers
+            .into_iter()
+            .map(|(_, worker)| worker.join().unwrap())
+            .collect::<Vec<_>>();
+        let mut results = joined.into_iter();
+        assert!(
+            results.next().unwrap().is_err(),
+            "stale actor inherited current authority"
+        );
+        let current_result = results.next().unwrap().unwrap();
+        assert_eq!(current_result.binding.lease_epoch, 2);
+        let peer = rusqlite::Connection::open(t.0.join("native-peer.sqlite")).unwrap();
+        let count = |action: &str| -> u64 {
+            peer.query_row(
+                "SELECT count(*) FROM calls WHERE action=?1",
+                [action],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        assert_eq!(count("launch"), 1);
+        assert_eq!(
+            count("cancel"),
+            if matches!(action, HostAction::Cancel) {
+                1
+            } else {
+                0
+            }
+        );
+        // Lost launch acknowledgement is reconciled, not retried. Reconnection
+        // must keep the observed native identity and the current epoch.
+        let snapshot = ports
+            .invoke(HostCall {
+                request: current.clone(),
+                action: HostAction::Reconcile,
+            })
+            .unwrap();
+        assert_eq!(
+            snapshot.native_session_id.as_deref(),
+            Some("actual-observed-native")
+        );
+        assert_eq!(snapshot.binding.lease_epoch, 2);
+    }
+}
