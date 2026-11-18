@@ -60,12 +60,7 @@ fn actual_receiver_lost_reply_reopen_reconciles_without_resubmit() {
         .unwrap();
     assert!(head.status.success());
     assert_eq!(String::from_utf8(head.stdout).unwrap().trim(), PIN);
-    let status = Command::new("git")
-        .args(["status", "--porcelain", "--untracked-files=all"])
-        .current_dir(&root)
-        .output()
-        .unwrap();
-    assert!(status.status.success() && status.stdout.is_empty());
+    assert!(source_clean(&root));
     let dir = std::env::temp_dir().join(format!(
         "core-browser-pipe-integration-{}",
         std::process::id()
@@ -116,4 +111,54 @@ fn actual_receiver_lost_reply_reopen_reconciles_without_resubmit() {
         .is_err());
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+fn source_clean(root: &Path) -> bool {
+    let status = Command::new("git")
+        .args([
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            "--ignored=matching",
+        ])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    status.status.success() && status.stdout.is_empty()
+}
+#[test]
+fn ignored_bytecode_is_not_an_exact_source_checkout() {
+    let root =
+        std::env::temp_dir().join(format!("core-browser-source-gate-{}", std::process::id()));
+    std::fs::create_dir(&root).unwrap();
+    let git = |args: &[&str]| {
+        let result = Command::new("git")
+            .args(args)
+            .current_dir(&root)
+            .output()
+            .unwrap();
+        assert!(result.status.success());
+    };
+    git(&["init", "--quiet"]);
+    std::fs::write(root.join(".gitignore"), "__pycache__/\n").unwrap();
+    git(&["add", ".gitignore"]);
+    git(&[
+        "-c",
+        "user.name=Synthetic Test",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "Synthetic gate fixture",
+    ]);
+    assert!(source_clean(&root));
+    std::fs::create_dir(root.join("__pycache__")).unwrap();
+    std::fs::write(
+        root.join("__pycache__/ignored.pyc"),
+        b"synthetic bytecode canary",
+    )
+    .unwrap();
+    assert!(!source_clean(&root));
+    std::fs::remove_dir_all(root).unwrap();
 }
