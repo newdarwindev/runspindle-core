@@ -2152,7 +2152,7 @@ fn missing_retained_validation_blocks_delivery_without_transport() {
     db.execute_batch("DROP TRIGGER validations_retained; DELETE FROM validations;")
         .unwrap();
     db.execute_batch(&trigger).unwrap();
-    let mut outbox = Outbox::open(&t.db()).unwrap();
+    let mut outbox = Outbox::open(t.db()).unwrap();
     let mut peer = Peer::open(&t.0.join("peer.sqlite"));
     assert!(outbox.deliver(&r, &Grant(r.clone()), &mut peer).is_err());
     assert_eq!(peer.count("send"), 0);
