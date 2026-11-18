@@ -103,3 +103,14 @@ replay. A fresh empty Core registry cannot be used to re-send a legacy unknown.
 The existing dual-journal integration fixtures remain historical evidence, not
 proof of the new stateless peer path. Python facade/real browser composition and
 fresh-process cross-language qualification are still separate work.
+
+
+## Optional typed control owner
+
+[Core-owned control](BROWSER_CONTROL_OWNER.md) explicitly upgrades this SAME file
+to schema v2. A head pointer references control transitions in the existing
+operations table; no Browser control store is introduced. Generic APIs reject the
+reserved control namespace. Unlike ordinary effect reconciliation above, typed
+control readback and input admission serialize under an immediate writer
+transaction. The application must bound callbacks and hold the real native fence.
+No automatic schema upgrade, legacy Browser import or operational cutover occurs.
