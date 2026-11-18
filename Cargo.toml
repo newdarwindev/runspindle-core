@@ -6,6 +6,7 @@ publish = false
 autobins = false
 
 [features]
+browser-child-peer = ["artifact-store", "dep:rustix"]
 authenticated-artifacts = ["artifact-store", "dep:ring"]
 runtime-envelope = ["delivery-runtime"]
 verified-authority = ["runtime-envelope", "dep:ring"]
@@ -15,6 +16,7 @@ host-runtime = ["temporal-runtime", "dep:runspindle-host", "dep:rusqlite"]
 temporal-runtime = ["dep:temporalio-sdk", "dep:temporalio-client", "dep:temporalio-common", "dep:temporalio-macros", "dep:tokio", "dep:serde", "dep:serde_json", "dep:sha2", "dep:anyhow", "dep:temporalio-workflow", "dep:futures", "dep:url", "dep:async-trait"]
 
 [dependencies]
+rustix = { version = "=1.1.6", features = ["fs", "process"], optional = true }
 ring = { version = "=0.17.14", optional = true }
 async-trait = { version = "=0.1.92", optional = true }
 runspindle-host = { git = "https://github.com/newdarwindev/runspindle-host.git", rev = "a56e5d7c18611b07c1c28da425db7c14227b3e76", optional = true }
