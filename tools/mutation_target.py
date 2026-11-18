@@ -1,6 +1,7 @@
 """Private build targets keep mutant outputs out of qualification."""
 
 import contextlib
+import os
 import pathlib
 import shutil
 import subprocess
@@ -11,6 +12,15 @@ from collections.abc import Iterator
 
 @contextlib.contextmanager
 def isolated_target(root: pathlib.Path, name: str) -> Iterator[pathlib.Path]:
+    cache = os.environ.get("RUNSPINDLE_COMPILER_CACHE")
+    if cache:
+        from tools.compiler_cache import materialized
+
+        expected = os.environ.get("RUNSPINDLE_COMPILER_CACHE_KEY", "")
+        workspace = pathlib.Path(os.environ["RUNSPINDLE_COMPILER_WORKSPACE"])
+        with materialized(root, pathlib.Path(cache), expected, workspace) as target:
+            yield target
+        return
     seed = (root / "local/linux-target").resolve()
 
     def fingerprint() -> tuple[bool, dict[str, tuple[int, int]]]:
