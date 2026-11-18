@@ -97,3 +97,16 @@ The earlier two-second helper proved unsuitable for engine startup. The distinct
 engine workflow corrects that limit without changing old workflow histories.
 These results neither close the parent issues nor rerun every historical
 admission/storage/provider qualification against the new executable.
+
+## F07 bounded-source refresh
+
+The engine source manifest now pins Browser revision
+`7f3ab01cced0a96a091a22d42886486bf8600d4b` (Browser PR #55), including its
+1,024-operation capacity and retained/schema-field bounds. The original
+pinned-library fixture remains intentionally unchanged for compatibility tests.
+The [refreshed native receipt](browser-capacity-temporal-tests.json) qualifies
+the new engine pin rather than reusing the previous artifact's receipt. Its
+before/after scenarios complement Browser's saturation, concurrent last-slot and
+capacity-limit mutation acceptance; they do not claim a production storage quota.
+The older library regression receipt is historical evidence for its recorded
+artifact, not a test of this newer binary.
