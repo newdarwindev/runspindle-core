@@ -113,3 +113,65 @@ fn malformed_and_mismatched_context_never_reaches_adapter() {
     }
     assert_eq!(adapters.len(), 0);
 }
+
+#[test]
+fn wire_diagnostics_never_retain_untrusted_fields_or_values() {
+    const SECRET: &str = "private-diagnostic-canary";
+    let vectors: Vec<Value> =
+        serde_json::from_str(include_str!("../conformance/envelope-v1/vectors.json")).unwrap();
+    for vector in vectors {
+        let original = vector["envelope"].clone();
+        for path in ["", "/binding", "/payload"] {
+            let mut changed = original.clone();
+            changed
+                .pointer_mut(path)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .insert(SECRET.into(), json!(SECRET));
+            let error = Envelope::decode(&serde_json::to_vec(&changed).unwrap()).unwrap_err();
+            assert_eq!(error.to_string(), "invalid wire structure");
+            assert_eq!(error.chain().count(), 1);
+            assert!(!format!("{error:?}").contains(SECRET));
+        }
+        let mut changed = original.clone();
+        changed["binding"]["revision"] = json!(SECRET);
+        let error = Envelope::decode(&serde_json::to_vec(&changed).unwrap()).unwrap_err();
+        assert_eq!(error.to_string(), "invalid wire structure");
+        assert_eq!(error.chain().count(), 1);
+        assert!(!format!("{error:?}").contains(SECRET));
+        // Direct message() is public too: it must not expose malformed payloads.
+        let mut envelope = Envelope::decode(&serde_json::to_vec(&original).unwrap()).unwrap();
+        envelope
+            .payload
+            .as_object_mut()
+            .unwrap()
+            .insert(SECRET.into(), json!(SECRET));
+        let error = envelope.message().unwrap_err();
+        assert_eq!(error.to_string(), "invalid wire structure");
+        assert_eq!(error.chain().count(), 1);
+    }
+    let error = runspindle_core::envelope::strict_json(b"{broken").unwrap_err();
+    assert_eq!(error.to_string(), "invalid wire JSON");
+    assert_eq!(error.chain().count(), 1);
+}
+
+#[cfg(feature = "verified-authority")]
+#[test]
+fn scoped_and_intent_ingress_diagnostics_use_the_same_safe_boundary() {
+    use runspindle_core::{
+        intent::{IntentAdmission, IntentBatch},
+        scoped_authority::ScopedAdmission,
+    };
+    let bytes = br#"{"private-diagnostic-canary":"private-diagnostic-canary"}"#;
+    let errors = [
+        ScopedAdmission::decode(bytes).unwrap_err(),
+        IntentAdmission::decode(bytes).unwrap_err(),
+        IntentBatch::decode(bytes).unwrap_err(),
+    ];
+    for error in errors {
+        assert_eq!(error.to_string(), "invalid wire structure");
+        assert_eq!(error.chain().count(), 1);
+        assert!(!format!("{error:?}").contains("private-diagnostic-canary"));
+    }
+}

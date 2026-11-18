@@ -226,7 +226,10 @@ impl Evidence {
         );
         // Typed deserialization rejects duplicate members and unknown fields at
         // every level; the canonical echo rejects numeric/encoding aliases.
-        let evidence: Self = serde_json::from_slice(bytes)?;
+        // Deserializer errors can quote untrusted member names or scalar
+        // values. Drop the source error, including its chain, at wire ingress.
+        let evidence: Self = serde_json::from_slice(bytes)
+            .map_err(|_| anyhow::anyhow!("invalid artifact evidence encoding"))?;
         anyhow::ensure!(
             evidence.encode()? == bytes,
             "noncanonical artifact evidence"

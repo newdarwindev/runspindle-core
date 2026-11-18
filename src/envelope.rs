@@ -73,8 +73,14 @@ impl<'de> Deserialize<'de> for Unique {
 }
 pub fn strict_json(bytes: &[u8]) -> anyhow::Result<Value> {
     anyhow::ensure!(bytes.len() <= MAX_BYTES, "oversized JSON");
-    let Unique(value) = serde_json::from_slice(bytes)?;
+    let Unique(value) =
+        serde_json::from_slice(bytes).map_err(|_| anyhow::anyhow!("invalid wire JSON"))?;
     Ok(value)
+}
+// Deserializer diagnostics can contain untrusted field names and values. Do not
+// preserve the original error as a cause at any public wire mapping boundary.
+pub(crate) fn typed_json<T: serde::de::DeserializeOwned>(value: Value) -> anyhow::Result<T> {
+    serde_json::from_value(value).map_err(|_| anyhow::anyhow!("invalid wire structure"))
 }
 pub fn canonical<T: Serialize>(value: &T) -> anyhow::Result<Vec<u8>> {
     Ok(serde_json::to_vec(&serde_json::to_value(value)?)?)
@@ -170,7 +176,7 @@ impl DeliveryPayload {
 }
 impl Envelope {
     pub fn decode(bytes: &[u8]) -> anyhow::Result<Self> {
-        let e: Self = serde_json::from_value(strict_json(bytes)?)?;
+        let e: Self = typed_json(strict_json(bytes)?)?;
         e.message()?;
         Ok(e)
     }
@@ -185,7 +191,7 @@ impl Envelope {
         );
         Ok(match self.message_type.as_str() {
             "admission_request" => {
-                let p: AdmissionPayload = serde_json::from_value(self.payload.clone())?;
+                let p: AdmissionPayload = typed_json(self.payload.clone())?;
                 let predecessor_revision = if p.predecessor_revision.is_null() {
                     None
                 } else {
@@ -208,7 +214,7 @@ impl Envelope {
                 Message::Admission(a)
             }
             "host_observation" => {
-                let p: ObservationPayload = serde_json::from_value(self.payload.clone())?;
+                let p: ObservationPayload = typed_json(self.payload.clone())?;
                 anyhow::ensure!(
                     valid_id(&p.native_session_id) && p.sequence > 0,
                     "invalid observation"
@@ -229,11 +235,10 @@ impl Envelope {
                 })
             }
             "delivery_request" => Message::Delivery(
-                serde_json::from_value::<DeliveryPayload>(self.payload.clone())?
-                    .mapped(&self.binding)?,
+                typed_json::<DeliveryPayload>(self.payload.clone())?.mapped(&self.binding)?,
             ),
             "delivery_receipt" => {
-                let p: ReceiptPayload = serde_json::from_value(self.payload.clone())?;
+                let p: ReceiptPayload = typed_json(self.payload.clone())?;
                 anyhow::ensure!(valid_id(&p.receipt_id), "invalid receipt");
                 Message::Receipt(DeliveryReceipt {
                     request: p.request.mapped(&self.binding)?,

@@ -441,6 +441,9 @@ impl Outbox {
     /// Read-only applicability, not authorization: exact prior or exact retained
     /// completed decision. A receipt alone never proves the decision was committed.
     pub fn resolution_applicable(&self, resolution: &ConflictResolution) -> anyhow::Result<bool> {
+        // A cached bridge cannot authorize a resolver effect after retained
+        // accepted bytes/evidence have become invalid, including exact replay.
+        self.store.accepted(&resolution.prior.request.accepted)?;
         Ok(
             self.snapshot(&resolution.prior.request)?.as_ref() == Some(&resolution.prior)
                 || Self::completed_resolution(&self.store.connection, resolution)?.is_some(),
