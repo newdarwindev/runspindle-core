@@ -79,3 +79,6 @@ pub mod browser_runtime;
 
 #[cfg(feature = "artifact-store")]
 mod browser_fixture_peer;
+
+#[cfg(feature = "artifact-store")]
+mod browser_chromium_fixture;

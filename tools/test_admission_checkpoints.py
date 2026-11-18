@@ -270,6 +270,11 @@ def prior_image(root, prepared):
             root / "tests/fixtures/browser_effect_peer.py",
             root / "tests/fixtures/browser_source_pin.json",
         ]
+    if (root / "src/browser_chromium_fixture.rs").is_file():
+        paths += [
+            root / "tests/fixtures/browser_chromium_peer.py",
+            root / "tests/fixtures/browser_chromium_source_pin.json",
+        ]
     require(
         {str(p.relative_to(root)): sha(p) for p in paths} == declared["source_hashes"],
         "prior source bytes changed",
