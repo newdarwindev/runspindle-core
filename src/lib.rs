@@ -82,3 +82,6 @@ mod browser_fixture_peer;
 
 #[cfg(feature = "artifact-store")]
 mod browser_chromium_fixture;
+
+#[cfg(all(feature = "browser-child-peer", target_os = "linux"))]
+pub mod browser_child_peer;
