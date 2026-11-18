@@ -1,4 +1,6 @@
-//! Bounded trusted-peer client for Browser's guarded effect journal.
+//! Bounded trusted-peer client for authenticated Browser effect execution.
+//! Legacy peers may retain a Browser journal; the external-owner composition
+//! reserves effects in Core BrowserRegistry and uses a stateless Browser peer.
 //! No launcher, network, retry, durable Core scheduling or issuer is supplied.
 use serde::{Deserialize, Serialize};
 
@@ -119,7 +121,9 @@ struct Response {
 }
 /// Immutable request identity and exact payload, but NOT a durable registry.
 /// The caller must retain/reconstruct the same operation across restart and may
-/// not create another ID to retry an unknown result. Browser owns reservation.
+/// not create another ID to retry an unknown result. This client itself reserves
+/// nothing: use Core BrowserRegistry for the external-owner path. Legacy fixture
+/// peers also retain Browser journals; those are not migrated by this client.
 pub struct Client {
     target: Target,
     payload: Vec<u8>,
