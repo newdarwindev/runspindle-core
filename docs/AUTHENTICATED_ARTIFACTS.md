@@ -1,4 +1,8 @@
-# Authenticated artifact evidence (unqualified source candidate)
+# Authenticated artifact evidence (original implementation record)
+
+Later bounded verification and the optional current-artifact delivery composition
+are documented in [Authenticated delivery](AUTHENTICATED_DELIVERY.md). The
+source-only statements below describe the original change, not that later lane.
 
 Partial Core [#18](https://github.com/newdarwindev/runspindle-core/issues/18) and
 parent [#4](https://github.com/newdarwindev/runspindle-core/issues/4), based on

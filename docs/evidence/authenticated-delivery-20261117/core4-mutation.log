@@ -1,0 +1,19 @@
+   Compiling runspindle-core v0.0.0 (/tmp/core4-mutant-yklcoc74)
+    Finished `test` profile [unoptimized] target(s) in 9.60s
+     Running tests/authenticated_artifacts.rs (/home/standard/.cache/core17-resolution-target/debug/deps/authenticated_artifacts-a2ea2416a8ca50a7)
+
+running 1 test
+
+thread 'delivery::authenticated_delivery_rechecks_each_callback_and_commit_without_nested_lock' (3031757) panicked at tests/authenticated_artifacts.rs:1030:17:
+assertion failed: open(&f).deliver(&r, &a, &mut spy, &live, &FixedClock(100)).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test delivery::authenticated_delivery_rechecks_each_callback_and_commit_without_nested_lock ... FAILED
+
+failures:
+
+failures:
+    delivery::authenticated_delivery_rechecks_each_callback_and_commit_without_nested_lock
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `--test authenticated_artifacts`

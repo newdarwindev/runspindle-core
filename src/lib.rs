@@ -64,3 +64,6 @@ pub mod intent_runtime;
 
 #[cfg(feature = "delivery-runtime")]
 pub mod tether_wire;
+
+#[cfg(all(feature = "authenticated-artifacts", feature = "delivery-runtime"))]
+pub mod authenticated_delivery;

@@ -133,5 +133,13 @@
     "tested_source": "077963fa00ca587e7044c950a9b091d5ce90f541",
     "issue_2": "open_pending_composition_and_criterion_audit",
     "live_acceptance": "not_run"
+  },
+  "authenticated_delivery": {
+    "status": "locally_verified_opt_in_current_artifact_guard",
+    "tested_source": "e28019f542ad0b60ab16934078b296eecda1d0b0",
+    "evidence": "docs/evidence/authenticated-delivery-20261117/qualification.json",
+    "top_level_tests_each": 144,
+    "live_acceptance": "not_run",
+    "parent_issue_closure": "not_claimed"
   }
 }

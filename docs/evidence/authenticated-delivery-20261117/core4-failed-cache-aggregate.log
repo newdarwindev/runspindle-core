@@ -1,0 +1,131 @@
+   Compiling runspindle-core v0.0.0 (/tmp/core4-authenticated-delivery-20261117)
+    Finished `test` profile [unoptimized] target(s) in 3.06s
+     Running unittests src/lib.rs (/home/standard/.cache/core17-resolution-target/debug/deps/runspindle_core-0e7bab0e4e4a67da)
+
+running 1 test
+test tests::unimplemented_activation_fails_closed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/temporal-runtime.rs (/home/standard/.cache/core17-resolution-target/debug/deps/temporal_runtime-3b666ddc1ab85025)
+
+running 4 tests
+test admission_checkpoints::tests::exact_scope_does_not_stop_other_workflows ... ok
+test admission_checkpoints::tests::unsupported_checkpoint_combinations_fail_closed ... ok
+test admission_checkpoints::tests::launch_selector_requires_actual_namespaced_sdk_activity_and_action ... ok
+test admission_checkpoints::tests::replay_or_unknown_completion_cannot_trigger_checkpoint ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/authenticated_artifacts.rs (/home/standard/.cache/core17-resolution-target/debug/deps/authenticated_artifacts-a2ea2416a8ca50a7)
+
+running 29 tests
+test authenticated_artifact_child ... ok
+test delivery::authenticated_delivery_child ... ok
+
+running 1 test
+test evidence_wire_and_missing_journal_fail_closed ... ok
+
+running 1 test
+test independent_literal_canonical_and_signature_vector ... ok
+test delivery::authenticated_delivery_rechecks_each_callback_and_commit_without_nested_lock ... FAILED
+test delivery::post_effect_revocation_preserves_unknown_and_never_resends ... FAILED
+
+thread 'delivery::authenticated_delivery_child' (3034933) panicked at tests/authenticated_artifacts.rs:1350:9:
+assertion failed: open(&f).deliver(&r, &Grant, &mut spy, &live, &FixedClock(100)).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test delivery::authenticated_delivery_child ... FAILED
+
+failures:
+
+failures:
+    delivery::authenticated_delivery_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.02s
+
+test delivery::absent_clock_and_missing_evidence_with_valid_schema_deny_without_effects ... FAILED
+test fresh_process_reopens_exact_evidence_and_rechecks_revocation ... ok
+test forged_same_revision_validator_and_producer_signatures_are_rejected ... ok
+test delivery::legacy_evidence_loss_schema_loss_expiry_and_denied_delivery_never_call_transport ... FAILED
+test byte_replacement_length_mismatch_and_failed_validation_never_accept ... ok
+test authenticated_acceptance_is_not_a_delivery_grant ... ok
+test legacy_acceptance_cannot_be_upgraded_or_inherit_authenticated_read ... ok
+test delivery::fresh_process_retains_post_effect_denial_without_resend ... FAILED
+test delivery::specialized_wire_resolution_first_call_is_guarded_and_repeat_reauthenticates ... FAILED
+test delivery::resolver_callback_revocation_blocks_lookup_or_commit_including_exact_replay ... FAILED
+test conflicting_prior_validation_and_corrupt_retained_evidence_are_denied ... ok
+test revocation_at_final_commit_check_rolls_back_all_new_rows ... ok
+test conflicting_authenticated_acceptances_race_without_mixed_evidence ... ok
+test evidence_failure_rolls_back_validation_and_acceptance_together ... ok
+test delivery::explicit_resolution_and_replay_require_current_artifact_and_separate_authority ... FAILED
+test retained_read_rechecks_authority_and_clock_after_byte_read ... ok
+test signed_native_identity_policy_principal_and_epoch_need_exact_authority ... ok
+test expiry_clock_rollback_and_post_read_authority_loss_fail_closed ... ok
+test roles_epochs_revocation_audience_and_lifetimes_fail_closed ... ok
+test duplicate_acceptance_denies_missing_or_corrupt_validation_without_repair ... ok
+test delivery::revoked_readback_still_retains_inferred_conflict_and_cannot_silently_clear ... ok
+test signatures_bind_real_bytes_and_preserve_exact_acceptance ... ok
+test valid_changed_evidence_cannot_replace_an_existing_acceptance ... ok
+
+failures:
+
+---- delivery::authenticated_delivery_rechecks_each_callback_and_commit_without_nested_lock stdout ----
+
+thread 'delivery::authenticated_delivery_rechecks_each_callback_and_commit_without_nested_lock' (3034912) panicked at tests/authenticated_artifacts.rs:1030:17:
+assertion failed: open(&f).deliver(&r, &a, &mut spy, &live, &FixedClock(100)).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- delivery::post_effect_revocation_preserves_unknown_and_never_resends stdout ----
+
+thread 'delivery::post_effect_revocation_preserves_unknown_and_never_resends' (3034916) panicked at tests/authenticated_artifacts.rs:1067:13:
+assertion failed: open(&f).deliver(&r, &Grant, &mut spy, &live, &FixedClock(100)).is_err()
+
+---- delivery::absent_clock_and_missing_evidence_with_valid_schema_deny_without_effects stdout ----
+
+thread 'delivery::absent_clock_and_missing_evidence_with_valid_schema_deny_without_effects' (3034910) panicked at tests/authenticated_artifacts.rs:1184:9:
+assertion failed: open(&f).deliver(&r, &Grant, &mut spy, &live, &NoClock).is_err()
+
+---- delivery::legacy_evidence_loss_schema_loss_expiry_and_denied_delivery_never_call_transport stdout ----
+
+thread 'delivery::legacy_evidence_loss_schema_loss_expiry_and_denied_delivery_never_call_transport' (3034915) panicked at tests/authenticated_artifacts.rs:1110:13:
+assertion failed: result.is_err()
+
+---- delivery::fresh_process_retains_post_effect_denial_without_resend stdout ----
+
+thread 'delivery::fresh_process_retains_post_effect_denial_without_resend' (3034914) panicked at tests/authenticated_artifacts.rs:1375:17:
+assertion `left == right` failed
+  left: Some(101)
+ right: Some(95)
+
+---- delivery::specialized_wire_resolution_first_call_is_guarded_and_repeat_reauthenticates stdout ----
+
+thread 'delivery::specialized_wire_resolution_first_call_is_guarded_and_repeat_reauthenticates' (3034919) panicked at tests/authenticated_artifacts.rs:1318:9:
+assertion failed: open(&f).resolve_wire(&mut bridge, &Grant, &Grant, &live,
+        &FixedClock(100)).is_err()
+
+---- delivery::resolver_callback_revocation_blocks_lookup_or_commit_including_exact_replay stdout ----
+
+thread 'delivery::resolver_callback_revocation_blocks_lookup_or_commit_including_exact_replay' (3034917) panicked at tests/authenticated_artifacts.rs:1243:17:
+assertion failed: open(&f).resolve(&resolution, &Grant, &resolver, &mut spy, &live,
+        &FixedClock(100)).is_err()
+
+---- delivery::explicit_resolution_and_replay_require_current_artifact_and_separate_authority stdout ----
+
+thread 'delivery::explicit_resolution_and_replay_require_current_artifact_and_separate_authority' (3034913) panicked at tests/authenticated_artifacts.rs:1161:9:
+assertion failed: open(&f).resolve(&resolution, &Grant, &Grant, &mut spy, &live,
+        &FixedClock(100)).is_err()
+
+
+failures:
+    delivery::absent_clock_and_missing_evidence_with_valid_schema_deny_without_effects
+    delivery::authenticated_delivery_rechecks_each_callback_and_commit_without_nested_lock
+    delivery::explicit_resolution_and_replay_require_current_artifact_and_separate_authority
+    delivery::fresh_process_retains_post_effect_denial_without_resend
+    delivery::legacy_evidence_loss_schema_loss_expiry_and_denied_delivery_never_call_transport
+    delivery::post_effect_revocation_preserves_unknown_and_never_resends
+    delivery::resolver_callback_revocation_blocks_lookup_or_commit_including_exact_replay
+    delivery::specialized_wire_resolution_first_call_is_guarded_and_repeat_reauthenticates
+
+test result: FAILED. 21 passed; 8 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+error: test failed, to rerun pass `--test authenticated_artifacts`
