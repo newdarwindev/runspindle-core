@@ -519,6 +519,153 @@ impl Drop for BoundedChild {
     }
 }
 #[test]
+fn interrupted_acceptance_child() {
+    let Ok(path) = std::env::var("CORE_AUTH_INTERRUPTED_DIR") else {
+        return;
+    };
+    let mode = std::env::var("CORE_AUTH_INTERRUPTED_MODE").unwrap();
+    if mode == "recover" {
+        // Inspect before Fixture::at can put any bytes: recovery must not repair
+        // a missing artifact or recreate acceptance state.
+        let db = Connection::open(PathBuf::from(&path).join("core.sqlite")).unwrap();
+        let count: u64 = db
+            .query_row("SELECT count(*) FROM artifacts", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+        let bytes: Vec<u8> = db
+            .query_row("SELECT bytes FROM artifacts", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(bytes, BYTES);
+        for table in [
+            "validations",
+            "acceptances",
+            "authenticated_artifact_evidence",
+        ] {
+            let count: u64 = db
+                .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(
+                count, 0,
+                "uncommitted row survived before recovery: {table}"
+            );
+        }
+    }
+    let f = Fixture::at(PathBuf::from(path), false);
+    if mode == "crash" {
+        struct ExitBeforeCommit {
+            state: TrustedState,
+            calls: AtomicU64,
+        }
+        impl Trust for ExitBeforeCommit {
+            fn current(&self, _: &Scope) -> Option<TrustedState> {
+                if self.calls.fetch_add(1, Ordering::SeqCst) == 3 {
+                    // No unwinding or Store/transaction destructor: SQLite must
+                    // recover the uncommitted journal in the next process.
+                    std::process::exit(96);
+                }
+                Some(self.state.clone())
+            }
+        }
+        f.open()
+            .accept(
+                &f.evidence(),
+                &ExitBeforeCommit {
+                    state: f.trust().0,
+                    calls: AtomicU64::new(0),
+                },
+                &FixedClock(100),
+            )
+            .unwrap();
+        panic!("final precommit interruption was not reached");
+    }
+    let mut store = f.open();
+    for table in [
+        "validations",
+        "acceptances",
+        "authenticated_artifact_evidence",
+    ] {
+        assert_eq!(
+            f.count(table),
+            0,
+            "partial row survived process exit: {table}"
+        );
+    }
+    assert_eq!(f.count("artifacts"), 1);
+    let bytes: Vec<u8> = f
+        .db()
+        .query_row("SELECT bytes FROM artifacts", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(bytes, BYTES);
+    let accepted = store
+        .accept(&f.evidence(), &f.trust(), &FixedClock(100))
+        .unwrap();
+    let mut conflict = f.scope.clone();
+    conflict.validator.revision = "validator-v2".into();
+    assert!(store
+        .accept(
+            &signed(conflict.clone()),
+            &trusted(conflict),
+            &FixedClock(100)
+        )
+        .is_err());
+    assert_eq!(
+        store
+            .read(accepted.accepted(), &f.trust(), &FixedClock(100))
+            .unwrap()
+            .1,
+        BYTES
+    );
+    for table in [
+        "validations",
+        "acceptances",
+        "authenticated_artifact_evidence",
+    ] {
+        assert_eq!(f.count(table), 1, "retry mixed evidence: {table}");
+    }
+    let wire: Vec<u8> = f
+        .db()
+        .query_row(
+            "SELECT evidence FROM authenticated_artifact_evidence",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(wire, f.evidence().encode().unwrap());
+}
+#[test]
+fn fresh_process_precommit_exit_recovers_without_partial_acceptance() {
+    let f = Fixture::new();
+    for (mode, expected) in [("crash", 96), ("recover", 0)] {
+        let diagnostic = f.dir.join(format!("{mode}.stderr"));
+        let mut child = BoundedChild(
+            Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "interrupted_acceptance_child", "--nocapture"])
+                .env("CORE_AUTH_INTERRUPTED_DIR", &f.dir)
+                .env("CORE_AUTH_INTERRUPTED_MODE", mode)
+                // Capture child diagnostics so they cannot split the parent's
+                // machine-readable result line; retain them on assertion failure.
+                .stdout(std::process::Stdio::null())
+                .stderr(std::fs::File::create(&diagnostic).unwrap())
+                .spawn()
+                .unwrap(),
+        );
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                assert_eq!(
+                    status.code(),
+                    Some(expected),
+                    "{mode}: {}",
+                    std::fs::read_to_string(&diagnostic).unwrap()
+                );
+                break;
+            }
+            assert!(std::time::Instant::now() < end, "{mode} child timeout");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+}
+#[test]
 fn fresh_process_reopens_exact_evidence_and_rechecks_revocation() {
     let f = Fixture::new();
     let mut child = BoundedChild(

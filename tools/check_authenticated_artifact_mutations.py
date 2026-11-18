@@ -25,6 +25,13 @@ from tools.prepared_builder import select  # noqa: E402
 FEATURES = "verified-authority,authenticated-artifacts"
 mutations = [
     (
+        "premature-acceptance-commit",
+        "fresh_process_precommit_exit_recovers_without_partial_acceptance",
+        {
+            "verify(evidence, trust, clock)?; // denial rolls back all three new rows\n        tx.commit()?;": "tx.commit()?;\n        verify(evidence, trust, clock)?; // deliberately committed before final check",
+        },
+    ),
+    (
         "untrusted-parser-diagnostic",
         "malformed_evidence_diagnostics_do_not_echo_untrusted_members_or_values",
         {
