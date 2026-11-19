@@ -16,12 +16,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import uuid
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.mutation_target import isolated_target  # noqa: E402
-from tools.prepared_builder import select  # noqa: E402
+from tools.prepared_builder import container_run, select  # noqa: E402
 
 # Match the normal Rust validation feature set and existing offline lockfile.
 # Literal canonical/signature vectors are independent of the Rust serializer.
@@ -178,76 +177,6 @@ def verify_shards(receipts: object, source_sha: str) -> dict[str, str | int]:
         "authenticated_artifact_mutation_shards": SHARD_COUNT,
         "authenticated_artifact_mutations": len(mutations),
     }
-
-
-def container_run(
-    root: pathlib.Path,
-    target: pathlib.Path,
-    builder: dict[str, str],
-    command: list[str],
-    timeout: int,
-) -> subprocess.CompletedProcess[str]:
-    # A CLI timeout does not stop its container. Retain an unguessable owned name
-    # so finally can force-remove precisely this invocation, then verify absence.
-    name = "core-artifact-evidence-" + uuid.uuid4().hex
-    prefix = [
-        "docker",
-        "run",
-        "--name",
-        name,
-        "--pull",
-        "never",
-        "--network",
-        "none",
-        "--user",
-        f"{os.getuid()}:{os.getgid()}",
-        "-v",
-        f"{root}:/source:ro",
-        "-v",
-        f"{target}:/work/local/linux-target",
-        "-v",
-        f"{pathlib.Path.home()}/.cargo/registry:/usr/local/cargo/registry:ro",
-        "-v",
-        f"{pathlib.Path.home()}/.cargo/git:/usr/local/cargo/git:ro",
-        "-w",
-        "/source",
-        builder["builder_image_id"],
-    ]
-    try:
-        return subprocess.run(
-            prefix + command,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            timeout=timeout,
-        )
-    finally:
-        # No broad pruning, shared-container changes or daemon reconfiguration.
-        # Failure to confirm cleanup aborts the harness, never counts a mutant.
-        subprocess.run(
-            ["docker", "rm", "--force", name],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-        )
-        remaining = subprocess.run(
-            [
-                "docker",
-                "ps",
-                "--all",
-                "--filter",
-                f"name=^/{name}$",
-                "--format",
-                "{{.Names}}",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=True,
-        )
-        if remaining.stdout.strip():
-            raise AssertionError("owned mutation container survived cleanup")
 
 
 def run_case(
