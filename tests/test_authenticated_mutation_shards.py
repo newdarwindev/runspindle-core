@@ -1,6 +1,8 @@
 import contextlib
 import subprocess
 import unittest
+from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from tools import check_authenticated_artifact_mutations as harness
@@ -9,7 +11,7 @@ SOURCE = "a" * 40
 
 
 class AuthenticatedMutationShardsTest(unittest.TestCase):
-    def recorded_shards(self):
+    def recorded_shards(self) -> list[dict[str, Any]]:
         return [
             {
                 "status": "passed",
@@ -30,7 +32,7 @@ class AuthenticatedMutationShardsTest(unittest.TestCase):
             for index in range(1, harness.SHARD_COUNT + 1)
         ]
 
-    def test_all_nine_mutations_have_one_shard(self):
+    def test_all_nine_mutations_have_one_shard(self) -> None:
         receipts = self.recorded_shards()
         self.assertEqual(
             [len(receipt["mutations"]) for receipt in receipts], [2, 2, 2, 2, 1]
@@ -61,7 +63,7 @@ class AuthenticatedMutationShardsTest(unittest.TestCase):
         )
         self.assertEqual(len(harness.selected_mutations(None)), 9)
 
-    def test_no_missing_duplicate_failed_or_stale_shard_can_pass(self):
+    def test_no_missing_duplicate_failed_or_stale_shard_can_pass(self) -> None:
         receipts = self.recorded_shards()
         bad_receipts = (
             receipts[:-1],
@@ -75,10 +77,12 @@ class AuthenticatedMutationShardsTest(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 harness.verify_shards(bad, SOURCE)
 
-    def test_shard_runs_full_baseline_before_its_cases(self):
-        calls = []
+    def test_shard_runs_full_baseline_before_its_cases(self) -> None:
+        calls: list[tuple[Path, str | None]] = []
 
-        def run_case(_target, _builder, source, case):
+        def run_case(
+            _target: object, _builder: object, source: Path, case: str | None
+        ) -> subprocess.CompletedProcess[str]:
             calls.append((source, case))
             if case is None:
                 all_pass = "\n".join(
