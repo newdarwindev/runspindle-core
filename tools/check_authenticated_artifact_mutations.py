@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -135,7 +136,10 @@ def verify_shards(receipts: object, source_sha: str) -> dict[str, str | int]:
         "status": "passed",
         "source_sha": source_sha,
         "evidence_class": "component_mutation",
-        "clean_baseline": {"status": "passed", "required_named_tests": baseline_cases()},
+        "clean_baseline": {
+            "status": "passed",
+            "required_named_tests": baseline_cases(),
+        },
         "features": FEATURES,
     }
     seen = set()
@@ -145,20 +149,28 @@ def verify_shards(receipts: object, source_sha: str) -> dict[str, str | int]:
             or receipt.get("qualification_target_unchanged") is not True
             or any(receipt.get(key) != value for key, value in expected_proof.items())
         ):
-            raise ValueError("failed or mismatched authenticated artifact mutation shard")
+            raise ValueError(
+                "failed or mismatched authenticated artifact mutation shard"
+            )
         shard = receipt.get("shard")
         if not isinstance(shard, dict) or shard.get("count") != SHARD_COUNT:
             raise ValueError("wrong authenticated artifact mutation shard count")
         index = shard.get("index")
-        expected = [coverage_record(name, case) for name, case, _ in selected_mutations(index)]
+        expected = [
+            coverage_record(name, case) for name, case, _ in selected_mutations(index)
+        ]
         observed = receipt.get("mutations")
         if (
             index is None
             or index in seen
             or observed != expected
-            or any(record["behavioral_failure_observed"] is not True for record in observed)
+            or any(
+                record["behavioral_failure_observed"] is not True for record in observed
+            )
         ):
-            raise ValueError("missing or duplicate authenticated artifact mutation case")
+            raise ValueError(
+                "missing or duplicate authenticated artifact mutation case"
+            )
         seen.add(index)
     return {
         "status": "passed",
@@ -343,18 +355,35 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--shard", type=int, choices=range(1, SHARD_COUNT + 1))
     mode.add_argument(
-        "--verify-shards", action="store_true", help="read all shard JSON receipts from stdin"
+        "--verify-shards",
+        action="store_true",
+        help="read all shard JSON receipts from stdin",
     )
     args = parser.parse_args()
     result: dict[str, object]
-    if args.verify_shards:
-        raw = sys.stdin.buffer.read(MAX_JOIN_INPUT + 1)
-        if len(raw) > MAX_JOIN_INPUT:
-            parser.exit(2, "authenticated artifact mutation shard input is too large\n")
+    from_ci = os.environ.get("RUNSPINDLE_AUTH_SHARDS") == "1"
+    if args.verify_shards or from_ci:
         try:
-            result = dict(verify_shards(json.loads(raw), checkout_sha()))
+            if from_ci:
+                if args.shard is not None or os.environ.get("GITHUB_ACTIONS") != "true":
+                    raise ValueError("unexpected shard join context")
+                raw_cases = [
+                    os.environ.get(f"RUNSPINDLE_AUTH_SHARD_{index}", "")
+                    for index in range(1, SHARD_COUNT + 1)
+                ]
+                if sum(map(len, raw_cases)) > MAX_JOIN_INPUT:
+                    raise ValueError("oversized shard receipts")
+                receipts = [json.loads(raw) for raw in raw_cases]
+            else:
+                raw = sys.stdin.buffer.read(MAX_JOIN_INPUT + 1)
+                if len(raw) > MAX_JOIN_INPUT:
+                    raise ValueError("oversized shard receipts")
+                receipts = json.loads(raw)
+            result = dict(verify_shards(receipts, checkout_sha()))
         except (OSError, ValueError, subprocess.SubprocessError):
-            parser.exit(2, "authenticated artifact mutation shard evidence did not validate\n")
+            parser.exit(
+                2, "authenticated artifact mutation shard evidence did not validate\n"
+            )
     else:
         result = run_mutations(args.shard)
     print(json.dumps(result))

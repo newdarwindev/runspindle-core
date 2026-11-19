@@ -62,11 +62,91 @@ jobs:
       - id: partition
         name: Run mutation_1 partition
         run: python3 tools/partition_validation.py mutation_1 --output "$GITHUB_OUTPUT"
+  auth_1:
+    name: validation / auth_1
+    runs-on: ["${{ format('runspindle-strix-direct-{0}-{1}-auth_1', github.run_id, github.run_attempt) }}"]
+    timeout-minutes: 23
+    outputs:
+      receipt: ${{ steps.shard.outputs.receipt }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - id: shard
+        name: Run authenticated artifact mutation shard 1
+        run: |
+          python3 -c 'from tools.partition_validation import manifests, guest_identity; guest_identity(manifests()[0]["image"])'
+          receipt="$(python3 tools/check_authenticated_artifact_mutations.py --shard 1)"
+          printf 'receipt=%s\n' "$receipt" >> "$GITHUB_OUTPUT"
+  auth_2:
+    name: validation / auth_2
+    runs-on: ["${{ format('runspindle-strix-direct-{0}-{1}-auth_2', github.run_id, github.run_attempt) }}"]
+    timeout-minutes: 23
+    outputs:
+      receipt: ${{ steps.shard.outputs.receipt }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - id: shard
+        name: Run authenticated artifact mutation shard 2
+        run: |
+          python3 -c 'from tools.partition_validation import manifests, guest_identity; guest_identity(manifests()[0]["image"])'
+          receipt="$(python3 tools/check_authenticated_artifact_mutations.py --shard 2)"
+          printf 'receipt=%s\n' "$receipt" >> "$GITHUB_OUTPUT"
+  auth_3:
+    name: validation / auth_3
+    runs-on: ["${{ format('runspindle-strix-direct-{0}-{1}-auth_3', github.run_id, github.run_attempt) }}"]
+    timeout-minutes: 23
+    outputs:
+      receipt: ${{ steps.shard.outputs.receipt }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - id: shard
+        name: Run authenticated artifact mutation shard 3
+        run: |
+          python3 -c 'from tools.partition_validation import manifests, guest_identity; guest_identity(manifests()[0]["image"])'
+          receipt="$(python3 tools/check_authenticated_artifact_mutations.py --shard 3)"
+          printf 'receipt=%s\n' "$receipt" >> "$GITHUB_OUTPUT"
+  auth_4:
+    name: validation / auth_4
+    runs-on: ["${{ format('runspindle-strix-direct-{0}-{1}-auth_4', github.run_id, github.run_attempt) }}"]
+    timeout-minutes: 23
+    outputs:
+      receipt: ${{ steps.shard.outputs.receipt }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - id: shard
+        name: Run authenticated artifact mutation shard 4
+        run: |
+          python3 -c 'from tools.partition_validation import manifests, guest_identity; guest_identity(manifests()[0]["image"])'
+          receipt="$(python3 tools/check_authenticated_artifact_mutations.py --shard 4)"
+          printf 'receipt=%s\n' "$receipt" >> "$GITHUB_OUTPUT"
+  auth_5:
+    name: validation / auth_5
+    runs-on: ["${{ format('runspindle-strix-direct-{0}-{1}-auth_5', github.run_id, github.run_attempt) }}"]
+    timeout-minutes: 23
+    outputs:
+      receipt: ${{ steps.shard.outputs.receipt }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - id: shard
+        name: Run authenticated artifact mutation shard 5
+        run: |
+          python3 -c 'from tools.partition_validation import manifests, guest_identity; guest_identity(manifests()[0]["image"])'
+          receipt="$(python3 tools/check_authenticated_artifact_mutations.py --shard 5)"
+          printf 'receipt=%s\n' "$receipt" >> "$GITHUB_OUTPUT"
   mutation_2:
+    needs: [auth_1, auth_2, auth_3, auth_4, auth_5]
     name: validation / mutation_2
     runs-on: ["${{ format('runspindle-strix-direct-{0}-{1}-mutation_2', github.run_id, github.run_attempt) }}"]
-    # 600s artifact check + 3600s bounded evidence harness + setup margin.
-    timeout-minutes: 75
+    timeout-minutes: 15
     outputs:
       receipt: ${{ steps.partition.outputs.receipt }}
     steps:
@@ -75,6 +155,13 @@ jobs:
           persist-credentials: false
       - id: partition
         name: Run mutation_2 partition
+        env:
+          RUNSPINDLE_AUTH_SHARDS: "1"
+          RUNSPINDLE_AUTH_SHARD_1: ${{ needs.auth_1.outputs.receipt }}
+          RUNSPINDLE_AUTH_SHARD_2: ${{ needs.auth_2.outputs.receipt }}
+          RUNSPINDLE_AUTH_SHARD_3: ${{ needs.auth_3.outputs.receipt }}
+          RUNSPINDLE_AUTH_SHARD_4: ${{ needs.auth_4.outputs.receipt }}
+          RUNSPINDLE_AUTH_SHARD_5: ${{ needs.auth_5.outputs.receipt }}
         run: python3 tools/partition_validation.py mutation_2 --output "$GITHUB_OUTPUT"
   mutation_3:
     name: validation / mutation_3

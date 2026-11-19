@@ -32,17 +32,31 @@ class AuthenticatedMutationShardsTest(unittest.TestCase):
 
     def test_all_nine_mutations_have_one_shard(self):
         receipts = self.recorded_shards()
-        self.assertEqual([len(receipt["mutations"]) for receipt in receipts], [2, 2, 2, 2, 1])
         self.assertEqual(
-            [record["mutation"] for receipt in receipts for record in receipt["mutations"]],
+            [len(receipt["mutations"]) for receipt in receipts], [2, 2, 2, 2, 1]
+        )
+        self.assertEqual(
             [
-                "premature-acceptance-commit", "untrusted-parser-diagnostic",
-                "forged-validator", "forged-producer", "native-scope",
-                "commit-authority", "byte-length", "retained-validation", "canonical-order",
+                record["mutation"]
+                for receipt in receipts
+                for record in receipt["mutations"]
+            ],
+            [
+                "premature-acceptance-commit",
+                "untrusted-parser-diagnostic",
+                "forged-validator",
+                "forged-producer",
+                "native-scope",
+                "commit-authority",
+                "byte-length",
+                "retained-validation",
+                "canonical-order",
             ],
         )
         self.assertEqual(
-            harness.verify_shards(list(reversed(receipts)), SOURCE)["authenticated_artifact_mutations"],
+            harness.verify_shards(list(reversed(receipts)), SOURCE)[
+                "authenticated_artifact_mutations"
+            ],
             9,
         )
         self.assertEqual(len(harness.selected_mutations(None)), 9)
@@ -67,21 +81,28 @@ class AuthenticatedMutationShardsTest(unittest.TestCase):
         def run_case(_target, _builder, source, case):
             calls.append((source, case))
             if case is None:
-                all_pass = "\n".join(f"test {name} ... ok" for name in harness.baseline_cases())
+                all_pass = "\n".join(
+                    f"test {name} ... ok" for name in harness.baseline_cases()
+                )
                 return subprocess.CompletedProcess([], 0, all_pass)
             return subprocess.CompletedProcess([], 101, f"test {case} ... FAILED")
 
         with (
             patch.object(harness, "checkout_sha", return_value=SOURCE),
             patch.object(harness, "select", return_value=(None, {})),
-            patch.object(harness, "isolated_target", return_value=contextlib.nullcontext(harness.ROOT)),
+            patch.object(
+                harness,
+                "isolated_target",
+                return_value=contextlib.nullcontext(harness.ROOT),
+            ),
             patch.object(harness, "run_case", side_effect=run_case),
         ):
             receipt = harness.run_mutations(1)
         self.assertIsNone(calls[0][1])
-        self.assertEqual([case for _, case in calls[1:]], [
-            case for _, case, _ in harness.selected_mutations(1)
-        ])
+        self.assertEqual(
+            [case for _, case in calls[1:]],
+            [case for _, case, _ in harness.selected_mutations(1)],
+        )
         self.assertTrue(all(source != calls[0][0] for source, _ in calls[1:]))
         self.assertEqual(receipt, self.recorded_shards()[0])
 
