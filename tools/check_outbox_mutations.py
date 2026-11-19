@@ -2,6 +2,7 @@
 """A fabricated send acknowledgement must fail without independent readback."""
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -80,6 +81,8 @@ for name, case, replacements in mutations:
             "never",
             "--network",
             "none",
+            "--user",
+            f"{os.getuid()}:{os.getgid()}",
             "-v",
             f"{root}:/source:ro",
             "-v",

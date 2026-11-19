@@ -199,6 +199,8 @@ def container_run(
         "never",
         "--network",
         "none",
+        "--user",
+        f"{os.getuid()}:{os.getgid()}",
         "-v",
         f"{root}:/source:ro",
         "-v",

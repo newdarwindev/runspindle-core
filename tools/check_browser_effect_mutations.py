@@ -8,6 +8,7 @@ qualification-target writes. The untouched baseline must pass before each isolat
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -58,6 +59,8 @@ def container_run(
         "never",
         "--network",
         "none",
+        "--user",
+        f"{os.getuid()}:{os.getgid()}",
         "-v",
         f"{root}:/source:ro",
         "-v",
