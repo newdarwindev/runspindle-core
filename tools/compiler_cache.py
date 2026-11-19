@@ -24,6 +24,14 @@ MAX_FILES = 20000
 FEATURES = "verified-authority,authenticated-artifacts"
 
 
+class MaterializationIntegrityError(ValueError):
+    """Finite marker for post-use validation, not preparation or cleanup."""
+
+    def __init__(self, message: str, permission_denied: bool = False) -> None:
+        super().__init__(message)
+        self.permission_denied = permission_denied
+
+
 def sha(path: Path) -> str:
     result = hashlib.sha256()
     with path.open("rb") as stream:
@@ -258,8 +266,17 @@ def materialized(
         try:
             yield target
         finally:
-            if verified(cache, expected) != data or key(root) != expected:
-                raise ValueError("compiler seed changed during job; reject results")
+            try:
+                unchanged = verified(cache, expected) == data and key(root) == expected
+            except Exception as error:
+                raise MaterializationIntegrityError(
+                    "changed compiler seed or unverifiable bytes; reject results",
+                    isinstance(error, PermissionError),
+                ) from None
+            if not unchanged:
+                raise MaterializationIntegrityError(
+                    "compiler seed changed during job; reject results"
+                )
 
 
 @contextlib.contextmanager
