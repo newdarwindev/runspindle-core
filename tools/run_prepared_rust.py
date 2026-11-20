@@ -36,24 +36,18 @@ def seed_guest_target(target: pathlib.Path, builder: dict[str, str]) -> bool:
         data = compiler_cache.verified(GUEST_SEED, expected)
         if data.get("builder") != builder["builder_image_id"]:
             return False
-        size = sum(row[0] for row in data["files"].values())
-        if shutil.disk_usage(target.parent).free - size < GUEST_FREE_RESERVE:
+        stage = GUEST_SEED / expected / "target"
+        if (
+            shutil.disk_usage(target.parent).free < GUEST_FREE_RESERVE
+            or stage.stat().st_dev != target.parent.stat().st_dev
+        ):
             return False
-        with tempfile.TemporaryDirectory(prefix="core-seed-", dir=target.parent) as temp:
-            stage = pathlib.Path(temp) / "target"
-            stage.mkdir()
-            for relative, row in data["files"].items():
-                source = GUEST_SEED / expected / "target" / relative
-                destination = stage / relative
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                compiler_cache.clone(source, destination)
-                if (
-                    compiler_cache.sha(destination) != row[1]
-                    or destination.stat().st_mtime_ns != row[3]
-                ):
-                    raise ValueError("compiler target copy changed")
-            (stage / SEED_MARKER).touch(exist_ok=False)
-            stage.rename(target)
+        # This extracted copy belongs to this disposable guest. The sealed
+        # transport archive remains on the host.
+        for relative, row in data["files"].items():
+            (stage / relative).chmod(row[2] | stat.S_IWUSR)
+        (stage / SEED_MARKER).touch(exist_ok=False)
+        stage.rename(target)
     except (OSError, ValueError):
         print("Verified compiler seed unavailable, using a clean Cargo target", flush=True)
         return False
