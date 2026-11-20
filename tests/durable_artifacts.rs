@@ -349,6 +349,124 @@ fn versioned_artifact_store_requires_original_tables_and_safety_triggers() {
     }
 }
 #[test]
+fn open_artifact_handles_deny_operations_under_incompatible_schema() {
+    use rusqlite::Connection;
+    use std::cell::Cell;
+
+    struct Spy<'a>(&'a Cell<u32>);
+    impl Validator for Spy<'_> {
+        fn revision(&self) -> &str {
+            "validator-2"
+        }
+        fn validate(&self, _: &ArtifactRef, _: &[u8], _: &str) -> bool {
+            self.0.set(self.0.get() + 1);
+            true
+        }
+    }
+
+    for fault in ["version", "retention trigger"] {
+        let t = Temp::new();
+        let mut store = Store::open(t.db()).unwrap();
+        let (artifact, validation) = prepare(&mut store, "artifact");
+        let accepted = store.accept(VERSION, &validation, &Grant).unwrap();
+        let observer = Connection::open(t.db()).unwrap();
+        let original_trigger: String = observer
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE name='acceptances_retained'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let (damage, restore) = if fault == "version" {
+            ("PRAGMA user_version=99;", "PRAGMA user_version=1;")
+        } else {
+            (
+                "DROP TRIGGER acceptances_retained;",
+                original_trigger.as_str(),
+            )
+        };
+        observer.execute_batch(damage).unwrap();
+
+        let calls = Cell::new(0);
+        let outcomes = [
+            ("read staged bytes", store.bytes(&artifact).is_err()),
+            ("read accepted bytes", store.accepted(&accepted).is_err()),
+            (
+                "accept duplicate",
+                store.accept(VERSION, &validation, &Grant).is_err(),
+            ),
+            (
+                "validate",
+                store
+                    .validate(VERSION, &artifact, "policy", &Spy(&calls))
+                    .is_err(),
+            ),
+            (
+                "put",
+                store
+                    .put(VERSION, binding(), "second".into(), 1, BYTES)
+                    .is_err(),
+            ),
+        ];
+        assert_eq!(calls.get(), 0, "validator received bytes under {fault}");
+        for (operation, denied) in outcomes {
+            assert!(denied, "{operation} allowed under {fault}");
+        }
+        for table in ["artifacts", "validations", "acceptances"] {
+            let rows: u64 = observer
+                .query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            assert_eq!(rows, 1, "{fault}: changed {table}");
+        }
+
+        observer.execute_batch(restore).unwrap();
+        assert_eq!(store.accepted(&accepted).unwrap(), BYTES);
+        assert_eq!(
+            store.accept(VERSION, &validation, &Grant).unwrap(),
+            accepted
+        );
+        assert_eq!(
+            Store::open(t.db()).unwrap().accepted(&accepted).unwrap(),
+            BYTES
+        );
+    }
+}
+
+#[test]
+fn validation_rechecks_artifact_schema_after_the_validator_runs() {
+    struct SchemaChange(rusqlite::Connection);
+    impl Validator for SchemaChange {
+        fn revision(&self) -> &str {
+            "validator-2"
+        }
+        fn validate(&self, _: &ArtifactRef, bytes: &[u8], _: &str) -> bool {
+            assert_eq!(bytes, BYTES);
+            self.0.execute_batch("PRAGMA user_version=99;").unwrap();
+            true
+        }
+    }
+
+    let t = Temp::new();
+    let mut store = Store::open(t.db()).unwrap();
+    let (artifact, _) = prepare(&mut store, "artifact");
+    let validator = SchemaChange(rusqlite::Connection::open(t.db()).unwrap());
+    assert!(store
+        .validate(VERSION, &artifact, "policy", &validator)
+        .is_err());
+    let (version, validations): (u64, u64) = validator
+        .0
+        .query_row(
+            "SELECT user_version, (SELECT count(*) FROM validations) FROM pragma_user_version",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((version, validations), (99, 1));
+}
+
+#[test]
 fn corrupt_file_and_unversioned_schema_block_without_initialization() {
     let t = Temp::new();
     let corrupt = b"synthetic non-SQLite corruption fixture";
