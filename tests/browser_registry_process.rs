@@ -108,7 +108,29 @@ fn registry_child() {
     };
     let root = PathBuf::from(root);
     let mode = std::env::var("CORE_BROWSER_REGISTRY_MODE").unwrap();
-    let mut registry = BrowserRegistry::open(root.join("core.sqlite")).unwrap();
+    let registry = BrowserRegistry::open(root.join("core.sqlite"));
+    if mode == "damaged" {
+        std::fs::write(
+            root.join("open-damaged"),
+            if registry.is_err() {
+                "blocked"
+            } else {
+                "opened"
+            },
+        )
+        .unwrap();
+        let mut peer = Site {
+            root: root.clone(),
+            mode,
+            calls: 0,
+        };
+        let outcome =
+            registry.and_then(|mut registry| registry.dispatch(target(), b"x", &Allow, &mut peer));
+        std::fs::write(root.join("calls-damaged"), peer.calls.to_string()).unwrap();
+        assert!(outcome.is_err());
+        return;
+    }
+    let mut registry = registry.unwrap();
     if mode == "concurrent" {
         let id = std::env::var("CORE_BROWSER_REGISTRY_ID").unwrap();
         std::fs::write(root.join(format!("ready-{id}")), b"").unwrap();
@@ -158,6 +180,39 @@ fn wait(child: &mut Child, root: &Path, id: &str) -> i32 {
         );
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
+}
+#[test]
+fn fresh_process_missing_browser_reservation_blocks_duplicate_dispatch() {
+    let t = Temp::new();
+    let mut initial = spawn(&t.0, "after", "initial");
+    assert_eq!(wait(&mut initial, &t.0, "initial"), 95);
+    let effect = std::fs::read(t.0.join("effect.json")).unwrap();
+
+    let db = rusqlite::Connection::open(t.0.join("core.sqlite")).unwrap();
+    let trigger: String = db
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE name='browser_operations_retained'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    db.execute_batch(&format!(
+        "DROP TRIGGER browser_operations_retained;DELETE FROM browser_operations;{trigger};"
+    ))
+    .unwrap();
+
+    let mut recovered = spawn(&t.0, "damaged", "damaged");
+    let exit = wait(&mut recovered, &t.0, "damaged");
+    assert_eq!(
+        std::fs::read_to_string(t.0.join("calls-damaged")).unwrap(),
+        "0"
+    );
+    assert_eq!(
+        std::fs::read_to_string(t.0.join("open-damaged")).unwrap(),
+        "blocked"
+    );
+    assert_eq!(exit, 0);
+    assert_eq!(std::fs::read(t.0.join("effect.json")).unwrap(), effect);
 }
 #[test]
 fn fresh_process_crash_before_or_after_site_effect_never_restores_dispatch_right() {

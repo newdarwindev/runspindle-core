@@ -204,20 +204,19 @@ impl crate::browser_effect_registry::BrowserRegistry {
         let tx = self
             .connection
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        crate::browser_effect_registry::schema(&tx)?;
+        let version = schema(&tx)?;
         anyhow::ensure!(
             authority.allow_schema_upgrade(),
             "control schema upgrade denied"
         );
-        let version: u32 = tx.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if version == 1 {
+        if version == EFFECT_VERSION {
             {
                 for target in crate::browser_effect_registry::validated_targets(&tx)? {
                     anyhow::ensure!(!reserved(&target), "legacy control namespace collision");
                 }
             }
             crate::durable::create_schema(&tx, SCHEMA)?;
-            tx.pragma_update(None, "user_version", 2)?;
+            tx.pragma_update(None, "user_version", CONTROL_VERSION)?;
         }
         crate::browser_effect_registry::schema(&tx)?;
         anyhow::ensure!(
@@ -230,7 +229,8 @@ impl crate::browser_effect_registry::BrowserRegistry {
 }
 
 use crate::browser_effect_registry::{
-    identity, read, schema, BrowserRegistry, HistoricalSnapshot, Record,
+    read_record, reserve, schema, BrowserRegistry, HistoricalSnapshot, Record, CONTROL_VERSION,
+    EFFECT_VERSION,
 };
 use crate::browser_effect_wire::{Client, Outcome, Peer};
 use rusqlite::{params, Connection, TransactionBehavior};
@@ -272,13 +272,14 @@ fn transition(record: &Record) -> anyhow::Result<Transition> {
 /// head: orphaned reservations, forks and rewritten predecessor generations fail
 /// closed. Holder state exists only in the transition payload, never the pointer.
 fn heads(connection: &Connection) -> anyhow::Result<HashMap<String, Record>> {
-    schema(connection)?;
-    let version: u32 = connection.pragma_query_value(None, "user_version", |r| r.get(0))?;
-    anyhow::ensure!(version == 2, "control schema not enabled");
+    anyhow::ensure!(
+        schema(connection)? == CONTROL_VERSION,
+        "control schema not enabled"
+    );
     let mut records = HashMap::new();
     for target in crate::browser_effect_registry::validated_targets(connection)? {
         if reserved(&target) {
-            let record = read(connection, &target)?
+            let record = read_record(connection, &target)?
                 .ok_or_else(|| anyhow::anyhow!("missing control record"))?;
             transition(&record)?;
             records.insert(target.binding.operation.clone(), record);
@@ -330,7 +331,10 @@ fn heads(connection: &Connection) -> anyhow::Result<HashMap<String, Record>> {
                 }
             }
         }
-        result.insert(browser, read(connection, &head.snapshot.target)?.unwrap());
+        result.insert(
+            browser,
+            read_record(connection, &head.snapshot.target)?.unwrap(),
+        );
     }
     anyhow::ensure!(visited.len() == records.len(), "orphaned control record");
     Ok(result)
@@ -366,7 +370,7 @@ impl BrowserRegistry {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current = heads(&tx)?;
-        if let Some(old) = read(&tx, &value.target)? {
+        if let Some(old) = read_record(&tx, &value.target)? {
             anyhow::ensure!(old.payload == payload, "control reservation conflict");
             return Ok(Outcome::Unknown);
         }
@@ -410,16 +414,7 @@ impl BrowserRegistry {
             count < CAPACITY && admitted(authority, value, Action::Dispatch),
             "control admission denied"
         );
-        tx.execute(
-            "INSERT INTO browser_operations VALUES(?1,?2,?3,?4,?5,'unknown',0,0)",
-            params![
-                identity(&value.target)?,
-                value.target.binding.operation,
-                serde_json::to_string(&value.target)?,
-                payload,
-                digest(&payload)
-            ],
-        )?;
+        reserve(&tx, &value.target, &payload, &digest(&payload))?;
         match previous {
             None => {
                 tx.execute(

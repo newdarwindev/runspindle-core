@@ -6,6 +6,20 @@ service, network listener, issuer, account store, or effect ledger. The existing
 Core `BrowserRegistry` remains the reservation/reconciliation owner. Autosave
 credentials and version markers are a separate protocol, not implicitly mapped.
 
+The registry atomically retains each effect or control reservation alongside its
+mutable observation in the same WAL database. The retained record binds the
+semantic identity, operation, exact target and payload digest. Reopening or
+reading a registry with a missing or mismatched record fails closed. A surviving
+reservation cannot become permission to resubmit when the observation row is lost.
+
+Opening a v1 effect-only or v2 control-enabled registry adds reservations for
+its existing operations and advances to v3 or v4 respectively in one transaction.
+The migration preserves existing observations and control heads. It cannot recover
+an operation whose sole legacy row was already missing. Preserve external evidence
+for independent reconciliation of such a legacy database. Rollback to earlier code
+requires an earlier compatible database and independent reconciliation because an
+earlier snapshot can omit effects. The registry never downgrades automatically.
+
 A trusted application explicitly supplies an absolute program, bounded arguments
 and a 10 ms–30 s total exchange deadline. It must verify executable/source identity
 and compose the Browser receiver with an independently authorized out-of-band
