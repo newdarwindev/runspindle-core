@@ -228,7 +228,8 @@ def run_case(
             command += [case, "--", "--exact", "--test-threads=1"]
         else:
             command += ["--", "--test-threads=1"]
-        return container_run(root, target, builder, command, 300)
+        # Cargo diagnostics on stderr can split a libtest result line on stdout.
+        return container_run(root, target, builder, command, 300, combine_output=False)
 
 
 def run_mutations(shard: int | None = None) -> dict[str, object]:
@@ -250,7 +251,9 @@ def run_mutations(shard: int | None = None) -> dict[str, object]:
         if baseline.returncode or any(
             f"test {case} ... ok" not in baseline.stdout for case in cases
         ):
-            raise AssertionError("clean baseline failed: " + baseline.stdout[-5000:])
+            raise AssertionError(
+                "clean baseline failed: " + (baseline.stderr + baseline.stdout)[-5000:]
+            )
         for name, case, replacements in selected:
             mutated = source
             for old, new in replacements.items():
@@ -259,10 +262,11 @@ def run_mutations(shard: int | None = None) -> dict[str, object]:
             if not (
                 run.returncode
                 and f"test {case} ... FAILED" in run.stdout
-                and "could not compile" not in run.stdout
+                and "could not compile" not in run.stderr
             ):
                 raise AssertionError(
-                    "mutant not behaviorally detected: " + run.stdout[-5000:]
+                    "mutant not behaviorally detected: "
+                    + (run.stderr + run.stdout)[-5000:]
                 )
             observed.append(coverage_record(name, case))
     receipt: dict[str, object] = {
