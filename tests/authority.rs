@@ -14,7 +14,9 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     path::PathBuf,
+    process::Command,
     sync::atomic::{AtomicU64, Ordering},
+    time::{Duration, Instant},
 };
 static NEXT: AtomicU64 = AtomicU64::new(0);
 struct Fixture {
@@ -344,6 +346,91 @@ fn assertion_is_immutable_and_revocation_is_retained() {
     c.execute("INSERT INTO revocations VALUES('grant-1')", [])
         .unwrap();
     assert!(c.execute("DELETE FROM revocations", []).is_err());
+}
+
+#[test]
+fn authority_schema_reopen_child() {
+    let Some(directory) = std::env::var_os("CORE_AUTHORITY_SCHEMA_TEST_DIR") else {
+        return;
+    };
+    let directory = PathBuf::from(directory);
+    let ports = AuthenticatedPorts {
+        helper: Some(LocalHelper::read(directory.join("helper.json")).unwrap()),
+        script_directory: Some(directory.clone()),
+    };
+    let call =
+        serde_json::from_slice(&std::fs::read(directory.join("call.json")).unwrap()).unwrap();
+    let status = ports.invoke(&call).unwrap().status;
+    std::fs::write(directory.join("result"), format!("{status:?}")).unwrap();
+}
+
+#[test]
+fn invalid_revocation_schema_blocks_fresh_dispatch_without_effects() {
+    for replacement in [
+        "",
+        "CREATE TRIGGER revocations_retained BEFORE DELETE ON revocations BEGIN SELECT 1;END;",
+    ] {
+        let f = Fixture::new();
+        f.insert(&f.assertion(), false);
+        assert!(f.helper.verify(f.wire.as_bytes(), Action::Dispatch));
+        f.ports();
+        std::fs::write(
+            f.directory.join("helper.json"),
+            serde_json::to_vec(&f.helper).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            f.directory.join("call.json"),
+            serde_json::to_vec(&f.call(PortAction::Launch, Action::Dispatch)).unwrap(),
+        )
+        .unwrap();
+
+        let db = Connection::open(&f.helper.database).unwrap();
+        db.execute("INSERT INTO revocations VALUES('grant-1')", [])
+            .unwrap();
+        assert!(!f.helper.verify(f.wire.as_bytes(), Action::Dispatch));
+        db.execute_batch("DROP TRIGGER revocations_retained;")
+            .unwrap();
+        db.execute_batch(replacement).unwrap();
+        assert_eq!(db.execute("DELETE FROM revocations", []).unwrap(), 1);
+        drop(db);
+
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "authority_schema_reopen_child"])
+            .env("CORE_AUTHORITY_SCHEMA_TEST_DIR", &f.directory)
+            .spawn()
+            .unwrap();
+        let end = Instant::now() + Duration::from_secs(15);
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) if Instant::now() < end => std::thread::sleep(Duration::from_millis(10)),
+                other => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("authority schema child failed to finish: {other:?}");
+                }
+            }
+        };
+        assert!(status.success());
+        f.assert_zero_calls();
+        assert_eq!(
+            std::fs::read_to_string(f.directory.join("result")).unwrap(),
+            "Denied"
+        );
+        let db = Connection::open(&f.helper.database).unwrap();
+        let retained: Option<String> = db
+            .query_row(
+                "SELECT (SELECT sql FROM sqlite_schema WHERE name='revocations_retained')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            retained.as_deref(),
+            (!replacement.is_empty()).then_some(replacement.trim_end_matches(';'))
+        );
+    }
 }
 
 #[test]

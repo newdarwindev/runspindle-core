@@ -20,6 +20,14 @@ signal.signal(signal.SIGTERM, cancelled)
 ROOT = Path(__file__).resolve().parents[1]
 MUTATIONS = [
     (
+        "ignore_authority_revocation_schema",
+        "src/authority.rs",
+        "        require_schema(&tx, AUTHORITY_SCHEMA)?;\n",
+        "        let _ = require_schema(&tx, AUTHORITY_SCHEMA);\n",
+        "authority",
+        "invalid_revocation_schema_blocks_fresh_dispatch_without_effects",
+    ),
+    (
         "intent_dispatch_guard",
         "src/intent_runtime.rs",
         "|| !self.authorized(&AuthorityCheck {",
