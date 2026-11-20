@@ -90,36 +90,32 @@
     {
       "id": "rust-test",
       "command": [
-        "cargo",
-        "test",
-        "--offline",
-        "--locked",
-        "--features",
-        "verified-authority,authenticated-artifacts"
+        "python3",
+        "-m",
+        "tools.run_prepared_rust",
+        "test"
       ],
       "required_files": [
         "Cargo.toml",
-        "Cargo.lock"
+        "Cargo.lock",
+        "temporal/toolchain.json",
+        "tools/run_prepared_rust.py"
       ],
       "timeout_seconds": 600
     },
     {
       "id": "rust-clippy",
       "command": [
-        "cargo",
-        "clippy",
-        "--offline",
-        "--locked",
-        "--all-targets",
-        "--features",
-        "verified-authority,authenticated-artifacts",
-        "--",
-        "-D",
-        "warnings"
+        "python3",
+        "-m",
+        "tools.run_prepared_rust",
+        "clippy"
       ],
       "required_files": [
         "Cargo.toml",
-        "Cargo.lock"
+        "Cargo.lock",
+        "temporal/toolchain.json",
+        "tools/run_prepared_rust.py"
       ],
       "timeout_seconds": 600
     },

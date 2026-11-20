@@ -2,6 +2,7 @@
 """Mutate actual artifact guards in disposable sources. Compile failures reject."""
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -55,6 +56,8 @@ for name, (old, new) in mutations.items():
             "never",
             "--network",
             "none",
+            "--user",
+            f"{os.getuid()}:{os.getgid()}",
             "-v",
             f"{root}:/source:ro",
             "-v",

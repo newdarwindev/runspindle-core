@@ -4,6 +4,7 @@
 import contextlib
 import time
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -101,6 +102,8 @@ def main():
                 "never",
                 "--network",
                 "none",
+                "--user",
+                f"{os.getuid()}:{os.getgid()}",
                 "-v",
                 f"{directory}:/source:ro",
                 "-v",

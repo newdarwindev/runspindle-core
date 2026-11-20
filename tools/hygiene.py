@@ -170,7 +170,10 @@ REPORTED_CATEGORIES = frozenset(
     }
 )
 DIAGNOSTIC_CODES = {
-    "target_preparation": frozenset({"missing_seed", "failed"}),
+    "target_preparation": frozenset({"missing_seed", "failed", "permission_denied"}),
+    "mutation_execution": frozenset({"failed", "permission_denied"}),
+    "target_cleanup": frozenset({"failed", "permission_denied"}),
+    "target_integrity": frozenset({"failed", "permission_denied"}),
     "builder_selection": frozenset({"unavailable", "identity_mismatch"}),
     "compilation": frozenset({"failed"}),
     "mutation": frozenset({"not_detected", "anchor_drift"}),

@@ -149,11 +149,22 @@ against a killed runner or unreachable Docker daemon. No broad pruning occurs.
 
 The existing Rust test/Clippy commands now enable `authenticated-artifacts`
 alongside `verified-authority`. The new check is assigned exactly once to the
-existing `mutation_2` partition. Its 3,600-second check budget accommodates a clean
-baseline plus seven mutants, each with 60-second clean, 300-second test and two
-30-second cleanup budgets (3,360 seconds total), plus setup. The existing job
-budget becomes 75 minutes for that check, the existing 600-second artifact check
-and setup margin. No runner, job, trigger, image pin or permission is added.
+existing `mutation_2` partition. The workflow currently allows 75 minutes for
+the existing 600-second artifact check, the authenticated artifact check and
+setup. The authenticated check now has nine mutation cases and repeats the
+clean and test commands for each. Their configured subprocess ceilings can
+exceed the existing 3,600-second check budget.
+
+For a private runner with a shorter VM watchdog, the harness accepts
+`--shard 1` through `--shard 5`. Every shard runs the full clean baseline
+before running up to two mutation cases in its private target. The subprocess
+ceilings total up to 1,260 seconds per shard, plus target setup and other
+overhead. The CI controller must measure that overhead and verify exact job
+provenance and successful conclusions before joining the five receipts with
+`--verify-shards`. The join checks the exact clean checkout revision, the full
+baseline in every shard, and every mutation case exactly once. The current
+GitHub workflow still calls the unsharded entry point and still requires its
+original aggregate.
 
 Use only the already-approved prepared isolated runner:
 
