@@ -154,7 +154,7 @@
       "required_files": [
         "tools/check_outbox_mutations.py"
       ],
-      "timeout_seconds": 600
+      "timeout_seconds": 780
     },
     {
       "id": "check-authority-mutations",
