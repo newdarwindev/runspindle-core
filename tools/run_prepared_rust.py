@@ -49,7 +49,9 @@ def seed_guest_target(target: pathlib.Path, builder: dict[str, str]) -> bool:
         (stage / SEED_MARKER).touch(exist_ok=False)
         stage.rename(target)
     except (OSError, ValueError):
-        print("Verified compiler seed unavailable, using a clean Cargo target", flush=True)
+        print(
+            "Verified compiler seed unavailable, using a clean Cargo target", flush=True
+        )
         return False
     print(f"Restored verified Core compiler seed {expected}", flush=True)
     return True
