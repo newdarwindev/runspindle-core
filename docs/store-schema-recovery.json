@@ -65,5 +65,30 @@
     "missing_primary_key_token_boundary_blocks_outbox_reopen"
   ],
   "schema_token_mutation": "schema_token_boundary",
-  "schema_version": 1
+  "schema_version": 1,
+  "outbox_v3_candidate": {
+    "base_revision": "7f9676a95004039dfaea4c1bdc667fb386ad5e12",
+    "inputs_sha256": {
+      "Cargo.lock": "216df163e47e5f8756267a2b62a162bcc3897f6a54aee0ddfc2eb971fcac70c6",
+      "Cargo.toml": "f52793d2c7da7c28243c5f8f2776958df6edde0c66a810c9dfef575b3b21b32e",
+      "temporal/toolchain.json": "d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7",
+      "src/outbox.rs": "4cc306992f676660cafa96c285335f312323196df16748c739c8f36f52b61958",
+      "tests/outbox.rs": "f1361a5a0b980b81ba220ff7140741c2120cf0b1486223c30a995493fe4a523f",
+      "tools/check_outbox_mutations.py": "f99193c95a513d1893180c13b1bdaa30fe1a05179e8c9dd97c7777834a6341e0"
+    },
+    "qualification": {
+      "format_scaffold_mutation_anchors": "passed",
+      "extracted_sql_migration_commit_rollback_and_lost_row_detection": "passed_Python_3.13.18_SQLite_3.54.1",
+      "rust_subprocess_and_mutation_execution": "not_run_local_Docker_daemon_unreachable",
+      "filesystem_power_loss_and_admission": "not_run"
+    },
+    "regressions": [
+      "lost_reservation_row_blocks_fresh_process_without_resend",
+      "failed_reservation_record_write_rolls_back_before_transport",
+      "opened_outbox_checks_reservation_record_before_lookup",
+      "legacy_audit_survives_upgrade_and_partial_or_orphan_audit_blocks"
+    ],
+    "deliberate_mutation": "ignore-retained-reservation-binding",
+    "recovery_limit": "loss of all local reservation, journal and audit evidence for an operation is undetectable"
+  }
 }

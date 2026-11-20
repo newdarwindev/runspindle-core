@@ -890,6 +890,11 @@ fn legacy_outbox(t: &Temp, r: &DeliveryRequest) {
     )
     .unwrap();
 }
+fn legacy_audit(db: &Connection) {
+    db.execute_batch("CREATE TABLE outbox_evidence(operation TEXT NOT NULL,generation INTEGER NOT NULL,kind TEXT NOT NULL,record TEXT NOT NULL,PRIMARY KEY(operation,generation,kind));
+      CREATE TRIGGER outbox_evidence_immutable BEFORE UPDATE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'immutable delivery evidence');END;
+      CREATE TRIGGER outbox_evidence_retained BEFORE DELETE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'retained delivery evidence');END;").unwrap();
+}
 fn schema_version(db: &Connection) -> u64 {
     db.query_row("SELECT version FROM outbox_schema WHERE id=1", [], |r| {
         r.get(0)
@@ -983,14 +988,12 @@ fn missing_journal_blocks_fresh_process_without_resend() {
     let t = Temp::new();
     let r = request(&t);
     let mut peer = Peer::open(&t.0.join("peer.sqlite"));
-    peer.lost = true;
-    let mut outbox = Outbox::open(t.db()).unwrap();
-    outbox.deliver(&r, &Grant(r.clone()), &mut peer).unwrap();
-    drop(outbox);
+    legacy_outbox(&t, &r);
+    peer.send(&r, BYTES).unwrap();
     let db = Connection::open(t.db()).unwrap();
     db.execute_batch("DROP TABLE outbox;").unwrap();
     // The authoritative marker and accepted BLOB survive the missing journal.
-    assert_eq!(schema_version(&db), 2);
+    assert_eq!(schema_version(&db), 1);
     SchemaChild::spawn(&t, "deliver", "reopen.txt").wait();
     assert_eq!(
         peer.count("send"),
@@ -1013,6 +1016,98 @@ fn missing_journal_blocks_fresh_process_without_resend() {
     );
 }
 #[test]
+fn lost_reservation_row_blocks_fresh_process_without_resend() {
+    let t = Temp::new();
+    let r = request(&t);
+    let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+    peer.lost = true;
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    outbox.deliver(&r, &Grant(r.clone()), &mut peer).unwrap();
+    drop(outbox);
+    let db = Connection::open(t.db()).unwrap();
+    db.execute_batch("DROP TRIGGER outbox_retained;DELETE FROM outbox;
+        CREATE TRIGGER outbox_retained BEFORE DELETE ON outbox BEGIN SELECT RAISE(ABORT,'retained delivery');END;").unwrap();
+    assert_eq!(schema_version(&db), 3);
+    assert_eq!(schema_count(&db, "outbox_retained"), 1);
+    let retained: String = db
+        .query_row("SELECT request FROM outbox_reservations", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<DeliveryRequest>(&retained).unwrap(),
+        r
+    );
+    SchemaChild::spawn(&t, "deliver", "missing-row.txt").wait();
+    assert_eq!(
+        peer.count("send"),
+        1,
+        "lost row must not trigger another send"
+    );
+    assert_eq!(peer.count("lookup"), 0);
+    assert_eq!(
+        std::fs::read_to_string(t.0.join("missing-row.txt")).unwrap(),
+        "blocked"
+    );
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM outbox", [], |row| row
+            .get::<_, u64>(0))
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        Store::open(t.db()).unwrap().accepted(&r.accepted).unwrap(),
+        BYTES
+    );
+}
+#[test]
+fn failed_reservation_record_write_rolls_back_before_transport() {
+    let t = Temp::new();
+    let r = request(&t);
+    let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+    drop(Outbox::open(t.db()).unwrap());
+    let db = Connection::open(t.db()).unwrap();
+    db.execute_batch("CREATE TRIGGER fail_reservation BEFORE INSERT ON outbox_reservations BEGIN SELECT RAISE(ABORT,'synthetic reservation write fault');END;").unwrap();
+    SchemaChild::spawn(&t, "deliver", "write-failed.txt").wait();
+    assert_eq!(peer.count("send"), 0);
+    assert_eq!(peer.count("lookup"), 0);
+    assert!(Outbox::open(t.db())
+        .unwrap()
+        .snapshot(&r)
+        .unwrap()
+        .is_none());
+    db.execute_batch("DROP TRIGGER fail_reservation;").unwrap();
+    assert_eq!(
+        Outbox::open(t.db())
+            .unwrap()
+            .deliver(&r, &Grant(r.clone()), &mut peer)
+            .unwrap()
+            .state,
+        DeliveryState::Delivered
+    );
+    assert_eq!(peer.count("send"), 1);
+    assert_eq!(peer.count("lookup"), 1);
+}
+#[test]
+fn opened_outbox_checks_reservation_record_before_lookup() {
+    let t = Temp::new();
+    let r = request(&t);
+    let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+    peer.lost = true;
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    outbox.deliver(&r, &Grant(r.clone()), &mut peer).unwrap();
+    let db = Connection::open(t.db()).unwrap();
+    db.execute_batch("DROP TRIGGER outbox_reservations_immutable;
+        UPDATE outbox_reservations SET request='changed';
+        CREATE TRIGGER outbox_reservations_immutable BEFORE UPDATE ON outbox_reservations BEGIN SELECT RAISE(ABORT,'immutable reservation');END;").unwrap();
+    let outcome = outbox.reconcile(&r, &Grant(r.clone()), &mut peer);
+    assert_eq!(peer.count("send"), 1);
+    assert_eq!(peer.count("lookup"), 0);
+    assert!(outcome.is_err());
+    assert!(outbox.snapshot(&r).is_err());
+    assert!(Outbox::open(t.db()).is_err());
+}
+#[test]
 fn legacy_migration_preserves_reservation_across_concurrent_processes() {
     let t = Temp::new();
     let r = request(&t);
@@ -1028,9 +1123,10 @@ fn legacy_migration_preserves_reservation_across_concurrent_processes() {
     for result in ["a.txt", "b.txt"] {
         assert_eq!(std::fs::read_to_string(t.0.join(result)).unwrap(), "opened");
     }
-    assert_eq!(schema_version(&db), 2);
+    assert_eq!(schema_version(&db), 3);
     assert_eq!(retained_row(&db), before);
     assert_eq!(schema_count(&db, "outbox_evidence"), 1);
+    assert_eq!(schema_count(&db, "outbox_reservations"), 1);
     let mut outbox = Outbox::open(t.db()).unwrap();
     assert_eq!(
         outbox
@@ -1067,6 +1163,9 @@ fn failed_schema_upgrade_rolls_back_before_fresh_process_retry() {
         "outbox_evidence",
         "outbox_evidence_immutable",
         "outbox_evidence_retained",
+        "outbox_reservations",
+        "outbox_reservations_immutable",
+        "outbox_reservations_retained",
     ] {
         assert_eq!(schema_count(&db, name), 0);
     }
@@ -1080,7 +1179,7 @@ fn failed_schema_upgrade_rolls_back_before_fresh_process_retry() {
         std::fs::read_to_string(t.0.join("retry.txt")).unwrap(),
         "opened"
     );
-    assert_eq!(schema_version(&db), 2);
+    assert_eq!(schema_version(&db), 3);
     assert_eq!(retained_row(&db), before);
 }
 #[test]
@@ -1094,6 +1193,8 @@ fn incomplete_or_incompatible_outbox_schemas_are_never_repaired() {
         "DROP TABLE outbox_evidence;",
         "DROP TRIGGER outbox_evidence_immutable;",
         "ALTER TABLE outbox_evidence ADD COLUMN unknown TEXT;",
+        "DROP TABLE outbox_reservations;",
+        "DROP TRIGGER outbox_reservations_immutable;",
     ] {
         let t = Temp::new();
         let r = request(&t);
@@ -1110,29 +1211,41 @@ fn incomplete_or_incompatible_outbox_schemas_are_never_repaired() {
     }
 }
 #[test]
-fn existing_v1_evidence_is_retained_but_partial_audit_schema_is_denied() {
+fn legacy_audit_survives_upgrade_and_partial_or_orphan_audit_blocks() {
+    for version in [1, 2] {
+        for damage in ["", "DROP TRIGGER outbox_evidence_retained;", "DROP TRIGGER outbox_retained;DELETE FROM outbox;CREATE TRIGGER outbox_retained BEFORE DELETE ON outbox BEGIN SELECT RAISE(ABORT,'retained delivery');END;"] {
+            check_legacy_audit_upgrade(version, damage);
+        }
+    }
+}
+fn check_legacy_audit_upgrade(version: u64, damage: &str) {
     let t = Temp::new();
     let r = request(&t);
-    Outbox::open(t.db()).unwrap();
+    legacy_outbox(&t, &r);
     let db = Connection::open(t.db()).unwrap();
-    db.execute_batch("UPDATE outbox_schema SET version=1;")
+    legacy_audit(&db);
+    db.execute("UPDATE outbox_schema SET version=?1", [version])
         .unwrap();
     db.execute(
         "INSERT INTO outbox_evidence VALUES(?1,0,'conflict','synthetic preserved audit')",
         [&r.delivery_operation_id],
     )
     .unwrap();
-    Outbox::open(t.db()).unwrap();
-    assert_eq!(schema_version(&db), 2);
+    db.execute_batch(damage).unwrap();
+    let reopened = Outbox::open(t.db());
+    assert_eq!(reopened.is_ok(), damage.is_empty());
+    assert_eq!(
+        schema_version(&db),
+        if damage.is_empty() { 3 } else { version }
+    );
+    assert_eq!(
+        schema_count(&db, "outbox_reservations"),
+        u64::from(damage.is_empty())
+    );
     let record: String = db
         .query_row("SELECT record FROM outbox_evidence", [], |r| r.get(0))
         .unwrap();
     assert_eq!(record, "synthetic preserved audit");
-    db.execute_batch("UPDATE outbox_schema SET version=1;DROP TRIGGER outbox_evidence_retained;")
-        .unwrap();
-    assert!(Outbox::open(t.db()).is_err());
-    assert_eq!(schema_version(&db), 1);
-    assert_eq!(schema_count(&db, "outbox_evidence_retained"), 0);
 }
 
 #[test]
