@@ -85,9 +85,9 @@
     "behavioral_qualification": "blocked_approved_Docker_boundary_unavailable",
     "core_schema": 1,
     "evidence": "docs/store-schema-recovery.json",
-    "issue_19": "open_partial_schema_reopen_only",
+    "issue_19": "open_partial_schema_and_reservation_recovery",
     "mapping": "docs/STORE_SCHEMA_RECOVERY.md",
-    "outbox_schema": 2,
+    "outbox_schema": 3,
     "status": "source_candidate_runtime_not_run"
   },
   "temporal_integration": "locally_tested_pinned_development_server",
