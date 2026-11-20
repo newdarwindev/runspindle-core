@@ -321,7 +321,7 @@ impl<P: Peer> ResolutionBridge<P> {
             outbox.resolution_applicable(&self.resolution)?,
             "stale resolution before peer call"
         );
-        outbox.check_artifact_guard(&self.resolution.prior.request, guard)?;
+        outbox.check_transport(&self.resolution.prior.request, guard)?;
         anyhow::ensure!(
             self.observe("resolve")?.as_ref() == Some(&self.resolution.receipt),
             "resolution not independently observed"
@@ -332,7 +332,7 @@ impl<P: Peer> ResolutionBridge<P> {
             "resolution authority changed"
         );
         let resolution = self.resolution.clone();
-        outbox.check_artifact_guard(&self.resolution.prior.request, guard)?;
+        outbox.check_transport(&self.resolution.prior.request, guard)?;
         outbox.resolve_guarded(
             &resolution,
             authority,
