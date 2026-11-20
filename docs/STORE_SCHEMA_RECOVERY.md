@@ -1,4 +1,34 @@
-# Fail-closed store reopening (unqualified source candidate)
+# Fail-closed store reopening
+
+## Reservation row recovery in outbox v3
+
+The outbox stores a separate immutable operation and request record in the same
+transaction as each new reservation, before calling transport. Reopening checks
+that every reservation and journal row has an exact counterpart. Each operation
+read checks both copies in one SQLite snapshot. Retained audit evidence also
+blocks treating that operation as new when both rows are absent.
+
+Valid v1 and v2 stores upgrade inside one write transaction. The upgrade
+preserves the existing journal and audit rows, creates reservation records for
+surviving operations, and advances the marker to v3. An orphan audit record,
+partial reservation schema or failed write blocks the upgrade. Older outbox
+executables need the pre-upgrade store format. Loss of every record for an
+operation, including the reservation, journal and any audit evidence, remains
+undetectable by this check. Both copies are in the same database file.
+
+Development checks on base `7f9676a95004039dfaea4c1bdc667fb386ad5e12` used
+Python 3.13.18 and SQLite 3.54.1. Executing the SQL from the source against a
+temporary file verified v2 backfill, rollback, reopen, and the mismatch after
+deleting a journal row. The scaffold, formatting and mutation anchors passed.
+The approved offline Rust test wrapper could not connect to the local Docker
+daemon. The fresh-process Rust regressions and mutation await isolated CI.
+
+```
+python3 tools/offline_rust.py test --features delivery-runtime --test outbox
+python3 tools/check_outbox_mutations.py
+```
+
+## Earlier v2 schema work
 
 Bounded Core issue #19 work, based on main
 `263a00442f10096ae691be9b479f59a90e53d1ca`. This does not complete #19, its
@@ -25,7 +55,7 @@ objects are not removed or prohibited. This is not a generic SQLite schema
 compatibility or repair engine; changed layouts need an explicit migration.
 
 The Core artifact `user_version` stays 1. The independent outbox version becomes
-2 to record that the additive evidence schema committed. Valid v1 stores with no
+2 in this historical change to record that the additive evidence schema committed. Valid v1 stores with no
 evidence schema acquire it atomically; valid v1 stores already carrying complete
 evidence retain it. Both preserve reservations, receipts, generations, conflict
 flags, bindings and accepted bytes. A partial audit schema is rejected. v2 must

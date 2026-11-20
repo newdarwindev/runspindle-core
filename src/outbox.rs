@@ -141,8 +141,8 @@ fn guard_check(
 pub struct Outbox {
     store: Store,
 }
-// v2 records that the additive audit schema committed. v1 remains readable
-// only through this atomic migration; v2 never recreates a missing journal.
+// v2 introduced the audit schema. v3 retains a separate immutable reservation
+// record so loss of the mutable journal row cannot authorize a second send.
 const OUTBOX_VERSION_SCHEMA: &[durable::SchemaObject] = &[
     ("table", "outbox_schema", "CREATE TABLE IF NOT EXISTS outbox_schema(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL);"),
 ];
@@ -156,6 +156,60 @@ const EVIDENCE_SCHEMA: &[durable::SchemaObject] = &[
     ("trigger", "outbox_evidence_immutable", "CREATE TRIGGER IF NOT EXISTS outbox_evidence_immutable BEFORE UPDATE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'immutable delivery evidence');END;"),
     ("trigger", "outbox_evidence_retained", "CREATE TRIGGER IF NOT EXISTS outbox_evidence_retained BEFORE DELETE ON outbox_evidence BEGIN SELECT RAISE(ABORT,'retained delivery evidence');END;"),
 ];
+const RESERVATION_SCHEMA: &[durable::SchemaObject] = &[
+    ("table", "outbox_reservations", "CREATE TABLE IF NOT EXISTS outbox_reservations(operation TEXT PRIMARY KEY NOT NULL,request TEXT NOT NULL);"),
+    ("trigger", "outbox_reservations_immutable", "CREATE TRIGGER IF NOT EXISTS outbox_reservations_immutable BEFORE UPDATE ON outbox_reservations BEGIN SELECT RAISE(ABORT,'immutable reservation');END;"),
+    ("trigger", "outbox_reservations_retained", "CREATE TRIGGER IF NOT EXISTS outbox_reservations_retained BEFORE DELETE ON outbox_reservations BEGIN SELECT RAISE(ABORT,'retained reservation');END;"),
+];
+fn require_absent_schema(
+    connection: &Connection,
+    objects: &[durable::SchemaObject],
+) -> anyhow::Result<()> {
+    for (_, name, _) in objects {
+        anyhow::ensure!(
+            !durable::schema_object_exists(connection, name)?,
+            "unversioned outbox schema"
+        );
+    }
+    Ok(())
+}
+fn require_matching_reservations(connection: &Connection) -> anyhow::Result<()> {
+    let mismatch: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM outbox AS o LEFT JOIN outbox_reservations AS r USING(operation)
+          WHERE r.operation IS NULL OR r.request <> o.request)
+          OR EXISTS(SELECT 1 FROM outbox_reservations AS r LEFT JOIN outbox AS o USING(operation)
+          WHERE o.operation IS NULL)",
+        [],
+        |row| row.get(0),
+    )?;
+    anyhow::ensure!(!mismatch, "outbox reservation journal mismatch");
+    Ok(())
+}
+fn migrate_reservations(connection: &Connection, version: u64) -> anyhow::Result<()> {
+    require_absent_schema(connection, RESERVATION_SCHEMA)?;
+    let orphan: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM outbox_evidence AS e LEFT JOIN outbox AS o USING(operation)
+          WHERE o.operation IS NULL)",
+        [],
+        |row| row.get(0),
+    )?;
+    anyhow::ensure!(!orphan, "outbox evidence has no retained operation");
+    let count: u64 = connection.query_row("SELECT count(*) FROM outbox", [], |row| row.get(0))?;
+    anyhow::ensure!(count <= durable::CAPACITY, "outbox reservation capacity");
+    durable::create_schema(connection, RESERVATION_SCHEMA)?;
+    connection.execute(
+        "INSERT INTO outbox_reservations SELECT operation,request FROM outbox",
+        [],
+    )?;
+    anyhow::ensure!(
+        connection.execute(
+            "UPDATE outbox_schema SET version=3 WHERE id=1 AND version=?1",
+            [version],
+        )? == 1,
+        "outbox migration conflict"
+    );
+    Ok(())
+}
 impl Outbox {
     pub(crate) fn check_artifact_guard(
         &self,
@@ -175,7 +229,7 @@ impl Outbox {
                 tx.query_row("SELECT version FROM outbox_schema WHERE id=1", [], |r| {
                     r.get(0)
                 })?;
-            anyhow::ensure!(version == 1 || version == 2, "unsupported outbox version");
+            anyhow::ensure!((1..=3).contains(&version), "unsupported outbox version");
             durable::require_schema(&tx, OUTBOX_SCHEMA)?;
             if version == 1 {
                 // Historical v1 may have no audit schema at all. A partial
@@ -187,30 +241,24 @@ impl Outbox {
                 if !existing {
                     durable::create_schema(&tx, EVIDENCE_SCHEMA)?;
                 }
-                durable::require_schema(&tx, EVIDENCE_SCHEMA)?;
-                anyhow::ensure!(
-                    tx.execute(
-                        "UPDATE outbox_schema SET version=2 WHERE id=1 AND version=1",
-                        [],
-                    )? == 1,
-                    "outbox migration conflict"
-                );
-            } else {
-                durable::require_schema(&tx, EVIDENCE_SCHEMA)?;
+            }
+            durable::require_schema(&tx, EVIDENCE_SCHEMA)?;
+            if version < 3 {
+                migrate_reservations(&tx, version)?;
             }
         } else {
             // Only a genuinely artifact-only store may acquire a first outbox.
-            for (_, name, _) in OUTBOX_SCHEMA.iter().chain(EVIDENCE_SCHEMA) {
-                anyhow::ensure!(
-                    !durable::schema_object_exists(&tx, name)?,
-                    "unversioned outbox schema"
-                );
-            }
+            require_absent_schema(&tx, OUTBOX_SCHEMA)?;
+            require_absent_schema(&tx, EVIDENCE_SCHEMA)?;
+            require_absent_schema(&tx, RESERVATION_SCHEMA)?;
             durable::create_schema(&tx, OUTBOX_VERSION_SCHEMA)?;
             durable::create_schema(&tx, OUTBOX_SCHEMA)?;
             durable::create_schema(&tx, EVIDENCE_SCHEMA)?;
-            tx.execute("INSERT INTO outbox_schema VALUES(1,2)", [])?;
+            durable::create_schema(&tx, RESERVATION_SCHEMA)?;
+            tx.execute("INSERT INTO outbox_schema VALUES(1,3)", [])?;
         }
+        durable::require_schema(&tx, RESERVATION_SCHEMA)?;
+        require_matching_reservations(&tx)?;
         tx.commit()?;
         Ok(Self { store })
     }
@@ -218,13 +266,25 @@ impl Outbox {
         connection: &rusqlite::Connection,
         request: &DeliveryRequest,
     ) -> anyhow::Result<Option<DeliverySnapshot>> {
-        let row: Option<StoredDelivery> = connection
+        let (row, retained, has_evidence): (Option<StoredDelivery>, Option<String>, bool) = connection
             .query_row(
-                "SELECT request,state,receipt,generation,acknowledgement,conflict FROM outbox WHERE operation=?1",
+                "SELECT o.request,o.state,o.receipt,o.generation,o.acknowledgement,o.conflict,r.request,
+                 EXISTS(SELECT 1 FROM outbox_evidence WHERE operation=?1)
+                 FROM (SELECT ?1 AS operation) AS key LEFT JOIN outbox AS o USING(operation)
+                 LEFT JOIN outbox_reservations AS r USING(operation)",
                 [&request.delivery_operation_id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?,r.get(4)?,r.get(5)?)),
-            )
-            .optional()?;
+                |r| {
+                    let row = match r.get::<_, Option<String>>(0)? {
+                        Some(stored) => Some((stored, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+                        None => None,
+                    };
+                    Ok((row, r.get(6)?, r.get(7)?))
+                },
+            )?;
+        anyhow::ensure!(
+            row.as_ref().map(|row| &row.0) == retained.as_ref() && (row.is_some() || !has_evidence),
+            "outbox reservation record mismatch"
+        );
         let Some((stored, state, receipt, generation, acknowledgement, conflict)) = row else {
             return Ok(None);
         };
@@ -609,12 +669,14 @@ impl Outbox {
             return self.reconcile_guarded(request, authority, transport, guard);
         }
         durable::room(&tx, "outbox")?;
+        let encoded = serde_json::to_string(request)?;
         tx.execute(
             "INSERT INTO outbox VALUES(?1,?2,'reserved',NULL,0,NULL,0)",
-            params![
-                request.delivery_operation_id,
-                serde_json::to_string(request)?
-            ],
+            params![request.delivery_operation_id, encoded],
+        )?;
+        tx.execute(
+            "INSERT INTO outbox_reservations VALUES(?1,?2)",
+            params![request.delivery_operation_id, encoded],
         )?;
         tx.commit()?;
         let mut reserved = DeliverySnapshot {
