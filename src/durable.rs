@@ -192,6 +192,13 @@ pub(crate) fn create_schema(
     }
     Ok(())
 }
+
+fn require_artifact_schema(connection: &Connection) -> anyhow::Result<()> {
+    let version: u64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    anyhow::ensure!(version == 1, "unsupported core store schema");
+    require_schema(connection, ARTIFACT_SCHEMA)
+}
+
 impl Store {
     pub fn open(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let mut connection = Connection::open(path)?;
@@ -248,6 +255,7 @@ impl Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        require_artifact_schema(&tx)?;
         let old: Option<(String, Vec<u8>)> = tx
             .query_row(
                 "SELECT reference,bytes FROM artifacts WHERE identity=?1",
@@ -271,13 +279,17 @@ impl Store {
         Ok(reference)
     }
     pub fn bytes(&self, reference: &ArtifactRef) -> anyhow::Result<Vec<u8>> {
-        Self::read_bytes(&self.connection, reference)
+        let tx = self.connection.unchecked_transaction()?;
+        Self::read_bytes(&tx, reference)
     }
     pub(crate) fn read_bytes(
         connection: &Connection,
         reference: &ArtifactRef,
     ) -> anyhow::Result<Vec<u8>> {
         anyhow::ensure!(reference.valid(), "invalid artifact reference");
+        // Inspect schema and bytes in the same transaction, even on an
+        // already-open handle. A correct BLOB alone cannot qualify the store.
+        require_artifact_schema(connection)?;
         let (stored, bytes): (String, Vec<u8>) = connection.query_row(
             "SELECT reference,bytes FROM artifacts WHERE identity=?1",
             [reference.key()?],
