@@ -16,6 +16,12 @@ by the trusted composition boundary. Deterministic child IDs are namespace-globa
 so a duplicate child collision fails closed; it is not cross-registry admission
 reconciliation. No other process-local cache claims global admission uniqueness.
 
+The development admission start commands reject an existing workflow ID while
+Temporal retains the run, including after it closes. This applies to the base,
+Host, authenticated and scoped registries, and to source-bound Intent intake.
+A closed run retains the admission history associated with its ID. If history
+has expired or been lost, this policy alone cannot recover reservations.
+
 The registry retains at most 1024 accepted delivery keys and 1024 task/revision
 bindings without eviction, expiry or continue-as-new. Known exact deliveries
 reconcile at capacity; new delivery keys reject. Same-revision deliveries bind the

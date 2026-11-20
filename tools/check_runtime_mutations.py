@@ -2,7 +2,6 @@
 """Deliberately break real registry code in throwaway copies; no source edits."""
 
 import contextlib
-import time
 import json
 import os
 import pathlib
@@ -10,6 +9,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+
 from mutation_target import isolated_target
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -66,6 +67,16 @@ def main():
             "concurrent_stale_actor_never_inherits_current_launch_or_cancel",
         )
     )
+    mutations.append(
+        (
+            "closed_admission_registry_reused",
+            "WorkflowStartOptions::new(queue, workflow_id)\n"
+            "        .id_reuse_policy(temporalio_client::WorkflowIdReusePolicy::RejectDuplicate)",
+            "WorkflowStartOptions::new(queue, workflow_id)\n"
+            "        .id_reuse_policy(temporalio_client::WorkflowIdReusePolicy::AllowDuplicate)",
+            "admission_start_preserves_retained_workflow_ids",
+        )
+    )
     observed = []
     for name, old, new, test in mutations:
         with (
@@ -77,19 +88,29 @@ def main():
                 shutil.copyfile(ROOT / f, directory / f)
             for f in ["src", "tests"]:
                 shutil.copytree(ROOT / f, directory / f)
-            cargo = directory / "Cargo.toml"
-            text = cargo.read_text().replace(
-                "[features]\n", "[features]\nmutation-no-cli = []\n"
-            )
-            # These registry-only tests do not exercise the CLI. Avoid linking an
-            # unused executable; the actual runtime source/dependencies stay intact.
-            text = text.replace(
-                'required-features = ["temporal-runtime"]',
-                'required-features = ["mutation-no-cli"]',
-            )
-            cargo.write_text(text)
+            cli_case = name == "closed_admission_registry_reused"
             host_case = name == "stale_actor_rebound"
-            path = directory / ("src/integration.rs" if host_case else "src/runtime.rs")
+            source = {
+                "closed_admission_registry_reused": "src/bin/temporal-runtime.rs",
+                "stale_actor_rebound": "src/integration.rs",
+            }.get(name, "src/runtime.rs")
+            if cli_case:
+                test_target = ["--bin", "temporal-runtime"]
+                qualified_test = f"tests::{test}"
+            else:
+                test_target = ["--test", "host_runtime" if host_case else "runtime"]
+                qualified_test = test
+                # Registry-only tests can skip linking the unused CLI.
+                cargo = directory / "Cargo.toml"
+                text = cargo.read_text().replace(
+                    "[features]\n", "[features]\nmutation-no-cli = []\n"
+                )
+                text = text.replace(
+                    'required-features = ["temporal-runtime"]',
+                    'required-features = ["mutation-no-cli"]',
+                )
+                cargo.write_text(text)
+            path = directory / source
             original = path.read_text()
             if original.count(old) != 1:
                 raise RuntimeError(f"mutation anchor changed: {name}")
@@ -123,9 +144,8 @@ def main():
                 "host-runtime" if host_case else "temporal-runtime",
                 "--target-dir",
                 "/work/local/linux-target",
-                "--test",
-                "host_runtime" if host_case else "runtime",
-                test,
+                *test_target,
+                qualified_test,
                 "--",
                 "--exact",
             ]
@@ -151,7 +171,7 @@ def main():
             output = result.stdout + result.stderr
             detected = (
                 result.returncode != 0
-                and f"test {test} ... FAILED" in output
+                and f"test {qualified_test} ... FAILED" in output
                 and "could not compile" not in output
             )
             if not detected:
