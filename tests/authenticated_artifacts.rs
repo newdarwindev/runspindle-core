@@ -500,6 +500,15 @@ fn authenticated_artifact_child() {
         return;
     };
     let f = Fixture::at(PathBuf::from(path), false);
+    if std::env::var_os("CORE_AUTH_ARTIFACT_CHECK_LINK").is_some() {
+        let accepted: durable::Accepted =
+            serde_json::from_slice(&std::fs::read(f.dir.join("accepted.json")).unwrap()).unwrap();
+        assert!(f
+            .open()
+            .read(&accepted, &f.trust(), &FixedClock(100))
+            .is_err());
+        return;
+    }
     let accepted = f
         .open()
         .accept(&f.evidence(), &f.trust(), &FixedClock(100))
@@ -898,6 +907,103 @@ fn duplicate_acceptance_denies_missing_or_corrupt_validation_without_repair() {
             )
             .unwrap();
         assert_eq!(wire, f.evidence().encode().unwrap());
+    }
+}
+#[test]
+fn misbound_artifact_links_block_authenticated_read_and_duplicate_acceptance() {
+    for table in ["acceptances", "validations"] {
+        let f = Fixture::new();
+        let evidence = f.evidence();
+        let trust = f.trust();
+        let clock = FixedClock(100);
+        let accepted = f.open().accept(&evidence, &trust, &clock).unwrap();
+        assert_eq!(
+            f.open()
+                .read(accepted.accepted(), &trust, &clock)
+                .unwrap()
+                .1,
+            BYTES
+        );
+        let db_path = f.dir.join("core.sqlite");
+        let other = durable::Store::open(&db_path)
+            .unwrap()
+            .put(
+                durable::VERSION,
+                f.scope.artifact.binding.clone(),
+                "other-artifact".into(),
+                f.scope.artifact.artifact_revision,
+                BYTES,
+            )
+            .unwrap();
+        assert_ne!(other, f.scope.artifact);
+        assert_eq!(other.sha256, f.scope.artifact.sha256);
+        let db = f.db();
+        let link_row = || -> (String, String) {
+            db.query_row(
+                &format!("SELECT record,artifact_identity FROM {table}"),
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap()
+        };
+        let (original_record, original_link) = link_row();
+        let trigger = format!("{table}_immutable");
+        let trigger_ddl: String = db
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE name=?1",
+                [&trigger],
+                |r| r.get(0),
+            )
+            .unwrap();
+        db.execute_batch(&format!("PRAGMA foreign_keys=ON; DROP TRIGGER {trigger};"))
+            .unwrap();
+        let other_key: String = db
+            .query_row(
+                "SELECT identity FROM artifacts WHERE identity<>?1",
+                [&original_link],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            db.execute(
+                &format!("UPDATE {table} SET artifact_identity=?1"),
+                [&other_key]
+            )
+            .unwrap(),
+            1
+        );
+        db.execute_batch(&trigger_ddl).unwrap();
+        assert_eq!(link_row(), (original_record.clone(), other_key.clone()));
+        std::fs::write(
+            f.dir.join("accepted.json"),
+            serde_json::to_vec(accepted.accepted()).unwrap(),
+        )
+        .unwrap();
+        let mut child = BoundedChild(
+            Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "authenticated_artifact_child", "--nocapture"])
+                .env("CORE_AUTH_ARTIFACT_DIR", &f.dir)
+                .env("CORE_AUTH_ARTIFACT_CHECK_LINK", "1")
+                .spawn()
+                .unwrap(),
+        );
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                assert!(
+                    status.success(),
+                    "authenticated read released bytes for {table}"
+                );
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "child timed out");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(f.open().accept(&evidence, &trust, &clock).is_err());
+        assert_eq!(link_row(), (original_record, other_key));
+        assert_eq!(f.count("acceptances"), 1);
+        assert_eq!(f.count("validations"), 1);
+        assert_eq!(f.count("authenticated_artifact_evidence"), 1);
     }
 }
 #[test]
