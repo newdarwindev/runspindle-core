@@ -112,3 +112,34 @@ validation is missing. The controlled injector disables foreign keys for invalid
 links; this is not a supported application write or filesystem fault simulation.
 Generic acceptance remains distinct from cryptographic/current-authority checks.
 This does not complete admission-store, filesystem or power-loss qualification.
+
+## Retained Temporal admission history
+
+The development client explicitly rejects reuse of a workflow ID for each
+admission start command while Temporal retains its history. The Host integration
+test closes an exact registry run after observing its completed children. A
+fresh client must receive Temporal's already-started error. The test compares
+the complete retained history and the independent synthetic native peer ledger
+before and after the rejected start. A separate binary test checks the SDK
+options, and the runtime mutation harness changes the closed-run policy to
+allow reuse. The harness requires the named assertion to fail after successful
+compilation.
+
+Use the pinned isolated builder and a disposable checkout. Build the
+`delivery-runtime` image without acquisition and use its generated manifest as
+the development build record in that checkout. The integration harness verifies
+the pinned source, dependencies and executable bytes before starting the image.
+
+```sh
+python3 tools/offline_rust.py test --features temporal-runtime
+python3 tools/check_runtime_mutations.py
+python3 tools/prepare_temporal_runtime.py --features delivery-runtime
+cp local/runtime-prepared/manifest.json docs/runtime-build.json
+python3 tools/test_admission_runtime.py --platform /path/to/pinned-platform \
+  --platform-prepared /path/to/prepared-platform \
+  --core-prepared local/runtime-prepared --report local/admission-recovery.json
+```
+
+The pinned Docker builder was unavailable during local verification. The new
+binary, mutation and isolated Temporal checks have no observed result for this
+candidate. Actual history deletion, corruption and retention expiry remain open.
