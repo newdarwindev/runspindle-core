@@ -409,7 +409,11 @@ impl Store {
             Self::read_accepted(&self.connection, accepted)
         }
     }
-    fn read_accepted(connection: &Connection, accepted: &Accepted) -> anyhow::Result<Vec<u8>> {
+    /// Validate the retained row links and bytes in the caller's read snapshot.
+    pub(crate) fn read_accepted(
+        connection: &Connection,
+        accepted: &Accepted,
+    ) -> anyhow::Result<Vec<u8>> {
         anyhow::ensure!(
             accepted.validation.valid() && accepted.validation.passed,
             "invalid acceptance"

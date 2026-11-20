@@ -32,10 +32,10 @@ class AuthenticatedMutationShardsTest(unittest.TestCase):
             for index in range(1, harness.SHARD_COUNT + 1)
         ]
 
-    def test_all_nine_mutations_have_one_shard(self) -> None:
+    def test_all_ten_mutations_have_one_shard(self) -> None:
         receipts = self.recorded_shards()
         self.assertEqual(
-            [len(receipt["mutations"]) for receipt in receipts], [2, 2, 2, 2, 1]
+            [len(receipt["mutations"]) for receipt in receipts], [2, 2, 2, 2, 2]
         )
         self.assertEqual(
             [
@@ -53,15 +53,16 @@ class AuthenticatedMutationShardsTest(unittest.TestCase):
                 "byte-length",
                 "retained-validation",
                 "canonical-order",
+                "retained-artifact-links",
             ],
         )
         self.assertEqual(
             harness.verify_shards(list(reversed(receipts)), SOURCE)[
                 "authenticated_artifact_mutations"
             ],
-            9,
+            10,
         )
-        self.assertEqual(len(harness.selected_mutations(None)), 9)
+        self.assertEqual(len(harness.selected_mutations(None)), 10)
 
     def test_no_missing_duplicate_failed_or_stale_shard_can_pass(self) -> None:
         receipts = self.recorded_shards()

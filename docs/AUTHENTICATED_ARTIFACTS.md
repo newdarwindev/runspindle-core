@@ -187,3 +187,44 @@ external trust source, cross-component wire acceptance, deployment and live
 qualification remain blocked/not run. Admission grants and envelope v1 do not
 grant artifact or delivery authority. Existing legacy APIs remain trusted-code
 interfaces and must not be substituted for this authenticated path.
+
+## Retained artifact links
+
+This follow-up to Core #18 and #19 extends the existing durable read check to
+authenticated reads. The retained acceptance and validation must each point to
+the exact signed artifact in their SQLite `artifact_identity` column. Signed
+records, byte digests and lengths can all agree when a link points to a
+different artifact with identical bytes. The authenticated read now uses the
+standard retained reader in its current transaction. Acceptance checks those
+same links before reusing a retained validation or returning an exact duplicate.
+A mismatch returns an error and leaves the stored records intact.
+
+The regression creates two actual SQLite artifacts with equal bytes and distinct
+identities. For each link it restores the original immutable trigger after a
+controlled SQL update, then exercises readback in a bounded fresh process and
+duplicate acceptance on reopen. SQL checks confirm that the inconsistent link
+and row counts remain intact. The deliberate mutation bypasses the standard
+retained reader. The fixture simulates logical row corruption alongside
+synthetic signing and trust. Native producer custody and filesystem or
+power-loss recovery still require separate qualification.
+
+Base `7f9676a95004039dfaea4c1bdc667fb386ad5e12`. Local Rust formatting,
+scaffold, Ruff and Python 3.13.18 checks passed, with 145 Python passes and three
+skips under a canonical temporary directory. The local Docker daemon was
+unavailable. Rust behavioral and mutation execution require the existing
+isolated builder. Run the focused checks there with:
+
+```sh
+python3 tools/offline_rust.py test --features verified-authority,authenticated-artifacts --test authenticated_artifacts
+python3 tools/check_authenticated_artifact_mutations.py --shard 5
+```
+
+SHA-256 for the lockfile and core fixture inputs:
+
+```text
+216df163e47e5f8756267a2b62a162bcc3897f6a54aee0ddfc2eb971fcac70c6  Cargo.lock
+22ef87b867e7c39a8da8597efd3aab4b79639658a5c4211abb014124c9e36c3c  src/durable.rs
+ef8bba6ca2591ef808496b6eaa6aff76fd4293ddd39214d8326cf51a7b84a223  src/authenticated_artifacts.rs
+ff071a88883926784b849efc84bc8149a46477b9f497d8fcfc9785c2b3ed35a9  tests/authenticated_artifacts.rs
+14a2916fd43e08f7820620b26ced8ad2a870be0bc50bf6ba6db96fa2d4c3e84b  tools/check_authenticated_artifact_mutations.py
+```
