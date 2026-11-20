@@ -33,6 +33,13 @@ mutations = [
         },
     ),
     (
+        "ignore-retained-reservation-binding",
+        "opened_outbox_checks_reservation_record_before_lookup",
+        {
+            "row.as_ref().map(|row| &row.0) == retained.as_ref()": "{ let _ = &retained; true }",
+        },
+    ),
+    (
         "fabricated-receipt",
         "fabricated_delivery_receipts_do_not_pass_readback",
         {"if observed.len() == 1 && observed[0] == reply {": "if true {"},
@@ -51,6 +58,7 @@ mutations = [
 expected_anchors = {
     "&self.request == request && valid_id(&self.receipt_id)": 1,
     "durable::require_schema(&tx, OUTBOX_SCHEMA)?;": 1,
+    "row.as_ref().map(|row| &row.0) == retained.as_ref()": 1,
     "if observed.len() == 1 && observed[0] == reply {": 1,
     "resolver.verify_resolution(resolution)": 4,
     "authority.verify(request)": 12,
