@@ -376,6 +376,36 @@ fn corrupt_file_and_unversioned_schema_block_without_initialization() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn artifact_store_requires_a_literal_file_and_wal() {
+    let t = Temp::new();
+    let path = t.db();
+    let disk_uri = format!("file:{}?mode=rwc", path.display());
+    for alias in ["", ":memory:", "file::memory:?cache=shared", &disk_uri] {
+        let error = Store::open(alias).err().expect("non-file path admitted");
+        assert_eq!(
+            error.to_string(),
+            "core store requires an ordinary file path"
+        );
+    }
+    assert!(!path.exists(), "the disk URI must not create its target");
+
+    for path in [path, t.0.join(":memory:"), t.0.join("file:literal")] {
+        let mut store = Store::open(&path).unwrap();
+        let (reference, _) = prepare(&mut store, "test-artifact");
+        let original = store.bytes(&reference).unwrap();
+        drop(store);
+        let db = rusqlite::Connection::open(&path).unwrap();
+        let mode: String = db
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(mode, "wal");
+        let reopened = Store::open(&path).unwrap();
+        assert_eq!(reopened.bytes(&reference).unwrap(), original);
+    }
+}
+
 #[test]
 fn missing_primary_key_token_boundary_blocks_artifact_reopen() {
     // Both spellings are valid declared SQLite types, not PRIMARY KEY. They

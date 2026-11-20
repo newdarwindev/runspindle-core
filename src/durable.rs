@@ -1,6 +1,8 @@
 //! Core-owned immutable byte store and explicit authorized acceptance.
 use crate::runtime::{valid_id, Binding};
-use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
+use rusqlite::{
+    params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{path::Path, time::Duration};
@@ -194,14 +196,33 @@ pub(crate) fn create_schema(
 }
 impl Store {
     pub fn open(path: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let mut connection = Connection::open(path)?;
+        let path = path.as_ref();
+        let name = path.as_os_str().as_encoded_bytes();
+        anyhow::ensure!(
+            !name.is_empty() && name != b":memory:" && !name.starts_with(b"file:"),
+            "core store requires an ordinary file path"
+        );
+        let mut connection = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+                | OpenFlags::SQLITE_OPEN_CREATE
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
         connection.busy_timeout(Duration::from_secs(5))?;
         let version: u64 = connection.pragma_query_value(None, "user_version", |r| r.get(0))?;
         anyhow::ensure!(
             version == 0 || version == 1,
             "unsupported core store schema"
         );
-        connection.execute_batch("PRAGMA journal_mode=WAL;PRAGMA synchronous=FULL;PRAGMA foreign_keys=ON;PRAGMA max_page_count=524288;")?;
+        let journal_mode: String =
+            connection.query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))?;
+        anyhow::ensure!(
+            journal_mode == "wal",
+            "core store requires WAL journal mode"
+        );
+        connection.execute_batch(
+            "PRAGMA synchronous=FULL;PRAGMA foreign_keys=ON;PRAGMA max_page_count=524288;",
+        )?;
         // Validate and initialize under one write lock. A version marker alone
         // must never turn an incomplete journal into a new empty store.
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
