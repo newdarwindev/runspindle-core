@@ -1124,6 +1124,78 @@ fn failed_reservation_record_write_rolls_back_before_transport() {
     assert_eq!(peer.count("lookup"), 1);
 }
 #[test]
+fn opened_outbox_blocks_new_delivery_after_schema_change() {
+    for corruption in [
+        "UPDATE outbox_schema SET version=99;",
+        "DROP TRIGGER outbox_reservations_retained;",
+    ] {
+        let t = Temp::new();
+        let r = request(&t);
+        let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+        let mut outbox = Outbox::open(t.db()).unwrap();
+        let db = Connection::open(t.db()).unwrap();
+        db.execute_batch(corruption).unwrap();
+
+        let outcome = outbox.deliver(&r, &Grant(r.clone()), &mut peer);
+        assert_eq!(peer.count("send"), 0, "sent after {corruption}");
+        assert_eq!(peer.count("lookup"), 0);
+        assert!(outcome.is_err());
+        for table in ["outbox", "outbox_reservations"] {
+            let count: u64 = db
+                .query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            assert_eq!(count, 0);
+        }
+    }
+}
+#[test]
+fn delivery_rechecks_schema_after_reservation_before_send() {
+    struct ChangeSchema {
+        db: PathBuf,
+        checks: AtomicU64,
+    }
+
+    impl DeliveryAuthority for ChangeSchema {
+        fn verify(&self, _: &DeliveryRequest) -> bool {
+            if self.checks.fetch_add(1, Ordering::SeqCst) == 1 {
+                Connection::open(&self.db)
+                    .unwrap()
+                    .execute_batch("UPDATE outbox_schema SET version=99;")
+                    .unwrap();
+            }
+            true
+        }
+    }
+
+    let t = Temp::new();
+    let r = request(&t);
+    let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    let grant = ChangeSchema {
+        db: t.db(),
+        checks: AtomicU64::new(0),
+    };
+
+    let outcome = outbox.deliver(&r, &grant, &mut peer);
+    assert_eq!(peer.count("send"), 0);
+    assert_eq!(peer.count("lookup"), 0);
+    assert!(outcome.is_err());
+
+    let db = Connection::open(t.db()).unwrap();
+    db.execute_batch("UPDATE outbox_schema SET version=3;")
+        .unwrap();
+    let mut reopened = Outbox::open(t.db()).unwrap();
+    assert_eq!(
+        reopened.snapshot(&r).unwrap().unwrap().state,
+        DeliveryState::Reserved
+    );
+    assert!(reopened.deliver(&r, &Grant(r.clone()), &mut peer).is_err());
+    assert_eq!(peer.count("send"), 0);
+    assert_eq!(peer.count("lookup"), 1);
+}
+#[test]
 fn opened_outbox_checks_reservation_record_before_lookup() {
     let t = Temp::new();
     let r = request(&t);
