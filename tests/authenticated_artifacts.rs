@@ -740,6 +740,62 @@ fn evidence_wire_and_missing_journal_fail_closed() {
         .unwrap();
     assert!(AuthenticatedArtifacts::open(f.dir.join("core.sqlite")).is_err());
 }
+#[test]
+fn open_handle_denies_new_and_duplicate_acceptance_after_schema_changes() {
+    let f = Fixture::new();
+    let mut store = f.open();
+    let prior = store
+        .accept(&f.evidence(), &f.trust(), &FixedClock(100))
+        .unwrap();
+    let mut next_scope = f.scope.clone();
+    let mut next_binding = next_scope.artifact.binding.clone();
+    next_binding.revision += 1;
+    next_scope.artifact = durable::Store::open(f.dir.join("core.sqlite"))
+        .unwrap()
+        .put(durable::VERSION, next_binding, "artifact".into(), 1, BYTES)
+        .unwrap();
+    let next = signed(next_scope.clone());
+    let next_trust = trusted(next_scope);
+    let db = f.db();
+    let retained_ddl: String = db
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE name='authenticated_artifact_evidence_retained'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    for (damage, restore) in [
+        (
+            "UPDATE authenticated_artifact_schema SET version=2",
+            "UPDATE authenticated_artifact_schema SET version=1",
+        ),
+        (
+            "DROP TRIGGER authenticated_artifact_evidence_retained",
+            retained_ddl.as_str(),
+        ),
+    ] {
+        db.execute_batch(damage).unwrap();
+        let duplicate_denied = store
+            .accept(&f.evidence(), &f.trust(), &FixedClock(100))
+            .is_err();
+        let new_denied = store.accept(&next, &next_trust, &FixedClock(100)).is_err();
+        assert_eq!((duplicate_denied, new_denied), (true, true), "{damage}");
+        assert!(AuthenticatedArtifacts::open(f.dir.join("core.sqlite")).is_err());
+        assert_eq!(f.count("validations"), 1);
+        assert_eq!(f.count("acceptances"), 1);
+        assert_eq!(f.count("authenticated_artifact_evidence"), 1);
+        db.execute_batch(restore).unwrap();
+        let (unchanged, bytes) = f
+            .open()
+            .read(prior.accepted(), &f.trust(), &FixedClock(100))
+            .unwrap();
+        assert_eq!(unchanged.evidence_sha256(), prior.evidence_sha256());
+        assert_eq!(bytes, BYTES);
+    }
+    store.accept(&next, &next_trust, &FixedClock(100)).unwrap();
+    assert_eq!(f.count("acceptances"), 2);
+}
+
 #[cfg(feature = "delivery-runtime")]
 #[test]
 fn authenticated_acceptance_is_not_a_delivery_grant() {
