@@ -15,6 +15,12 @@ not permission to retry. Lost replies become Unknown; the outbox never regenerat
 accepted work or resends. Bytes come from the retained accepted BLOB and are hashed
 again before dispatch. Request binding cannot change during updates.
 
+An open outbox validates the current SQLite version, tables, and retention
+triggers in the transaction that reads or changes a reservation. It checks the
+schema and retained reservation again immediately before a transport call. A
+schema change after reservation stops dispatch and retains the reservation for
+read-only reconciliation once the store is valid again.
+
 A send acknowledgement alone is insufficient: authoritative transport readback
 must return exactly the same bound receipt before the outbox marks Delivered.
 A lost acknowledgement is reconciled through the same read-only interface.

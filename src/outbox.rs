@@ -173,6 +173,23 @@ fn require_absent_schema(
     }
     Ok(())
 }
+fn outbox_version(connection: &Connection) -> anyhow::Result<u64> {
+    durable::require_schema(connection, OUTBOX_VERSION_SCHEMA)?;
+    Ok(
+        connection.query_row("SELECT version FROM outbox_schema WHERE id=1", [], |row| {
+            row.get(0)
+        })?,
+    )
+}
+fn require_current_schema(connection: &Connection) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        outbox_version(connection)? == 3,
+        "unsupported outbox version"
+    );
+    durable::require_schema(connection, OUTBOX_SCHEMA)?;
+    durable::require_schema(connection, EVIDENCE_SCHEMA)?;
+    durable::require_schema(connection, RESERVATION_SCHEMA)
+}
 fn require_matching_reservations(connection: &Connection) -> anyhow::Result<()> {
     let mismatch: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM outbox AS o LEFT JOIN outbox_reservations AS r USING(operation)
@@ -211,12 +228,16 @@ fn migrate_reservations(connection: &Connection, version: u64) -> anyhow::Result
     Ok(())
 }
 impl Outbox {
-    pub(crate) fn check_artifact_guard(
+    pub(crate) fn check_transport(
         &self,
         request: &DeliveryRequest,
         guard: Option<&dyn ArtifactGuard>,
     ) -> anyhow::Result<()> {
-        guard_check(guard, &self.store.connection, request)
+        let tx = self.store.connection.unchecked_transaction()?;
+        guard_check(guard, &tx, request)?;
+        anyhow::ensure!(Self::read(&tx, request)?.is_some(), "missing reservation");
+        tx.commit()?;
+        Ok(())
     }
     pub fn open(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
         let mut store = Store::open(path)?;
@@ -224,11 +245,7 @@ impl Outbox {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         if durable::schema_object_exists(&tx, "outbox_schema")? {
-            durable::require_schema(&tx, OUTBOX_VERSION_SCHEMA)?;
-            let version: u64 =
-                tx.query_row("SELECT version FROM outbox_schema WHERE id=1", [], |r| {
-                    r.get(0)
-                })?;
+            let version = outbox_version(&tx)?;
             anyhow::ensure!((1..=3).contains(&version), "unsupported outbox version");
             durable::require_schema(&tx, OUTBOX_SCHEMA)?;
             if version == 1 {
@@ -257,15 +274,16 @@ impl Outbox {
             durable::create_schema(&tx, RESERVATION_SCHEMA)?;
             tx.execute("INSERT INTO outbox_schema VALUES(1,3)", [])?;
         }
-        durable::require_schema(&tx, RESERVATION_SCHEMA)?;
+        require_current_schema(&tx)?;
         require_matching_reservations(&tx)?;
         tx.commit()?;
         Ok(Self { store })
     }
     fn read(
-        connection: &rusqlite::Connection,
+        connection: &rusqlite::Transaction<'_>,
         request: &DeliveryRequest,
     ) -> anyhow::Result<Option<DeliverySnapshot>> {
+        require_current_schema(connection)?;
         let (row, retained, has_evidence): (Option<StoredDelivery>, Option<String>, bool) = connection
             .query_row(
                 "SELECT o.request,o.state,o.receipt,o.generation,o.acknowledgement,o.conflict,r.request,
@@ -323,7 +341,10 @@ impl Outbox {
     }
     pub fn snapshot(&self, request: &DeliveryRequest) -> anyhow::Result<Option<DeliverySnapshot>> {
         anyhow::ensure!(request.valid(), "invalid delivery version/binding");
-        Self::read(&self.store.connection, request)
+        let tx = self.store.connection.unchecked_transaction()?;
+        let snapshot = Self::read(&tx, request)?;
+        tx.commit()?;
+        Ok(snapshot)
     }
     fn contradiction(old: &DeliverySnapshot, observed: &[DeliveryReceipt]) -> bool {
         let valid = observed
@@ -500,7 +521,7 @@ impl Outbox {
         Ok(())
     }
     fn completed_resolution(
-        connection: &rusqlite::Connection,
+        connection: &rusqlite::Transaction<'_>,
         resolution: &ConflictResolution,
     ) -> anyhow::Result<Option<DeliverySnapshot>> {
         let Some(current) = Self::read(connection, &resolution.prior.request)? else {
@@ -532,10 +553,13 @@ impl Outbox {
         // A cached bridge cannot authorize a resolver effect after retained
         // accepted bytes/evidence have become invalid, including exact replay.
         self.store.accepted(&resolution.prior.request.accepted)?;
-        Ok(
-            self.snapshot(&resolution.prior.request)?.as_ref() == Some(&resolution.prior)
-                || Self::completed_resolution(&self.store.connection, resolution)?.is_some(),
-        )
+        let request = &resolution.prior.request;
+        anyhow::ensure!(request.valid(), "invalid delivery version/binding");
+        let tx = self.store.connection.unchecked_transaction()?;
+        let applicable = Self::read(&tx, request)?.as_ref() == Some(&resolution.prior)
+            || Self::completed_resolution(&tx, resolution)?.is_some();
+        tx.commit()?;
+        Ok(applicable)
     }
     /// Resolve quarantine using independent readback only. Never calls send.
     /// Authority callbacks must be fresh, bounded and non-reentrant; a remote
@@ -580,7 +604,7 @@ impl Outbox {
             authority.verify(request) && resolver.verify_resolution(resolution),
             "resolution readback denied"
         );
-        guard_check(guard, &self.store.connection, request)?;
+        self.check_transport(request, guard)?;
         let readback = transport.lookup_observation(request)?;
         anyhow::ensure!(!readback.conflict, "transport conflict remains unresolved");
         let observed = readback.receipts;
@@ -696,7 +720,7 @@ impl Outbox {
             authority.verify(request),
             "delivery authority revoked after reservation"
         );
-        guard_check(guard, &self.store.connection, request)?;
+        self.check_transport(request, guard)?;
         // This call path is reachable only after a newly committed reservation. An
         // existing reservation can only reach read-only reconciliation above.
         let sent = transport
@@ -718,7 +742,7 @@ impl Outbox {
                 "acknowledgement contradicts retained receipt"
             );
             anyhow::ensure!(authority.verify(request), "readback authority unavailable");
-            guard_check(guard, &self.store.connection, request)?;
+            self.check_transport(request, guard)?;
             let readback = transport.lookup_observation(request).unwrap_or_default();
             if readback.conflict {
                 self.remember(request, None, true, &readback.receipts)?;
@@ -770,7 +794,7 @@ impl Outbox {
             .ok_or_else(|| anyhow::anyhow!("missing reservation"))?;
         anyhow::ensure!(!old.conflict, "delivery receipt conflict is durably fenced");
         anyhow::ensure!(authority.verify(request), "readback authority unavailable");
-        guard_check(guard, &self.store.connection, request)?;
+        self.check_transport(request, guard)?;
         let readback = transport.lookup_observation(request).unwrap_or_default();
         if readback.conflict {
             self.remember(request, None, true, &readback.receipts)?;
