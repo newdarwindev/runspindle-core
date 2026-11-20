@@ -49,6 +49,13 @@ mutations = [
         "restored_schema_cannot_hide_corrupt_bytes_keys_or_digest",
         {"for row in rows {": "for row in rows.take(0) {"},
     ),
+    (
+        "missing-reservation-witness",
+        "fresh_process_missing_browser_reservation_blocks_duplicate_dispatch",
+        {
+            'anyhow::ensure!(!mismatch, "browser reservation journal mismatch");': "let _ = mismatch;",
+        },
+    ),
 ]
 
 
