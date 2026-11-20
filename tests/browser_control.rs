@@ -187,6 +187,40 @@ fn explicit_upgrade_preserves_existing_rows_and_reopens() {
     assert!(r.historical_control(&initial().target).unwrap().is_none());
 }
 #[test]
+fn legacy_control_upgrade_preserves_the_existing_head_without_refencing() {
+    let temp = Temp::new();
+    let t = initial();
+    let mut peer = Spy::new("confirmed");
+    let mut registry = BrowserRegistry::open(temp.db()).unwrap();
+    registry.upgrade_control_schema(&grant()).unwrap();
+    registry.dispatch_control(&t, &grant(), &mut peer).unwrap();
+    registry.reconcile_control(&t, &grant(), &mut peer).unwrap();
+    drop(registry);
+    let db = Connection::open(temp.db()).unwrap();
+    db.execute_batch("DROP TABLE browser_reservations; PRAGMA user_version=2;")
+        .unwrap();
+
+    let mut registry = BrowserRegistry::open(temp.db()).unwrap();
+    assert_eq!(
+        db.pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
+            .unwrap(),
+        4
+    );
+    assert_eq!(
+        registry
+            .historical_control(&t.target)
+            .unwrap()
+            .unwrap()
+            .observation,
+        Outcome::Confirmed
+    );
+    assert_eq!(
+        registry.dispatch_control(&t, &grant(), &mut peer).unwrap(),
+        Outcome::Unknown
+    );
+    assert_eq!(peer.actions, ["dispatch", "reconcile"]);
+}
+#[test]
 fn unknown_survives_reopen_no_refence_then_exact_readback() {
     let temp = Temp::new();
     let mut r = BrowserRegistry::open(temp.db()).unwrap();
@@ -397,7 +431,7 @@ fn schema_upgrade_lost_authority_rolls_back_without_head_table() {
     assert_eq!(
         db.pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
             .unwrap(),
-        1
+        3
     );
     assert_eq!(
         db.query_row(
@@ -517,7 +551,7 @@ fn rejected_head_never_admits_input_or_new_transition() {
         .is_err());
 }
 #[test]
-fn malformed_v1_metadata_is_not_upgraded() {
+fn malformed_effect_metadata_is_not_upgraded_to_control() {
     let temp = Temp::new();
     let mut r = BrowserRegistry::open(temp.db()).unwrap();
     let mut peer = Spy::new("confirmed");
@@ -539,7 +573,7 @@ fn malformed_v1_metadata_is_not_upgraded() {
     assert_eq!(
         db.pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
             .unwrap(),
-        1
+        3
     );
 }
 #[test]
