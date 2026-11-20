@@ -230,3 +230,37 @@ python3 tools/test_admission_runtime.py --platform /path/to/pinned-platform \
 The pinned Docker builder was unavailable during local verification. The new
 binary, mutation and isolated Temporal checks have no observed result for this
 candidate. Actual history deletion, corruption and retention expiry remain open.
+
+## Admission authority schema
+
+The local SQLite admission verifier checks all four v1 tables and four
+retention triggers in the same read-only snapshot as the assertion, key, and
+revocation. An absent or changed revocation trigger blocks dispatch even when
+the version marker and signed grant still look valid. The schema version stays
+at 1 and the historical definitions are unchanged. Synthetic bootstrap uses
+the same definitions and commits its DDL and version marker together.
+
+The fresh-process regression replaces the revocation delete trigger with a
+no-op or removes it, then deletes the revocation for an otherwise valid signed
+grant. It invokes the existing authenticated dispatch port with a synthetic
+adapter. The independent observer checks that neither the call log nor the
+effect receipt exists, and SQLite readback checks that the verifier left the
+damaged schema untouched. The deliberate mutation ignores the schema-check
+error so the same regression must detect a dispatch.
+
+```sh
+python3 tools/offline_rust.py test --features verified-authority --test authority
+python3 tools/check_authority_mutations.py
+```
+
+On base `7f9676a95004039dfaea4c1bdc667fb386ad5e12`, SQLite 3.54.1 confirmed
+that all eight historical DDL definitions match and reproduced the controlled
+revocation loss in a separate process. The scaffold, Rust formatting, static
+quality and Python suite passed locally. The pinned Rust builder could not reach
+the local Docker daemon, so the Rust regression and mutation await isolated
+execution. The toolchain manifest SHA-256 is
+`d768124d266e0e5e2a49731a0f20b0a4c5252fea6dfa9e31f2d50ed7c72f77f7`.
+
+A revocation lost while the exact schema still appears intact can escape this
+check. SQLite authority schema validation leaves Temporal history corruption,
+storage-device faults and power-loss qualification open under Core #19.
