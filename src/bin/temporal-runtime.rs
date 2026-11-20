@@ -25,6 +25,14 @@ use temporalio_sdk::{
     Runtime, Worker, WorkerOptions,
 };
 
+// An empty run cannot reconstruct admission reservations from a closed run.
+fn admission_start_options(queue: &str, workflow_id: String) -> WorkflowStartOptions {
+    WorkflowStartOptions::new(queue, workflow_id)
+        .id_reuse_policy(temporalio_client::WorkflowIdReusePolicy::RejectDuplicate)
+        .id_conflict_policy(temporalio_client::WorkflowIdConflictPolicy::Fail)
+        .build()
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
@@ -593,8 +601,7 @@ async fn main() -> anyhow::Result<()> {
                 .start_workflow(
                     AuthenticatedRegistryV1::run,
                     (),
-                    WorkflowStartOptions::new(runspindle_core::authenticated::QUEUE, registry_id)
-                        .build(),
+                    admission_start_options(runspindle_core::authenticated::QUEUE, registry_id),
                 )
                 .await?;
             serde_json::json!({"status":"started","run_id":h.run_id()})
@@ -651,8 +658,7 @@ async fn main() -> anyhow::Result<()> {
                 .start_workflow(
                     IntentWorkflowV1::run,
                     (),
-                    WorkflowStartOptions::new(runspindle_core::intent_runtime::QUEUE, id.clone())
-                        .build(),
+                    admission_start_options(runspindle_core::intent_runtime::QUEUE, id.clone()),
                 )
                 .await?;
             serde_json::json!({"status":"started_intake_only","workflow_id":id,"run_id":h.run_id()})
@@ -713,11 +719,10 @@ async fn main() -> anyhow::Result<()> {
                 .start_workflow(
                     ScopedRegistryV1::run,
                     (),
-                    WorkflowStartOptions::new(
+                    admission_start_options(
                         runspindle_core::scoped_authenticated::QUEUE,
                         registry_id,
-                    )
-                    .build(),
+                    ),
                 )
                 .await?;
             serde_json::json!({"status":"started","run_id":h.run_id()})
@@ -797,7 +802,7 @@ async fn main() -> anyhow::Result<()> {
                 .start_workflow(
                     HostAdmissionRegistry::run,
                     (),
-                    WorkflowStartOptions::new(QUEUE, registry_id).build(),
+                    admission_start_options(QUEUE, registry_id),
                 )
                 .await?;
             serde_json::json!({"status":"started","run_id":h.run_id()})
@@ -836,7 +841,7 @@ async fn main() -> anyhow::Result<()> {
                 .start_workflow(
                     AdmissionRegistry::run,
                     (),
-                    WorkflowStartOptions::new(QUEUE, registry_id).build(),
+                    admission_start_options(QUEUE, registry_id),
                 )
                 .await?;
             serde_json::json!({"status":"started", "run_id":h.run_id()})
@@ -891,4 +896,22 @@ async fn main() -> anyhow::Result<()> {
     }
     println!("{}", serde_json::to_string(&result)?);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::admission_start_options;
+    use temporalio_client::{WorkflowIdConflictPolicy, WorkflowIdReusePolicy};
+
+    #[test]
+    fn admission_start_preserves_retained_workflow_ids() {
+        let options = admission_start_options("admission-test-queue", "test-registry".into());
+        assert_eq!(options.task_queue, "admission-test-queue");
+        assert_eq!(options.workflow_id, "test-registry");
+        assert_eq!(options.id_conflict_policy, WorkflowIdConflictPolicy::Fail);
+        assert_eq!(
+            options.id_reuse_policy,
+            WorkflowIdReusePolicy::RejectDuplicate
+        );
+    }
 }
