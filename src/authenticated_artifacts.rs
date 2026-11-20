@@ -387,6 +387,23 @@ fn schema_exists(connection: &Connection, name: &str) -> anyhow::Result<bool> {
         |r| r.get(0),
     )?)
 }
+fn require_evidence_schema(connection: &Connection) -> anyhow::Result<()> {
+    // Require the exact known DDL, including the two retention triggers.
+    for (name, expected) in SCHEMA {
+        let stored: String =
+            connection.query_row("SELECT sql FROM sqlite_master WHERE name=?1", [name], |r| {
+                r.get(0)
+            })?;
+        anyhow::ensure!(stored == *expected, "incompatible artifact evidence schema");
+    }
+    let version: u64 = connection.query_row(
+        "SELECT version FROM authenticated_artifact_schema WHERE id=1",
+        [],
+        |r| r.get(0),
+    )?;
+    anyhow::ensure!(version == 1, "unsupported artifact evidence schema");
+    Ok(())
+}
 /// Result is not Deserialize and does not implement any delivery authority.
 #[derive(Clone, Debug)]
 pub struct AuthenticatedAccepted {
@@ -422,20 +439,7 @@ impl AuthenticatedArtifacts {
             }
             tx.execute("INSERT INTO authenticated_artifact_schema VALUES(1,1)", [])?;
         }
-        // Exact known DDL only; do not erase SQL token boundaries or repair loss.
-        for (name, expected) in SCHEMA {
-            let stored: String =
-                tx.query_row("SELECT sql FROM sqlite_master WHERE name=?1", [name], |r| {
-                    r.get(0)
-                })?;
-            anyhow::ensure!(stored == *expected, "incompatible artifact evidence schema");
-        }
-        let version: u64 = tx.query_row(
-            "SELECT version FROM authenticated_artifact_schema WHERE id=1",
-            [],
-            |r| r.get(0),
-        )?;
-        anyhow::ensure!(version == 1, "unsupported artifact evidence schema");
+        require_evidence_schema(&tx)?;
         tx.commit()?;
         Ok(Self { store })
     }
@@ -457,6 +461,7 @@ impl AuthenticatedArtifacts {
             .store
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        require_evidence_schema(&tx)?;
         verify(evidence, trust, clock)?; // authority before protected byte read
         let bytes = Store::read_bytes(&tx, &scope.artifact)?;
         anyhow::ensure!(
@@ -572,20 +577,7 @@ impl AuthenticatedArtifacts {
         trust: &impl Trust,
         clock: &impl Clock,
     ) -> anyhow::Result<(AuthenticatedAccepted, Vec<u8>)> {
-        for (name, expected) in SCHEMA {
-            let stored: String = connection.query_row(
-                "SELECT sql FROM sqlite_master WHERE name=?1",
-                [name],
-                |r| r.get(0),
-            )?;
-            anyhow::ensure!(stored == *expected, "incompatible artifact evidence schema");
-        }
-        let version: u64 = connection.query_row(
-            "SELECT version FROM authenticated_artifact_schema WHERE id=1",
-            [],
-            |r| r.get(0),
-        )?;
-        anyhow::ensure!(version == 1, "unsupported artifact evidence schema");
+        require_evidence_schema(connection)?;
         let (record, wire, digest): (String, Vec<u8>, String) = connection.query_row(
             "SELECT accepted_record,evidence,evidence_sha256 FROM authenticated_artifact_evidence WHERE acceptance_identity=?1",
             [accepted.key()?], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),

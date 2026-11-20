@@ -113,6 +113,43 @@ integration must preserve its formatting changes and requalify the exact tree.
 No source result substitutes
 for #26's durability qualification or #18's real native provenance integration.
 
+## Acceptance after a schema change
+
+Core [#18](https://github.com/newdarwindev/runspindle-core/issues/18) and
+[#19](https://github.com/newdarwindev/runspindle-core/issues/19). Open, accept and
+read use the same authenticated evidence schema check. Acceptance checks the
+version and recorded DDL after acquiring its SQLite write lock and before
+reading the artifact bytes. A changed version or missing evidence trigger
+blocks both a new acceptance and a duplicate through an already-open handle.
+
+The regression uses synthetic signatures and two SQLite connections. One
+connection changes the version or removes the retention trigger after the store
+has opened. The existing handle and reopening both deny while the schema is
+damaged. An independent SQL reader verifies the retained row counts. After the
+fixture restores the schema, the signed evidence digest and bytes read back
+unchanged, and acceptance of a new revision succeeds. With the acceptance
+schema check removed, both requests succeeded under the unsupported version.
+
+Local macOS arm64 verification at base
+`374e0184885059d4e5de4114dc0fa95d0a24f7e6` used Rust 1.94.1 and protoc
+3.21.12. The three suites passed 89 cases, with six optional Tether peer
+cases skipped. Clippy, formatting, scaffold and 145 Python tests passed,
+with three Python skips. The cases use synthetic identities and SQLite
+logical changes. Power-loss, production custody and Linux qualification
+of this change are outside those results.
+
+```sh
+python3 tools/offline_rust.py test --features verified-authority,authenticated-artifacts --test authenticated_artifacts --test durable_artifacts --test outbox
+```
+
+SHA-256 of the lockfile and focused inputs
+
+```text
+216df163e47e5f8756267a2b62a162bcc3897f6a54aee0ddfc2eb971fcac70c6  Cargo.lock
+c99ac1a5b93ae1fa03e7e8bb6b637653a32116d49ad54716ad413133d4ed3b34  src/authenticated_artifacts.rs
+2c15cab12835367649c6304f5e1e9f22a87c0dcad2a9e26899e968e5bebc1b68  tests/authenticated_artifacts.rs
+```
+
 ## Authored regressions and execution boundary
 
 Tests cover forged same-revision validators/producers, cross-role signature
