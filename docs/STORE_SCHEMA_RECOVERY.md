@@ -112,3 +112,32 @@ validation is missing. The controlled injector disables foreign keys for invalid
 links; this is not a supported application write or filesystem fault simulation.
 Generic acceptance remains distinct from cryptographic/current-authority checks.
 This does not complete admission-store, filesystem or power-loss qualification.
+
+## File-backed artifact and outbox storage
+
+`Store::open` and the outbox constructors that use it require an ordinary
+filesystem path. An empty name, the raw `:memory:` token and raw `file:` SQLite
+URIs are rejected before SQLite opens anything. To use a literal Unix filename
+such as `file:example`, supply a directory-qualified path such as
+`./file:example`. The constructor disables URI mode and requires SQLite to
+confirm WAL before it admits a store.
+
+The offline artifact and outbox tests verify that a rejected URI creates no
+database, that file-backed artifacts reopen with the same bytes and WAL mode,
+and that reopening a reserved outbox by its ordinary path reconciles with
+one send and one lookup in an independent synthetic SQLite peer. The check
+requires an ordinary path and confirmed journal mode. Power-loss behavior,
+storage replacement and filesystem durability are separate qualifications.
+
+Local macOS arm64 component tests on base
+`7f9676a95004039dfaea4c1bdc667fb386ad5e12` used Rust 1.94.1 and the
+[upstream protoc 3.21.12 release](https://github.com/protocolbuffers/protobuf/releases/tag/v21.12).
+The macOS ARM64 archive SHA-256 was
+`96839af0caed64352442fc8236f4bdf7c1cd6efcfaa98fa5db37307a73fc7c70`.
+The pinned Linux builder needs a running Docker daemon and remains a separate
+validation gate.
+
+```sh
+cargo test --locked --offline --features authenticated-artifacts,delivery-runtime \
+  --test durable_artifacts --test outbox --test authenticated_artifacts
+```
