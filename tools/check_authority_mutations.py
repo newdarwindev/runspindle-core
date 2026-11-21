@@ -36,6 +36,14 @@ MUTATIONS = [
         "atomic_chain_never_schedules_superseded_creates_or_edits",
     ),
     (
+        "single_delete_loses_pending_evidence",
+        "src/intent_runtime.rs",
+        "self.tombstone = true;\n            self.record_pending_superseded();",
+        "self.tombstone = true;\n            self.pending = None;",
+        "intent",
+        "single_delete_records_only_unstarted_pending_intent_as_superseded",
+    ),
+    (
         "scoped_delivery_destination",
         "src/scoped_authority.rs",
         "&& request.account_id == scoped.destination.account_id",
