@@ -1293,6 +1293,49 @@ fn opened_outbox_checks_reservation_record_before_lookup() {
     assert!(Outbox::open(t.db()).is_err());
 }
 #[test]
+fn fresh_process_reconciliation_supersedes_pending_send() {
+    struct ReconcileBeforeSend<'a>(&'a Temp, AtomicBool);
+    impl DeliveryAuthority for ReconcileBeforeSend<'_> {
+        fn verify(&self, request: &DeliveryRequest) -> bool {
+            let db = Connection::open(self.0.db()).unwrap();
+            let reserved: bool = db
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM outbox WHERE operation=?1)",
+                    [&request.delivery_operation_id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            if reserved && !self.1.swap(true, Ordering::SeqCst) {
+                SchemaChild::spawn(self.0, "deliver", "reconciled.txt").wait();
+            }
+            true
+        }
+    }
+
+    let t = Temp::new();
+    let r = request(&t);
+    let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+    let mut outbox = Outbox::open(t.db()).unwrap();
+    let authority = ReconcileBeforeSend(&t, AtomicBool::new(false));
+    let result = outbox.deliver(&r, &authority, &mut peer);
+
+    assert!(authority.1.load(Ordering::SeqCst));
+    assert_eq!(
+        std::fs::read_to_string(t.0.join("reconciled.txt")).unwrap(),
+        "opened"
+    );
+    assert_eq!(peer.count("send"), 0);
+    assert_eq!(peer.count("lookup"), 1);
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "dispatch reservation changed before send"
+    );
+    let retained = Outbox::open(t.db()).unwrap().snapshot(&r).unwrap().unwrap();
+    assert_eq!(retained.state, DeliveryState::Unknown);
+    assert_eq!(retained.generation, 1);
+    assert!(retained.receipt.is_none());
+}
+#[test]
 fn legacy_migration_preserves_reservation_across_concurrent_processes() {
     let t = Temp::new();
     let r = request(&t);
