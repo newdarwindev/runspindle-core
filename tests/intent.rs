@@ -400,6 +400,43 @@ fn batch(intents: Vec<IntentAdmission>) -> runspindle_core::intent::IntentBatch 
         intents,
     }
 }
+
+#[test]
+fn single_delete_records_only_unstarted_pending_intent_as_superseded() {
+    let create = vectors().remove(0);
+    let delete = next(&create, Kind::Delete);
+    for started in [false, true] {
+        let mut state = IntentState::default();
+        assert_eq!(state.admit(create.clone()), "admitted");
+        assert!(state.pending.is_some());
+        if started {
+            // The workflow consumes pending before scheduling the operation.
+            state.pending.take();
+        }
+        assert_eq!(state.admit(delete.clone()), "admitted");
+        assert!(state.pending.is_none());
+        assert!(state.tombstone);
+        assert_eq!(state.terminal_revision, None);
+        let expected = if started { vec![] } else { vec![1] };
+        assert_eq!(state.superseded_without_execution, expected);
+        assert_eq!(state.admit(delete.clone()), "duplicate");
+        assert_eq!(state.superseded_without_execution, expected);
+    }
+}
+
+#[test]
+fn batch_delete_keeps_previously_queued_and_new_skipped_revisions_in_order() {
+    let chain = vectors();
+    let mut state = IntentState::default();
+    assert_eq!(state.admit(chain[0].clone()), "admitted");
+    assert_eq!(state.install_batch(batch(chain.clone()), false), "admitted");
+    assert_eq!(state.superseded_without_execution, vec![1, 2]);
+    assert!(state.pending.is_none());
+    assert_eq!(state.terminal_revision, None);
+    assert_eq!(state.install_batch(batch(chain), false), "duplicate");
+    assert_eq!(state.superseded_without_execution, vec![1, 2]);
+}
+
 #[test]
 fn atomic_chain_never_schedules_superseded_creates_or_edits() {
     let chain = vectors();

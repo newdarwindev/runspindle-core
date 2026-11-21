@@ -37,6 +37,14 @@ pub struct IntentState {
     pub superseded_without_execution: Vec<u64>,
 }
 impl IntentState {
+    fn record_pending_superseded(&mut self) {
+        if let Some(pending) = self.pending.take() {
+            let pending = IntentAdmission::decode(pending.as_bytes()).expect("retained");
+            self.superseded_without_execution
+                .push(pending.event.revision);
+        }
+    }
+
     pub fn install_batch(&mut self, batch: IntentBatch, active: bool) -> String {
         if batch.validate().is_err() {
             return "invalid".into();
@@ -57,6 +65,7 @@ impl IntentState {
         if active && latest.event.kind != Kind::Delete {
             return "predecessor_active".into();
         }
+        self.record_pending_superseded();
         for value in batch.intents.iter().skip(self.history.len()) {
             self.deliveries.insert(
                 value.event.event_id.clone(),
@@ -64,13 +73,6 @@ impl IntentState {
             );
             if value.event.revision != latest.event.revision && value.event.kind != Kind::Delete {
                 self.superseded_without_execution.push(value.event.revision);
-            }
-        }
-        if let Some(pending) = &self.pending {
-            let pending = IntentAdmission::decode(pending.as_bytes()).expect("retained");
-            if pending.event.revision != latest.event.revision {
-                self.superseded_without_execution
-                    .push(pending.event.revision);
             }
         }
         self.tombstone = latest.event.kind == Kind::Delete;
@@ -131,7 +133,7 @@ impl IntentState {
         self.deliveries.insert(value.event.event_id.clone(), hash);
         if value.event.kind == Kind::Delete {
             self.tombstone = true;
-            self.pending = None;
+            self.record_pending_superseded();
         } else {
             self.pending = Some(String::from_utf8(wire).expect("canonical utf8"));
         }

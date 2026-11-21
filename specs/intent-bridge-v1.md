@@ -47,6 +47,12 @@ activity boundary; trust unavailability remains deny-only.
 
 ## Scheduling and cancellation boundary
 
+When a single or batch delete clears a queued revision, the query snapshot
+retains that revision as `superseded_without_execution`. A batch records the
+previously queued revision before any newer skipped revisions. Once scheduling
+has consumed a queued revision, deletion leaves the existing operation and its
+cancellation or terminal evidence to the operation state machine.
+
 Deletion before launch scheduling prevents a new launch command. A launch already
 scheduled before deletion is an in-flight external effect, not retroactively
 undone: it remains pending/unknown, is reconciled, then cancellation is requested.
