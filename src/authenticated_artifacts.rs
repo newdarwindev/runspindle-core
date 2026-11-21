@@ -5,7 +5,7 @@ use crate::runtime::valid_id;
 use ring::signature::{UnparsedPublicKey, ED25519};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{cell::Cell, path::Path};
 
 pub const VERSION: &str = "runspindle.artifact-evidence.v1";
 pub const PRODUCER_DOMAIN: &[u8] = b"runspindle.artifact-evidence.v1\0producer\0ed25519\0";
@@ -280,6 +280,33 @@ impl Trust for Deny {
 pub trait Clock {
     fn now_ms(&self) -> Option<u64>;
 }
+
+/// Preserve time ordering across all checks in one public operation.
+pub(crate) struct OperationClock<'a> {
+    source: &'a dyn Clock,
+    last: Cell<Option<u64>>,
+}
+
+impl<'a> OperationClock<'a> {
+    pub(crate) fn new(source: &'a dyn Clock) -> Self {
+        Self {
+            source,
+            last: Cell::new(None),
+        }
+    }
+}
+
+impl Clock for OperationClock<'_> {
+    fn now_ms(&self) -> Option<u64> {
+        let now = self.source.now_ms()?;
+        if self.last.get().is_some_and(|last| now < last) {
+            return None;
+        }
+        self.last.set(Some(now));
+        Some(now)
+    }
+}
+
 fn within(now: u64, start: u64, end: u64) -> bool {
     start < end && start <= now && now < end
 }
@@ -445,6 +472,7 @@ impl AuthenticatedArtifacts {
         trust: &impl Trust,
         clock: &impl Clock,
     ) -> anyhow::Result<AuthenticatedAccepted> {
+        let clock = &OperationClock::new(clock);
         let wire = evidence.encode()?;
         verify(evidence, trust, clock)?;
         let scope = &evidence.producer.statement.scope;
@@ -561,7 +589,7 @@ impl AuthenticatedArtifacts {
             .store
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let result = Self::read_retained(&tx, accepted, trust, clock)?;
+        let result = Self::read_retained(&tx, accepted, trust, &OperationClock::new(clock))?;
         tx.commit()?;
         Ok(result)
     }
@@ -570,7 +598,7 @@ impl AuthenticatedArtifacts {
         connection: &Connection,
         accepted: &Accepted,
         trust: &impl Trust,
-        clock: &impl Clock,
+        clock: &OperationClock<'_>,
     ) -> anyhow::Result<(AuthenticatedAccepted, Vec<u8>)> {
         for (name, expected) in SCHEMA {
             let stored: String = connection.query_row(

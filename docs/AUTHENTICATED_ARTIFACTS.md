@@ -61,9 +61,13 @@ allowed: the caller must independently configure each role, and domain separatio
 still applies.
 
 The trusted injected clock must return unavailable on detected rollback/failure.
-Time is checked after trust resolution and again after cryptography, including
-monotonicity within that check. No clock integrity or cross-call rollback defense
-is claimed. Trust/clock callbacks must be bounded and non-reentrant. A fresh check
+Time is checked after trust resolution and again after cryptography. Each
+acceptance, retained read, and authenticated delivery or resolution operation
+retains the last sampled time through all of its artifact checks. A reading
+earlier than that sample stops the operation even when each individual
+signature check would otherwise see a valid time. Separate public calls and
+processes still rely on the injected clock's rollback detection. Trust/clock
+callbacks must be bounded and non-reentrant. A fresh check
 is not atomic with a remote issuer; revocation after the final check cannot be
 claimed as synchronized with an unrelated authority system.
 
@@ -125,6 +129,22 @@ evidence accepted in an independent clean store but rejected as a replacement,
 expiry/clock rollback within verification, and trust/clock denial after protected
 byte reads in both acceptance and retained-read paths. Direct SQL rows, bytes and
 callback counts are the authored observations.
+
+The operation-clock regressions cross actual SQLite and transport boundaries.
+A rollback just before acceptance commit leaves zero validation, acceptance
+or evidence rows. A retained read with a rollback after the protected byte read
+returns an error and preserves the existing evidence. On delivery, rollback
+after reservation yields zero sends, and rollback after an acknowledged send
+retains the acknowledgement without performing destination readback or settling
+delivery.
+
+Local macOS arm64 verification for this follow-up used Rust 1.94.1,
+protoc 3.21.12 and the pinned Cargo lock. With `verified-authority` and
+`authenticated-artifacts` enabled, the authenticated-artifact, durable-artifact
+and outbox binaries passed 90 tests with six ignored. Reproduce with
+`cargo test --offline --locked --features verified-authority,authenticated-artifacts
+--test authenticated_artifacts --test durable_artifacts --test outbox` on one line.
+The prepared Linux Docker builder was unavailable on this host.
 
 `fixtures/authenticated-artifact-v1.json` is an independent literal JSON, Ed25519
 and SHA-256 vector generated with Python stdlib and cryptography 50.0.0, without

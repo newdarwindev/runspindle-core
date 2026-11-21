@@ -1,7 +1,7 @@
 //! Opt-in authenticated artifact checks composed with separate delivery authority.
 //! Current trust checks are not atomic with a remote issuer or external effect.
 use crate::{
-    authenticated_artifacts::{AuthenticatedArtifacts, Clock, Trust},
+    authenticated_artifacts::{AuthenticatedArtifacts, Clock, OperationClock, Trust},
     outbox::{
         ArtifactGuard, ConflictResolution, DeliveryAuthority, DeliveryRequest, DeliverySnapshot,
         Outbox, ResolutionAuthority, Transport,
@@ -11,18 +11,26 @@ use crate::{
 use rusqlite::Connection;
 use std::path::Path;
 
-struct Guard<'a, T, C> {
+struct Guard<'a, T> {
     trust: &'a T,
-    clock: &'a C,
+    clock: OperationClock<'a>,
 }
-impl<T: Trust, C: Clock> ArtifactGuard for Guard<'_, T, C> {
+impl<'a, T> Guard<'a, T> {
+    fn new(trust: &'a T, clock: &'a dyn Clock) -> Self {
+        Self {
+            trust,
+            clock: OperationClock::new(clock),
+        }
+    }
+}
+impl<T: Trust> ArtifactGuard for Guard<'_, T> {
     fn verify(&self, connection: &Connection, request: &DeliveryRequest) -> anyhow::Result<()> {
         anyhow::ensure!(request.valid(), "invalid authenticated delivery request");
         AuthenticatedArtifacts::read_retained(
             connection,
             &request.accepted,
             self.trust,
-            self.clock,
+            &self.clock,
         )?;
         Ok(())
     }
@@ -47,8 +55,12 @@ impl AuthenticatedOutbox {
         trust: &T,
         clock: &C,
     ) -> anyhow::Result<DeliverySnapshot> {
-        self.inner
-            .deliver_guarded(request, authority, transport, Some(&Guard { trust, clock }))
+        self.inner.deliver_guarded(
+            request,
+            authority,
+            transport,
+            Some(&Guard::new(trust, clock)),
+        )
     }
     pub fn reconcile<A: DeliveryAuthority, P: Transport, T: Trust, C: Clock>(
         &mut self,
@@ -58,8 +70,12 @@ impl AuthenticatedOutbox {
         trust: &T,
         clock: &C,
     ) -> anyhow::Result<DeliverySnapshot> {
-        self.inner
-            .reconcile_guarded(request, authority, transport, Some(&Guard { trust, clock }))
+        self.inner.reconcile_guarded(
+            request,
+            authority,
+            transport,
+            Some(&Guard::new(trust, clock)),
+        )
     }
     pub fn resolve<
         A: DeliveryAuthority,
@@ -81,7 +97,7 @@ impl AuthenticatedOutbox {
             authority,
             resolver,
             transport,
-            Some(&Guard { trust, clock }),
+            Some(&Guard::new(trust, clock)),
         )
     }
     /// Guards the first decision-retention peer call as well as later readback.
@@ -103,7 +119,7 @@ impl AuthenticatedOutbox {
             &mut self.inner,
             authority,
             resolver,
-            Some(&Guard { trust, clock }),
+            Some(&Guard::new(trust, clock)),
         )
     }
 }
