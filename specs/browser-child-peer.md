@@ -31,6 +31,13 @@ application state. It does not authenticate peers or install a runtime authority
 The safe pinned `rustix` APIs preserve the crate's `forbid(unsafe_code)` rule;
 no host security, networking, trust-store or permissions settings are changed.
 
+Immediately before an effect dispatch, the registry rereads the exact committed
+reservation after the final authority check and request encoding. If read-only
+reconciliation already advanced the reservation's generation, the sender returns
+unknown and leaves that generation intact without calling the peer. A missing or
+changed reservation fails closed. The peer still owns synchronization at the
+external target.
+
 Local framing/deadline tests are component tests with explicit synthetic Python
 children. An opt-in integration test pins Browser source `379f020c650f3571867a17c6e84f28ff953d6770` and exercises the actual Python Receiver/GuardedPeer over OS pipes: a synthetic target effect occurs, its reply is lost, the Core registry reopens, duplicate dispatch remains unknown without another effect, and a fresh child reconciles. The test uses a target-owned fixture file, not Browser persistence. This proves registry reopen in the same Rust process and fresh Python children, not Rust crash-restart qualification. No live website, credentials, production IPC, CI runner admission or
 complete Browser parity is claimed.

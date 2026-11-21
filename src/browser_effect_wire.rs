@@ -177,12 +177,16 @@ impl Client {
         action: Action,
         authority: &A,
         peer: &mut P,
-    ) -> anyhow::Result<Outcome> {
+        ready: impl FnOnce() -> anyhow::Result<bool>,
+    ) -> anyhow::Result<Option<Outcome>> {
         anyhow::ensure!(
             authority.verify(&self.target, &self.digest, action),
             "browser effect denied"
         );
         let request = self.request(action)?;
+        if !ready()? {
+            return Ok(None);
+        }
         let response = peer.exchange(&request);
         // Even a cached terminal observation cannot outlive current authority.
         // A denial after dispatch does not undo its possible external effect.
@@ -191,34 +195,44 @@ impl Client {
             "browser effect authority changed"
         );
         let Ok(bytes) = response else {
-            return Ok(Outcome::Unknown);
+            return Ok(Some(Outcome::Unknown));
         };
         if bytes.len() > MAX_RESPONSE {
-            return Ok(Outcome::Unknown);
+            return Ok(Some(Outcome::Unknown));
         }
         let Ok(response) = serde_json::from_slice::<Response>(&bytes) else {
-            return Ok(Outcome::Unknown);
+            return Ok(Some(Outcome::Unknown));
         };
         if response.version != VERSION
             || response.evidence_class != EVIDENCE_CLASS
             || response.request_sha256 != crate::durable::digest(&request)
         {
-            return Ok(Outcome::Unknown);
+            return Ok(Some(Outcome::Unknown));
         }
-        Ok(response.outcome)
+        Ok(Some(response.outcome))
+    }
+    pub(crate) fn dispatch_reserved<A: Authority, P: Peer>(
+        &self,
+        authority: &A,
+        peer: &mut P,
+        ready: impl FnOnce() -> anyhow::Result<bool>,
+    ) -> anyhow::Result<Option<Outcome>> {
+        self.exchange(Action::Dispatch, authority, peer, ready)
     }
     pub fn dispatch<A: Authority, P: Peer>(
         &self,
         authority: &A,
         peer: &mut P,
     ) -> anyhow::Result<Outcome> {
-        self.exchange(Action::Dispatch, authority, peer)
+        self.exchange(Action::Dispatch, authority, peer, || Ok(true))
+            .map(|outcome| outcome.unwrap_or(Outcome::Unknown))
     }
     pub fn reconcile<A: Authority, P: Peer>(
         &self,
         authority: &A,
         peer: &mut P,
     ) -> anyhow::Result<Outcome> {
-        self.exchange(Action::Reconcile, authority, peer)
+        self.exchange(Action::Reconcile, authority, peer, || Ok(true))
+            .map(|outcome| outcome.unwrap_or(Outcome::Unknown))
     }
 }
