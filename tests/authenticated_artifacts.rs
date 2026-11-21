@@ -4,6 +4,7 @@ use ring::signature::{Ed25519KeyPair, KeyPair};
 use runspindle_core::{authenticated_artifacts::*, durable, runtime::Binding};
 use rusqlite::Connection;
 use std::{
+    cell::Cell,
     path::PathBuf,
     process::Command,
     sync::atomic::{AtomicU64, Ordering},
@@ -26,6 +27,29 @@ struct FixedClock(u64);
 impl Clock for FixedClock {
     fn now_ms(&self) -> Option<u64> {
         Some(self.0)
+    }
+}
+struct RegressingClock {
+    pre_regression_samples: usize,
+    samples: Cell<usize>,
+}
+impl RegressingClock {
+    fn after(samples: usize) -> Self {
+        Self {
+            pre_regression_samples: samples,
+            samples: Cell::new(0),
+        }
+    }
+}
+impl Clock for RegressingClock {
+    fn now_ms(&self) -> Option<u64> {
+        let previous = self.samples.get();
+        self.samples.set(previous + 1);
+        Some(if previous < self.pre_regression_samples {
+            200
+        } else {
+            100
+        })
     }
 }
 #[derive(Clone)]
@@ -1035,6 +1059,38 @@ fn retained_read_rechecks_authority_and_clock_after_byte_read() {
     }
 }
 
+#[test]
+fn clock_regression_between_verifications_blocks_commit_and_retained_read() {
+    let f = Fixture::new();
+    let mut store = f.open();
+    let clock = RegressingClock::after(6);
+    let decision = store.accept(&f.evidence(), &f.trust(), &clock);
+    for table in [
+        "validations",
+        "acceptances",
+        "authenticated_artifact_evidence",
+    ] {
+        assert_eq!(f.count(table), 0);
+    }
+    assert!(decision.is_err());
+    assert_eq!(clock.samples.get(), 7);
+
+    let accepted = store
+        .accept(&f.evidence(), &f.trust(), &FixedClock(100))
+        .unwrap();
+    let clock = RegressingClock::after(2);
+    assert!(store.read(accepted.accepted(), &f.trust(), &clock).is_err());
+    assert_eq!(clock.samples.get(), 3);
+    assert_eq!(f.count("authenticated_artifact_evidence"), 1);
+    assert_eq!(
+        f.open()
+            .read(accepted.accepted(), &f.trust(), &FixedClock(100))
+            .unwrap()
+            .1,
+        BYTES
+    );
+}
+
 #[cfg(feature = "delivery-runtime")]
 mod delivery {
     use super::*;
@@ -1162,6 +1218,22 @@ mod delivery {
             .snapshot(r)
             .unwrap()
     }
+    #[test]
+    fn clock_regression_between_artifact_guards_fences_send_and_readback() {
+        for (cutoff, sends) in [(8, 0), (12, 1)] {
+            let f = Fixture::new();
+            let (r, live, mut spy) = setup(&f);
+            let clock = RegressingClock::after(cutoff);
+            let decision = open(&f).deliver(&r, &Grant, &mut spy, &live, &clock);
+            assert_eq!((spy.sends, spy.reads), (sends, 0));
+            assert!(decision.is_err());
+            assert_eq!(clock.samples.get(), cutoff + 1);
+            let retained = snapshot(&f, &r).unwrap();
+            assert_ne!(retained.state, DeliveryState::Delivered);
+            assert_eq!(retained.acknowledgement.is_some(), sends == 1);
+        }
+    }
+
     #[test]
     fn authenticated_delivery_rechecks_each_callback_and_commit_without_nested_lock() {
         for validator in [false, true] {
