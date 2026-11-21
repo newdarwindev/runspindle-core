@@ -59,3 +59,6 @@ Bounded unqualified Core #18 candidate: [authenticated artifact evidence](../doc
 Bounded unqualified Core #19 candidate: [fail-closed store reopening](../docs/STORE_SCHEMA_RECOVERY.md). Required schema validation and atomic outbox v2 migration are authored; Rust/native checks remain pending.
 
 [Scoped authority candidate](scoped-authority-v2.md) adds a separately versioned exact-destination admission and Outbox authority adapter. Component tests are distinct from blocked prepared-image/Temporal qualification; Core #16 remains open.
+
+[Passive control readback](passive-control-readback.md) exposes scoped,
+historical control-head metadata for an independently admitted selection.

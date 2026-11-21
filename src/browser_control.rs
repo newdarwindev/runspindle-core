@@ -166,6 +166,33 @@ pub trait InputAuthority {
     fn verify(&self, target: &Target, holder: &Holder) -> bool;
 }
 
+/// Authorize a read of this exact application selection, independently of input.
+pub trait PassiveAuthority {
+    fn verify(&self, selection: &Target) -> bool;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RetainedControlState {
+    Pending,
+    Confirmed(Holder),
+    Rejected,
+    Conflict,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RetainedControlHead {
+    pub epoch: u64,
+    pub generation: u64,
+    pub state: RetainedControlState,
+}
+
+/// Historical Core evidence. A physical Browser observation is separate.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PassiveControlStatus {
+    pub selection: Target,
+    pub head: Option<RetainedControlHead>,
+}
+
 impl crate::browser_effect_registry::BrowserRegistry {
     /// Explicit additive migration of the existing Core file. No legacy Browser
     /// file is opened, copied, retired or selected as fallback by this method.
@@ -307,6 +334,18 @@ fn heads(connection: &Connection) -> anyhow::Result<HashMap<String, Record>> {
     }
     anyhow::ensure!(visited.len() == records.len(), "orphaned control record");
     Ok(result)
+}
+
+fn scoped_head(connection: &Connection, target: &Target) -> anyhow::Result<Option<Record>> {
+    let requested_scope = scope(target)?;
+    let head = heads(connection)?.remove(&target.binding.browser);
+    if let Some(record) = &head {
+        anyhow::ensure!(
+            requested_scope == scope(&record.snapshot.target)?,
+            "control scope mismatch"
+        );
+    }
+    Ok(head)
 }
 
 impl BrowserRegistry {
@@ -465,20 +504,52 @@ impl BrowserRegistry {
         target: &Target,
     ) -> anyhow::Result<Option<HistoricalSnapshot>> {
         let tx = self.connection.unchecked_transaction()?;
-        let current = heads(&tx)?;
-        let result = current
-            .get(&target.binding.browser)
-            .map(|r| {
-                anyhow::ensure!(
-                    scope(target)? == scope(&r.snapshot.target)?,
-                    "control scope mismatch"
-                );
-                Ok(r.snapshot.clone())
-            })
-            .transpose()?;
+        let result = scoped_head(&tx, target)?.map(|record| record.snapshot);
         tx.commit()?;
         Ok(result)
     }
+
+    /// Read canonical historical status for an independently admitted selection.
+    /// This opens only a read transaction and accepts no native/effect adapter.
+    pub fn passive_control_status<A: PassiveAuthority>(
+        &self,
+        selection: &Target,
+        authority: &A,
+    ) -> anyhow::Result<PassiveControlStatus> {
+        anyhow::ensure!(
+            selection.valid() && authority.verify(selection),
+            "passive control status denied"
+        );
+        let tx = self.connection.unchecked_transaction()?;
+        let head = if let Some(record) = scoped_head(&tx, selection)? {
+            let snapshot = &record.snapshot;
+            let state = if snapshot.conflict {
+                RetainedControlState::Conflict
+            } else {
+                match snapshot.observation {
+                    Outcome::Unknown => RetainedControlState::Pending,
+                    Outcome::Rejected => RetainedControlState::Rejected,
+                    Outcome::Confirmed => {
+                        RetainedControlState::Confirmed(transition(&record)?.data.destination)
+                    }
+                }
+            };
+            Some(RetainedControlHead {
+                epoch: snapshot.target.binding.epoch,
+                generation: snapshot.generation,
+                state,
+            })
+        } else {
+            None
+        };
+        anyhow::ensure!(authority.verify(selection), "passive control status denied");
+        tx.commit()?;
+        Ok(PassiveControlStatus {
+            selection: selection.clone(),
+            head,
+        })
+    }
+
     /// Serialize input with transfer reservations in the SAME Core database.
     /// The caller must additionally hold the real native fence; this does not
     /// manufacture an authenticated native holder token or credential grant.
