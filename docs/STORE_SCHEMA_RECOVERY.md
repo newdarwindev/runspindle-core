@@ -1,5 +1,33 @@
 # Fail-closed store reopening
 
+## Main database missing with surviving SQLite sidecars
+
+Core's artifact and outbox stores check for a surviving WAL, shared-memory
+file, or rollback journal before opening a missing or zero-byte main database.
+An existing symbolic link resolves to its target for this check. If a sidecar
+survives, Core leaves the files untouched and denies the open. Restore the
+original database and its matching sidecars through the component owner's
+recovery process before restarting. The check assumes a component-owned
+directory without concurrent file replacement.
+
+The Unix outbox regression commits a reservation, observes one synthetic
+delivery in an independent SQLite ledger, and exits the delivery process before
+it can close the Core database. It then moves the main file aside and tests both
+an absent file and a zero-byte replacement. A fresh Core process denies the
+open, preserves both sidecars byte for byte, and makes no destination calls.
+After restoring the original main file, another process recovers the exact
+reservation and reconciles the one delivery through readback. The artifact
+suite also covers isolated sidecars and a zero-byte symlink target.
+
+```
+python3 tools/offline_rust.py test --features delivery-runtime --test outbox
+python3 tools/offline_rust.py test --features artifact-store --test durable_artifacts
+```
+
+These cases exercise file displacement and process exit on a local filesystem.
+Power loss, storage-device failure, and loss of the main file and all sidecars
+remain unqualified. Removing a surviving sidecar is outside the procedure.
+
 ## Reservation row recovery in outbox v3
 
 The outbox stores a separate immutable operation and request record in the same

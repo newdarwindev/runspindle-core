@@ -406,6 +406,45 @@ fn artifact_store_requires_a_literal_file_and_wal() {
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn artifact_store_preserves_each_orphaned_sqlite_sidecar() {
+    let t = Temp::new();
+    let db = t.db();
+    let alias = t.0.join("alias.sqlite");
+    for suffix in ["-wal", "-shm", "-journal"] {
+        let sidecar = t.0.join(format!("core.sqlite{suffix}"));
+        std::fs::write(&sidecar, b"synthetic retained sidecar").unwrap();
+        let error = Store::open(&db)
+            .err()
+            .expect("opened without the main file");
+        assert!(error.to_string().contains("surviving SQLite sidecar"));
+        assert!(!db.try_exists().unwrap());
+
+        std::fs::write(&db, []).unwrap();
+        std::os::unix::fs::symlink(&db, &alias).unwrap();
+        let error = Store::open(&alias)
+            .err()
+            .expect("opened empty symlink target");
+        assert!(error.to_string().contains("surviving SQLite sidecar"));
+        assert_eq!(
+            std::fs::read(&sidecar).unwrap(),
+            b"synthetic retained sidecar"
+        );
+        assert!(std::fs::read(&db).unwrap().is_empty());
+
+        std::fs::remove_file(&alias).unwrap();
+        std::fs::remove_file(&db).unwrap();
+        std::fs::remove_file(&sidecar).unwrap();
+    }
+
+    std::fs::write(&db, []).unwrap();
+    std::os::unix::fs::symlink(&db, &alias).unwrap();
+    let mut store = Store::open(&alias).unwrap();
+    let (reference, _) = prepare(&mut store, "new-artifact");
+    assert_eq!(store.bytes(&reference).unwrap(), BYTES);
+}
+
 #[test]
 fn missing_primary_key_token_boundary_blocks_artifact_reopen() {
     // Both spellings are valid declared SQLite types, not PRIMARY KEY. They
