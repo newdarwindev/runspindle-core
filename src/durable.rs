@@ -5,7 +5,7 @@ use rusqlite::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{path::Path, time::Duration};
+use std::{io::ErrorKind, path::Path, time::Duration};
 pub const VERSION: &str = "runspindle.integration.v1";
 pub const CAPACITY: u64 = 1024;
 pub const MAX_BYTES: usize = 1_048_576;
@@ -194,6 +194,34 @@ pub(crate) fn create_schema(
     }
     Ok(())
 }
+
+fn require_unambiguous_store_path(path: &Path) -> anyhow::Result<()> {
+    match path.symlink_metadata() {
+        Ok(metadata) if metadata.is_symlink() => {
+            return require_unambiguous_store_path(&path.canonicalize()?);
+        }
+        Ok(metadata) if metadata.len() != 0 => return Ok(()),
+        Ok(_) => {}
+        Err(error) if error.kind() == ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+
+    // SQLite can discard a surviving journal when the main file is absent
+    // or empty. Check before it has a chance to open the path at all.
+    for suffix in ["-wal", "-shm", "-journal"] {
+        let mut sidecar = path.as_os_str().to_os_string();
+        sidecar.push(suffix);
+        match Path::new(&sidecar).symlink_metadata() {
+            Ok(_) => {
+                anyhow::bail!("core store has a surviving SQLite sidecar without its main file")
+            }
+            Err(error) if error.kind() == ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
+}
+
 impl Store {
     pub fn open(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let path = path.as_ref();
@@ -202,6 +230,7 @@ impl Store {
             !name.is_empty() && name != b":memory:" && !name.starts_with(b"file:"),
             "core store requires an ordinary file path"
         );
+        require_unambiguous_store_path(path)?;
         let mut connection = Connection::open_with_flags(
             path,
             OpenFlags::SQLITE_OPEN_READ_WRITE
