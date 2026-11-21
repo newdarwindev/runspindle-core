@@ -319,8 +319,22 @@ impl BrowserRegistry {
         )?;
         tx.commit()?;
         // Only this newly committed reservation may ever enter dispatch.
-        let result = client.dispatch(authority, peer)?;
-        self.remember(&target, payload, Action::Dispatch, result, authority)
+        let observation = client.dispatch_reserved(authority, peer, || {
+            let retained = self
+                .historical_snapshot(&target)?
+                .ok_or_else(|| anyhow::anyhow!("missing browser reservation"))?;
+            anyhow::ensure!(
+                retained.payload_digest == client.payload_digest(),
+                "browser payload changed"
+            );
+            Ok(retained.generation == 0
+                && retained.observation == Outcome::Unknown
+                && !retained.conflict)
+        })?;
+        match observation {
+            Some(result) => self.remember(&target, payload, Action::Dispatch, result, authority),
+            None => Ok(Outcome::Unknown),
+        }
     }
     pub fn reconcile<A: Authority, P: Peer>(
         &mut self,
