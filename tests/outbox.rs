@@ -973,11 +973,13 @@ impl SchemaChild {
         )
     }
     fn wait(&mut self) {
+        assert!(self.status().success());
+    }
+    fn status(&mut self) -> std::process::ExitStatus {
         let end = std::time::Instant::now() + std::time::Duration::from_secs(15);
         loop {
             if let Some(status) = self.0.try_wait().unwrap() {
-                assert!(status.success());
-                return;
+                return status;
             }
             assert!(std::time::Instant::now() < end, "schema child timed out");
             std::thread::sleep(std::time::Duration::from_millis(10));
@@ -1018,6 +1020,82 @@ fn schema_reopen_child() {
     )
     .unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn orphaned_wal_blocks_fresh_process_without_destroying_delivery_evidence() {
+    for empty_replacement in [false, true] {
+        let t = Temp::new();
+        let r = request(&t);
+        std::fs::write(t.0.join("request.json"), serde_json::to_vec(&r).unwrap()).unwrap();
+        let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+        assert_eq!(SchemaChild(child(&t.0, "after")).status().code(), Some(94));
+        assert_eq!(peer.count("send"), 1);
+        assert_eq!(peer.count("lookup"), 0);
+
+        // The child committed the reservation before sending, then exited with
+        // its SQLite connection still open. Keep the original main file for repair.
+        let wal = t.0.join("core.sqlite-wal");
+        let shm = t.0.join("core.sqlite-shm");
+        let wal_bytes = std::fs::read(&wal).unwrap();
+        let shm_bytes = std::fs::read(&shm).unwrap();
+        assert!(wal_bytes.len() > 32, "the WAL must contain frames");
+        let original_db = t.0.join("original.sqlite");
+        std::fs::rename(t.db(), &original_db).unwrap();
+        if empty_replacement {
+            std::fs::write(t.db(), []).unwrap();
+        }
+
+        SchemaChild::spawn(&t, "deliver", "orphaned.txt").wait();
+        assert_eq!(
+            std::fs::read_to_string(t.0.join("orphaned.txt")).unwrap(),
+            "blocked"
+        );
+        assert_eq!(std::fs::read(&wal).unwrap(), wal_bytes);
+        assert_eq!(std::fs::read(&shm).unwrap(), shm_bytes);
+        assert_eq!(peer.count("send"), 1);
+        assert_eq!(peer.count("lookup"), 0);
+        if empty_replacement {
+            assert!(std::fs::read(t.db()).unwrap().is_empty());
+            std::fs::remove_file(t.db()).unwrap();
+        } else {
+            assert!(!t.db().try_exists().unwrap());
+        }
+
+        std::fs::rename(&original_db, t.db()).unwrap();
+        SchemaChild::spawn(&t, "deliver", "repaired.txt").wait();
+        assert_eq!(
+            std::fs::read_to_string(t.0.join("repaired.txt")).unwrap(),
+            "opened"
+        );
+        assert_eq!(peer.count("send"), 1);
+        assert_eq!(peer.count("lookup"), 1);
+        let retained = Outbox::open(t.db()).unwrap().snapshot(&r).unwrap().unwrap();
+        assert_eq!(retained.state, DeliveryState::Delivered);
+        assert_eq!(retained.request, r);
+        let report = retained.receipt.unwrap();
+        assert_eq!(report.request, r);
+        assert_eq!(report.receipt_id, "external-observed-receipt");
+        assert_eq!(
+            Store::open(t.db()).unwrap().accepted(&r.accepted).unwrap(),
+            BYTES
+        );
+        let (receipt_json, observed_bytes): (String, Vec<u8>) = peer
+            .db
+            .query_row(
+                "SELECT receipt,bytes FROM receipts WHERE operation=?1",
+                [&r.delivery_operation_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<DeliveryReceipt>(&receipt_json).unwrap(),
+            report
+        );
+        assert_eq!(observed_bytes, BYTES);
+    }
+}
+
 #[test]
 fn missing_journal_blocks_fresh_process_without_resend() {
     let t = Temp::new();
