@@ -1028,7 +1028,7 @@ fn orphaned_wal_blocks_fresh_process_without_destroying_delivery_evidence() {
         let t = Temp::new();
         let r = request(&t);
         std::fs::write(t.0.join("request.json"), serde_json::to_vec(&r).unwrap()).unwrap();
-        let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+        let peer = Peer::open(&t.0.join("peer.sqlite"));
         assert_eq!(SchemaChild(child(&t.0, "after")).status().code(), Some(94));
         assert_eq!(peer.count("send"), 1);
         assert_eq!(peer.count("lookup"), 0);
