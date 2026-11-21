@@ -182,6 +182,41 @@ fn lost_reply_reconciles_exact_bytes_without_another_send() {
     assert_eq!(o.deliver(&r, &Grant(r.clone()), &mut p).unwrap(), done);
     assert_eq!(p.count("send"), 1);
 }
+
+#[test]
+fn outbox_rejects_sqlite_aliases_before_resolving_a_retained_dispatch() {
+    let t = Temp::new();
+    let r = request(&t);
+    let mut peer = Peer::open(&t.0.join("peer.sqlite"));
+    peer.lost = true;
+    let pending = Outbox::open(t.db())
+        .unwrap()
+        .deliver(&r, &Grant(r.clone()), &mut peer)
+        .unwrap();
+    assert_eq!(pending.state, DeliveryState::Unknown);
+    let disk_uri = format!("file:{}?mode=memory", t.db().display());
+    for alias in ["", ":memory:", "file::memory:?cache=shared", &disk_uri] {
+        let error = Outbox::open(alias).err().expect("non-file path admitted");
+        assert_eq!(
+            error.to_string(),
+            "core store requires an ordinary file path"
+        );
+    }
+    assert_eq!(peer.count("send"), 1);
+    assert_eq!(peer.count("lookup"), 0);
+
+    let mut reopened = Outbox::open(t.db()).unwrap();
+    assert_eq!(reopened.snapshot(&r).unwrap().unwrap(), pending);
+    assert_eq!(
+        reopened
+            .deliver(&r, &Grant(r.clone()), &mut peer)
+            .unwrap()
+            .state,
+        DeliveryState::Delivered
+    );
+    assert_eq!(peer.count("send"), 1);
+    assert_eq!(peer.count("lookup"), 1);
+}
 #[test]
 fn authority_version_destination_and_operation_bindings_fail_closed() {
     let t = Temp::new();
