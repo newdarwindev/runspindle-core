@@ -88,8 +88,13 @@ class AuthenticatedMutationShardsTest(unittest.TestCase):
                 all_pass = "\n".join(
                     f"test {name} ... ok" for name in harness.baseline_cases()
                 )
-                return subprocess.CompletedProcess([], 0, all_pass)
-            return subprocess.CompletedProcess([], 101, f"test {case} ... FAILED")
+                return subprocess.CompletedProcess([], 0, all_pass, "")
+            return subprocess.CompletedProcess(
+                [],
+                101,
+                f"test {case} ... FAILED",
+                "error: test failed, to rerun pass `--test authenticated_artifacts`",
+            )
 
         with (
             patch.object(harness, "checkout_sha", return_value=SOURCE),

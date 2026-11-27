@@ -127,6 +127,8 @@ def container_run(
     builder: dict[str, str],
     command: list[str],
     timeout: int,
+    *,
+    combine_output: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     # A CLI timeout does not stop its container. Retain an unguessable owned name
     # so finally can force-remove precisely this invocation, then verify absence.
@@ -159,7 +161,7 @@ def container_run(
             prefix + command,
             text=True,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.STDOUT if combine_output else subprocess.PIPE,
             timeout=timeout,
         )
     finally:
