@@ -145,12 +145,14 @@ fn registry_child() {
         mode,
         calls: 0,
     };
-    assert_eq!(
+    let outcome = if peer.mode == "reconcile" {
+        registry.reconcile(&target(), &Allow, &mut peer).unwrap()
+    } else {
         registry
             .dispatch(target(), b"x", &Allow, &mut peer)
-            .unwrap(),
-        Outcome::Unknown
-    );
+            .unwrap()
+    };
+    assert_eq!(outcome, Outcome::Unknown);
     let id = std::env::var("CORE_BROWSER_REGISTRY_ID").unwrap();
     std::fs::write(root.join(format!("calls-{id}")), peer.calls.to_string()).unwrap();
 }
@@ -291,4 +293,50 @@ fn competing_fresh_processes_reserve_one_dispatch() {
     let effect: Value =
         serde_json::from_slice(&std::fs::read(temp.0.join("effect.json")).unwrap()).unwrap();
     assert_eq!(effect["payload_hex"], "78");
+}
+
+#[test]
+fn fresh_reconciliation_fences_the_paused_original_dispatch() {
+    struct ReconcileBeforeExchange<'a> {
+        root: &'a Path,
+        checks: std::cell::Cell<usize>,
+    }
+    impl Authority for ReconcileBeforeExchange<'_> {
+        fn verify(&self, target: &Target, digest: &str, action: Action) -> bool {
+            self.checks.set(self.checks.get() + 1);
+            if self.checks.get() == 3 {
+                let mut child = spawn(self.root, "reconcile", "readback");
+                assert_eq!(wait(&mut child, self.root, "readback"), 0);
+            }
+            Allow.verify(target, digest, action)
+        }
+    }
+
+    let temp = Temp::new();
+    let mut registry = BrowserRegistry::open(temp.0.join("core.sqlite")).unwrap();
+    let authority = ReconcileBeforeExchange {
+        root: &temp.0,
+        checks: std::cell::Cell::new(0),
+    };
+    let mut peer = Site {
+        root: temp.0.clone(),
+        mode: "dispatch".into(),
+        calls: 0,
+    };
+    assert_eq!(
+        registry
+            .dispatch(target(), b"x", &authority, &mut peer)
+            .unwrap(),
+        Outcome::Unknown
+    );
+    assert_eq!(
+        std::fs::read_to_string(temp.0.join("calls-readback")).unwrap(),
+        "1"
+    );
+    assert_eq!(peer.calls, 0);
+    assert!(!temp.0.join("effect.json").exists());
+    let state = registry.historical_snapshot(&target()).unwrap().unwrap();
+    assert_eq!(state.generation, 1);
+    assert_eq!(state.observation, Outcome::Unknown);
+    assert!(!state.conflict);
 }
