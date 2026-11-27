@@ -486,6 +486,13 @@ fn unknown_after_confirmation_quarantines_historical_holder() {
     let snapshot = r.historical_control(&t.target).unwrap().unwrap();
     assert_eq!(snapshot.observation, Outcome::Confirmed);
     assert!(snapshot.conflict);
+    let passive = r
+        .passive_control_status(&t.target, &PassiveGrant::new(&t.target, 2))
+        .unwrap();
+    assert_eq!(
+        passive.head.unwrap().state,
+        control::RetainedControlState::Conflict
+    );
     assert!(r
         .with_control_input::<_, ()>(&t.target, &t.data.destination, &grant(), || panic!(
             "historical evidence is not current authority"
@@ -506,6 +513,13 @@ fn rejected_head_never_admits_input_or_new_transition() {
     assert_eq!(
         r.reconcile_control(&t, &grant(), &mut peer).unwrap(),
         Outcome::Rejected
+    );
+    let passive = r
+        .passive_control_status(&t.target, &PassiveGrant::new(&t.target, 2))
+        .unwrap();
+    assert_eq!(
+        passive.head.unwrap().state,
+        control::RetainedControlState::Rejected
     );
     assert!(r
         .with_control_input::<_, ()>(&t.target, &t.data.destination, &grant(), || panic!(
@@ -577,4 +591,178 @@ fn oversized_control_pointer_and_payload_deny_before_peer() {
         assert!(r.reconcile_control(&t, &grant(), &mut peer).is_err());
         assert_eq!(calls, peer.calls);
     }
+}
+
+struct PassiveGrant {
+    selection: Target,
+    allowed_checks: usize,
+    checks: std::cell::Cell<usize>,
+}
+impl PassiveGrant {
+    fn new(selection: &Target, allowed_checks: usize) -> Self {
+        Self {
+            selection: selection.clone(),
+            allowed_checks,
+            checks: std::cell::Cell::new(0),
+        }
+    }
+}
+impl control::PassiveAuthority for PassiveGrant {
+    fn verify(&self, selection: &Target) -> bool {
+        let checks = self.checks.get() + 1;
+        self.checks.set(checks);
+        self.selection == *selection && checks <= self.allowed_checks
+    }
+}
+
+const PASSIVE_WORKER_DB: &str = "RUNSPINDLE_TEST_PASSIVE_WORKER_DB";
+
+fn passive_control_readback_worker(db: std::ffi::OsString) {
+    let selection = initial().target;
+    let registry = BrowserRegistry::open(db).unwrap();
+    let authority = PassiveGrant::new(&selection, 2);
+    let observation = registry
+        .passive_control_status(&selection, &authority)
+        .unwrap();
+    assert_eq!(observation.selection, selection);
+    assert_eq!(
+        observation.head,
+        Some(control::RetainedControlHead {
+            epoch: 2,
+            generation: 1,
+            state: control::RetainedControlState::Confirmed(control::Holder {
+                kind: control::HolderKind::Human,
+                identity: "human".into(),
+            }),
+        })
+    );
+    assert_eq!(authority.checks.get(), 2);
+}
+
+#[test]
+fn passive_control_tracks_exact_selection_and_head_across_processes() {
+    if let Some(db) = std::env::var_os(PASSIVE_WORKER_DB) {
+        return passive_control_readback_worker(db);
+    }
+    let temp = Temp::new();
+    let db = temp.db();
+    let mut registry = BrowserRegistry::open(&db).unwrap();
+    registry.upgrade_control_schema(&grant()).unwrap();
+    let agent = initial();
+    let mut peer = Spy::new("confirmed");
+
+    let observe = |registry: &BrowserRegistry, selection: &Target| {
+        let authority = PassiveGrant::new(selection, 2);
+        let report = registry
+            .passive_control_status(selection, &authority)
+            .unwrap();
+        assert_eq!(authority.checks.get(), 2);
+        assert_eq!(report.selection, *selection);
+        report.head
+    };
+    assert_eq!(observe(&registry, &agent.target), None);
+    registry
+        .dispatch_control(&agent, &grant(), &mut peer)
+        .unwrap();
+    assert_eq!(
+        observe(&registry, &agent.target),
+        Some(control::RetainedControlHead {
+            epoch: 1,
+            generation: 0,
+            state: control::RetainedControlState::Pending,
+        })
+    );
+    registry
+        .reconcile_control(&agent, &grant(), &mut peer)
+        .unwrap();
+    let human = next(&registry, &agent);
+    registry
+        .dispatch_control(&human, &grant(), &mut peer)
+        .unwrap();
+    let pending = observe(&registry, &agent.target).unwrap();
+    assert_eq!(pending.state, control::RetainedControlState::Pending);
+    assert_eq!((pending.epoch, pending.generation), (2, 0));
+    registry
+        .reconcile_control(&human, &grant(), &mut peer)
+        .unwrap();
+
+    // An old selection can observe the current canonical head when separately
+    // admitted. Its authority and result never match the newly selected task.
+    let old_authority = PassiveGrant::new(&agent.target, 2);
+    assert!(registry
+        .passive_control_status(&human.target, &old_authority)
+        .is_err());
+    let confirmed = observe(&registry, &human.target).unwrap();
+    assert_eq!((confirmed.epoch, confirmed.generation), (2, 1));
+    assert_eq!(
+        confirmed.state,
+        control::RetainedControlState::Confirmed(human.data.destination)
+    );
+    assert_eq!(
+        peer.actions,
+        ["dispatch", "reconcile", "dispatch", "reconcile"]
+    );
+    drop(registry);
+    let before = std::fs::read(&db).unwrap();
+    let child = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "passive_control_tracks_exact_selection_and_head_across_processes",
+        ])
+        .env(PASSIVE_WORKER_DB, &db)
+        .output()
+        .unwrap();
+    assert!(
+        child.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&child.stdout),
+        String::from_utf8_lossy(&child.stderr)
+    );
+    assert!(String::from_utf8_lossy(&child.stdout).contains("1 passed; 0 failed"));
+    assert_eq!(std::fs::read(&db).unwrap(), before);
+}
+
+#[test]
+fn passive_control_denies_revocation_wrong_scope_and_corrupt_history() {
+    let temp = Temp::new();
+    let mut registry = BrowserRegistry::open(temp.db()).unwrap();
+    let transition = initial();
+    let selection = &transition.target;
+    assert!(registry
+        .passive_control_status(selection, &PassiveGrant::new(selection, 2))
+        .is_err()); // A v1 schema cannot report absence of a control head.
+    registry.upgrade_control_schema(&grant()).unwrap();
+
+    let mut malformed = selection.clone();
+    malformed.binding.revision = 0;
+    let malformed_authority = PassiveGrant::new(&malformed, 2);
+    assert!(registry
+        .passive_control_status(&malformed, &malformed_authority)
+        .is_err());
+    assert_eq!(malformed_authority.checks.get(), 0);
+
+    let mut peer = Spy::new("confirmed");
+    registry
+        .dispatch_control(&transition, &grant(), &mut peer)
+        .unwrap();
+    registry
+        .reconcile_control(&transition, &grant(), &mut peer)
+        .unwrap();
+    let revoked = PassiveGrant::new(selection, 1);
+    assert!(registry
+        .passive_control_status(selection, &revoked)
+        .is_err());
+    assert_eq!(revoked.checks.get(), 2);
+    let mut foreign = selection.clone();
+    foreign.binding.account = "different-account".into();
+    assert!(registry
+        .passive_control_status(&foreign, &PassiveGrant::new(&foreign, 2))
+        .is_err());
+    let db = Connection::open(temp.db()).unwrap();
+    db.execute_batch("DROP TRIGGER browser_control_heads_retained;")
+        .unwrap();
+    assert!(registry
+        .passive_control_status(selection, &PassiveGrant::new(selection, 2))
+        .is_err()); // Even an already-open registry rechecks scope and schema.
+    assert_eq!(peer.calls, 2);
 }
