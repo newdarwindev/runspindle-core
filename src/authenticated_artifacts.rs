@@ -480,6 +480,7 @@ impl AuthenticatedArtifacts {
             validation: scope.validation(),
         };
         let key = accepted.key()?;
+        let artifact_key = scope.artifact.key()?;
         let evidence_sha256 = durable::digest(&wire);
         let tx = self
             .store
@@ -493,30 +494,32 @@ impl AuthenticatedArtifacts {
         );
         verify(evidence, trust, clock)?; // authority after SQLite lock and exact bytes
         let validation = &accepted.validation;
-        let retained_validation: Option<String> = tx
+        let retained_validation: Option<(String, String)> = tx
             .query_row(
-                "SELECT record FROM validations WHERE identity=?1",
+                "SELECT record,artifact_identity FROM validations WHERE identity=?1",
                 [validation.key()?],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .optional()?;
-        if let Some(record) = &retained_validation {
+        if let Some((record, retained_artifact)) = &retained_validation {
             anyhow::ensure!(
-                serde_json::from_str::<Validation>(record)? == *validation,
+                serde_json::from_str::<Validation>(record)? == *validation
+                    && retained_artifact == &artifact_key,
                 "immutable validation conflict"
             );
         }
-        let old: Option<String> = tx
+        let old: Option<(String, String)> = tx
             .query_row(
-                "SELECT record FROM acceptances WHERE identity=?1",
+                "SELECT record,artifact_identity FROM acceptances WHERE identity=?1",
                 [&key],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .optional()?;
-        if let Some(old) = old {
+        if let Some((record, retained_artifact)) = old {
             anyhow::ensure!(retained_validation.is_some(), "retained validation missing");
             anyhow::ensure!(
-                serde_json::from_str::<Accepted>(&old)? == accepted,
+                serde_json::from_str::<Accepted>(&record)? == accepted
+                    && retained_artifact == artifact_key,
                 "authenticated acceptance conflict"
             );
             let (record, prior, digest): (String, Vec<u8>, String) = tx.query_row(
@@ -544,7 +547,7 @@ impl AuthenticatedArtifacts {
                 params![
                     validation.key()?,
                     serde_json::to_string(validation)?,
-                    scope.artifact.key()?
+                    artifact_key
                 ],
             )?;
         }
@@ -557,11 +560,7 @@ impl AuthenticatedArtifacts {
         anyhow::ensure!(count < durable::CAPACITY, "artifact evidence capacity");
         tx.execute(
             "INSERT INTO acceptances VALUES(?1,?2,?3)",
-            params![
-                key,
-                serde_json::to_string(&accepted)?,
-                scope.artifact.key()?
-            ],
+            params![key, serde_json::to_string(&accepted)?, artifact_key],
         )?;
         tx.execute(
             "INSERT INTO authenticated_artifact_evidence VALUES(?1,?2,?3,?4)",
@@ -628,26 +627,8 @@ impl AuthenticatedArtifacts {
             evidence.producer.statement.scope.validation() == accepted.validation,
             "retained validation mismatch"
         );
-        let stored: String = connection.query_row(
-            "SELECT record FROM acceptances WHERE identity=?1",
-            [accepted.key()?],
-            |r| r.get(0),
-        )?;
-        anyhow::ensure!(
-            serde_json::from_str::<Accepted>(&stored)? == *accepted,
-            "retained acceptance mismatch"
-        );
-        let validation: String = connection.query_row(
-            "SELECT record FROM validations WHERE identity=?1",
-            [accepted.validation.key()?],
-            |r| r.get(0),
-        )?;
-        anyhow::ensure!(
-            serde_json::from_str::<Validation>(&validation)? == accepted.validation,
-            "retained validation record mismatch"
-        );
         verify(&evidence, trust, clock)?;
-        let bytes = Store::read_bytes(connection, accepted.artifact())?;
+        let bytes = Store::read_accepted(connection, accepted)?;
         anyhow::ensure!(
             bytes.len() as u64 == evidence.producer.statement.scope.byte_length,
             "artifact byte length mismatch"

@@ -89,6 +89,13 @@ mutations = [
             "entries.sort_unstable_by(|a, b| a.0.cmp(b.0));": "entries.sort_unstable_by(|a, b| b.0.cmp(a.0));",
         },
     ),
+    (
+        "retained-artifact-links",
+        "misbound_artifact_links_block_authenticated_read_and_duplicate_acceptance",
+        {
+            "let bytes = Store::read_accepted(connection, accepted)?;": "let bytes = Store::read_bytes(connection, accepted.artifact())?;",
+        },
+    ),
 ]
 MUTATIONS_PER_SHARD = 2
 SHARD_COUNT = (len(mutations) + MUTATIONS_PER_SHARD - 1) // MUTATIONS_PER_SHARD
