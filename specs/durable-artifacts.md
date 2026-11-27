@@ -25,7 +25,10 @@ restart without reading a generator or regenerating work. Validator revision and
 policy changes never inherit acceptance. Acceptance grants no destination authority.
 
 All requests require the explicit integration version; the core SQLite schema is
-version 1 and rejects unknown or unversioned nonempty stores. Each artifact is at
+version 1 and rejects unknown or unversioned nonempty stores. An already-open
+handle checks the version and required artifact tables and triggers in the
+transaction that stages or reads bytes. An incompatible schema rejects the
+request before it can release bytes or record new evidence. Each artifact is at
 most 1 MiB, with at most 1,024 artifacts, 1,024 validations and 1,024 acceptances.
 New identities reject at capacity; exact known entries reconcile. SQLite has FULL
 synchronous WAL commits and a 524,288-page main database bound. Immutable-row
