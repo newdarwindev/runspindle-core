@@ -3,18 +3,20 @@
 
 No native wire or Tether claim. An independent SQLite peer ledger counts effects.
 """
+
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 import copy
 import hashlib
 import json
-from pathlib import Path
 import sqlite3
 import subprocess
 import tempfile
 import types
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from pathlib import Path
+from typing import Any
 
 from runtime_artifact import validate
 from test_host_runtime import admission, require, wait
@@ -49,7 +51,7 @@ def run(platform, platform_prepared, core_prepared, seed=17):
             pending.write_text(json.dumps(script))
             pending.replace(directory / "native-script.json")
 
-        def calls():
+        def calls() -> list[tuple[str, Any]]:
             path = directory / "native-peer.sqlite"
             if not path.exists():
                 return []
@@ -67,7 +69,7 @@ def run(platform, platform_prepared, core_prepared, seed=17):
         write()
         with module.Lane(platform_prepared) as lane:
 
-            def client(command):
+            def client(command: dict[str, Any]) -> Any:
                 name = "command-" + uuid.uuid4().hex + ".json"
                 (directory / name).write_text(json.dumps(command))
                 result = lane.run_client(
@@ -87,7 +89,8 @@ def run(platform, platform_prepared, core_prepared, seed=17):
 
             registry = "admission-registry"
             w = worker()
-            client({"command": "start_host", "registry_id": registry})
+            start_registry = {"command": "start_host", "registry_id": registry}
+            registry_run = client(start_registry)["run_id"]
 
             def admit(r=request):
                 return client(
@@ -249,6 +252,36 @@ def run(platform, platform_prepared, core_prepared, seed=17):
             require(
                 len(starts) == 2, "duplicate child workflow after admission recovery"
             )
+
+            # Close the retained run through the isolated server's CLI. A fresh
+            # Core client must fail before it can replace the admission state.
+            lane.cli(
+                "workflow",
+                "terminate",
+                "--workflow-id",
+                registry,
+                "--run-id",
+                registry_run,
+            )
+            closed_registry = client({"command": "history", "workflow_id": registry})
+            require(
+                "WorkflowExecutionTerminatedEventAttributes"
+                in closed_registry["events"][-1]["attributes"],
+                "expected termination of the original registry run",
+            )
+            try:
+                client(start_registry)
+            except RuntimeError as error:
+                if "Workflow already started" not in str(error):
+                    raise
+            else:
+                raise AssertionError("closed admission registry was replaced")
+            require(
+                client({"command": "history", "workflow_id": registry})
+                == closed_registry,
+                "rejected start changed the retained registry history",
+            )
+            require(calls() == observed, "rejected start invoked the native peer")
             return {
                 "seed": seed,
                 "admission_callers": 4,
@@ -257,6 +290,7 @@ def run(platform, platform_prepared, core_prepared, seed=17):
                 "authority": "scripted_exact_request_default_deny_expiry",
                 "recovery": "fresh_server_worker_after_host_prepare_commit_before_activity_reply",
                 "replay": "registry_and_children_no_effects",
+                "closed_registry_start": "denied_original_history_and_effects_retained",
                 "native_wire": "blocked",
             }
 
