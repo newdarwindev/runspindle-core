@@ -3,15 +3,24 @@
 //! forever after a crash before send; neither restart nor reconciliation resends.
 use crate::browser_effect_wire::{Action, Authority, Client, Outcome, Peer, Target, MAX_PAYLOAD};
 use crate::durable::{create_schema, digest, require_schema, SchemaObject};
-use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBehavior};
+use rusqlite::{
+    params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior,
+};
 use std::{path::Path, time::Duration};
 
 pub const CAPACITY: u64 = 1024;
 pub(crate) const APPLICATION_ID: u32 = 0x42524547;
+pub(crate) const EFFECT_VERSION: u32 = 3;
+pub(crate) const CONTROL_VERSION: u32 = 4;
 const SCHEMA: &[SchemaObject] = &[
     ("table", "browser_operations", "CREATE TABLE IF NOT EXISTS browser_operations(identity TEXT PRIMARY KEY,operation TEXT NOT NULL UNIQUE,target TEXT NOT NULL CHECK(length(target)<=8192),payload BLOB NOT NULL CHECK(length(payload)>0 AND length(payload)<=1048576),digest TEXT NOT NULL CHECK(length(digest)=64),observation TEXT NOT NULL CHECK(observation IN ('unknown','confirmed','rejected')),conflict INTEGER NOT NULL CHECK(conflict IN (0,1)),generation INTEGER NOT NULL CHECK(generation>=0));"),
     ("trigger", "browser_binding_immutable", "CREATE TRIGGER IF NOT EXISTS browser_binding_immutable BEFORE UPDATE OF identity,operation,target,payload,digest ON browser_operations BEGIN SELECT RAISE(ABORT,'immutable browser binding');END;"),
     ("trigger", "browser_operations_retained", "CREATE TRIGGER IF NOT EXISTS browser_operations_retained BEFORE DELETE ON browser_operations BEGIN SELECT RAISE(ABORT,'retained browser operation');END;"),
+];
+const RESERVATION_SCHEMA: &[SchemaObject] = &[
+    ("table", "browser_reservations", "CREATE TABLE IF NOT EXISTS browser_reservations(identity TEXT PRIMARY KEY NOT NULL,operation TEXT NOT NULL UNIQUE,target TEXT NOT NULL CHECK(length(target)<=8192),digest TEXT NOT NULL CHECK(length(digest)=64));"),
+    ("trigger", "browser_reservations_immutable", "CREATE TRIGGER IF NOT EXISTS browser_reservations_immutable BEFORE UPDATE ON browser_reservations BEGIN SELECT RAISE(ABORT,'immutable browser reservation');END;"),
+    ("trigger", "browser_reservations_retained", "CREATE TRIGGER IF NOT EXISTS browser_reservations_retained BEFORE DELETE ON browser_reservations BEGIN SELECT RAISE(ABORT,'retained browser reservation');END;"),
 ];
 
 /// Historical local evidence only, not permission or a current site receipt.
@@ -52,16 +61,20 @@ fn label(value: Outcome) -> &'static str {
         Outcome::Rejected => "rejected",
     }
 }
-pub(crate) fn schema(connection: &Connection) -> anyhow::Result<()> {
+fn layout(connection: &Connection) -> anyhow::Result<u32> {
     let app: u32 = connection.pragma_query_value(None, "application_id", |r| r.get(0))?;
     let version: u32 = connection.pragma_query_value(None, "user_version", |r| r.get(0))?;
     anyhow::ensure!(
-        app == APPLICATION_ID && (version == 1 || version == 2),
+        app == APPLICATION_ID && matches!(version, 1 | 2 | EFFECT_VERSION | CONTROL_VERSION),
         "unsupported browser registry"
     );
     require_schema(connection, SCHEMA)?;
-    if version == 2 {
+    let mut object_count = SCHEMA.len();
+    let mut capacity = CAPACITY;
+    if matches!(version, 2 | CONTROL_VERSION) {
         require_schema(connection, crate::browser_control::SCHEMA)?;
+        object_count += crate::browser_control::SCHEMA.len();
+        capacity += crate::browser_control::CAPACITY;
         let heads: u64 =
             connection.query_row("SELECT count(*) FROM browser_control_heads", [], |r| {
                 r.get(0)
@@ -71,33 +84,44 @@ pub(crate) fn schema(connection: &Connection) -> anyhow::Result<()> {
             "control head capacity"
         );
     }
+    if version >= EFFECT_VERSION {
+        require_schema(connection, RESERVATION_SCHEMA)?;
+        object_count += RESERVATION_SCHEMA.len();
+    }
     let objects: u64 = connection.query_row(
         "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'",
         [],
         |r| r.get(0),
     )?;
     anyhow::ensure!(
-        objects
-            == (SCHEMA.len()
-                + if version == 2 {
-                    crate::browser_control::SCHEMA.len()
-                } else {
-                    0
-                }) as u64,
+        objects == object_count as u64,
         "unexpected browser registry schema"
     );
     let rows: u64 =
         connection.query_row("SELECT count(*) FROM browser_operations", [], |r| r.get(0))?;
-    anyhow::ensure!(
-        rows <= CAPACITY
-            + if version == 2 {
-                crate::browser_control::CAPACITY
-            } else {
-                0
-            },
-        "browser registry capacity"
-    );
+    anyhow::ensure!(rows <= capacity, "browser registry capacity");
+    Ok(version)
+}
+fn require_matching_reservations(connection: &Connection) -> anyhow::Result<()> {
+    let mismatch: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM browser_operations AS o LEFT JOIN browser_reservations AS r USING(identity)
+         WHERE r.identity IS NULL OR o.operation <> r.operation OR o.target <> r.target OR o.digest <> r.digest)
+         OR EXISTS(SELECT 1 FROM browser_reservations AS r LEFT JOIN browser_operations AS o USING(identity)
+         WHERE o.identity IS NULL)",
+        [],
+        |row| row.get(0),
+    )?;
+    anyhow::ensure!(!mismatch, "browser reservation journal mismatch");
     Ok(())
+}
+pub(crate) fn schema(connection: &Connection) -> anyhow::Result<u32> {
+    let version = layout(connection)?;
+    anyhow::ensure!(
+        version >= EFFECT_VERSION,
+        "browser reservation schema required"
+    );
+    require_matching_reservations(connection)?;
+    Ok(version)
 }
 fn empty(connection: &Connection) -> anyhow::Result<bool> {
     let app: u32 = connection.pragma_query_value(None, "application_id", |r| r.get(0))?;
@@ -108,6 +132,9 @@ fn empty(connection: &Connection) -> anyhow::Result<bool> {
 }
 pub(crate) fn validated_targets(connection: &Connection) -> anyhow::Result<Vec<Target>> {
     schema(connection)?;
+    target_metadata(connection)
+}
+fn target_metadata(connection: &Connection) -> anyhow::Result<Vec<Target>> {
     // Scan only bounded metadata before trusting absence. Corrupting both SQL
     // keys must not hide an old reservation and permit a second dispatch.
     let mut metadata=connection.prepare("SELECT CASE WHEN typeof(identity)='text' AND length(CAST(identity AS BLOB))<=1024 THEN identity END,CASE WHEN typeof(operation)='text' AND length(CAST(operation AS BLOB))<=128 THEN operation END,CASE WHEN typeof(target)='text' AND length(CAST(target AS BLOB))<=8192 THEN target END FROM browser_operations")?;
@@ -134,10 +161,16 @@ pub(crate) fn validated_targets(connection: &Connection) -> anyhow::Result<Vec<T
     Ok(targets)
 }
 pub(crate) fn read(connection: &Connection, target: &Target) -> anyhow::Result<Option<Record>> {
-    anyhow::ensure!(target.valid(), "invalid browser target");
-    schema(connection)?;
-    let key = identity(target)?;
     validated_targets(connection)?;
+    read_record(connection, target)
+}
+// The caller has validated the registry inventory in the enclosing transaction.
+pub(crate) fn read_record(
+    connection: &Connection,
+    target: &Target,
+) -> anyhow::Result<Option<Record>> {
+    anyhow::ensure!(target.valid(), "invalid browser target");
+    let key = identity(target)?;
     let row=connection.query_row("SELECT CASE WHEN length(CAST(identity AS BLOB))<=1024 THEN identity END,CASE WHEN length(CAST(operation AS BLOB))<=128 THEN operation END,CASE WHEN length(CAST(target AS BLOB))<=8192 THEN target END,CASE WHEN typeof(payload)='blob' AND length(payload)<=?3 THEN payload END,CASE WHEN length(CAST(digest AS BLOB))=64 THEN digest END,CASE WHEN length(CAST(observation AS BLOB))<=9 THEN observation END,conflict,generation FROM browser_operations WHERE identity=?1 OR operation=?2",params![key,target.binding.operation,if crate::browser_control::reserved(target) {16384} else {1048576}],|r|Ok((r.get::<_,Option<String>>(0)?,r.get::<_,Option<String>>(1)?,r.get::<_,Option<String>>(2)?,r.get::<_,Option<Vec<u8>>>(3)?,r.get::<_,Option<String>>(4)?,r.get::<_,Option<String>>(5)?,r.get::<_,i64>(6)?,r.get::<_,i64>(7)?))).optional()?;
     let Some(row) = row else { return Ok(None) };
     let (
@@ -186,6 +219,34 @@ pub(crate) fn read(connection: &Connection, target: &Target) -> anyhow::Result<O
         payload,
     }))
 }
+pub(crate) fn reserve(
+    tx: &Transaction<'_>,
+    target: &Target,
+    payload: &[u8],
+    commitment: &str,
+) -> anyhow::Result<()> {
+    let key = identity(target)?;
+    let raw =
+        serde_json::to_string(target).map_err(|_| anyhow::anyhow!("invalid browser target"))?;
+    anyhow::ensure!(raw.len() <= 8192, "browser target capacity");
+    tx.execute(
+        "INSERT INTO browser_operations VALUES(?1,?2,?3,?4,?5,'unknown',0,0)",
+        params![key, target.binding.operation, raw, payload, commitment],
+    )?;
+    tx.execute(
+        "INSERT INTO browser_reservations VALUES(?1,?2,?3,?4)",
+        params![key, target.binding.operation, raw, commitment],
+    )?;
+    Ok(())
+}
+fn validate_before_write(connection: &Connection) -> anyhow::Result<()> {
+    let tx = connection.unchecked_transaction()?;
+    if !empty(&tx)? && layout(&tx)? >= EFFECT_VERSION {
+        require_matching_reservations(&tx)?;
+    }
+    tx.commit()?;
+    Ok(())
+}
 impl BrowserRegistry {
     pub fn open(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let path = path.as_ref();
@@ -199,9 +260,7 @@ impl BrowserRegistry {
                 path,
                 OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
             )?;
-            if !empty(&ro)? {
-                schema(&ro)?;
-            }
+            validate_before_write(&ro)?;
         }
         let mut connection = Connection::open_with_flags(
             path,
@@ -211,15 +270,34 @@ impl BrowserRegistry {
         )?;
         connection.busy_timeout(Duration::from_secs(5))?;
         // Reject incompatible existing layouts before modifying journal pragmas.
-        if !empty(&connection)? {
-            schema(&connection)?;
-        }
-        connection.execute_batch("PRAGMA journal_mode=WAL;PRAGMA synchronous=FULL;PRAGMA foreign_keys=ON;PRAGMA max_page_count=524288;")?;
+        validate_before_write(&connection)?;
+        let mode: String = connection.query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))?;
+        anyhow::ensure!(
+            mode.eq_ignore_ascii_case("wal"),
+            "browser registry requires WAL"
+        );
+        connection.execute_batch(
+            "PRAGMA synchronous=FULL;PRAGMA foreign_keys=ON;PRAGMA max_page_count=524288;",
+        )?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         if empty(&tx)? {
             create_schema(&tx, SCHEMA)?;
+            create_schema(&tx, RESERVATION_SCHEMA)?;
             tx.pragma_update(None, "application_id", APPLICATION_ID)?;
-            tx.pragma_update(None, "user_version", 1)?;
+            tx.pragma_update(None, "user_version", EFFECT_VERSION)?;
+        } else {
+            let version = layout(&tx)?;
+            if version < EFFECT_VERSION {
+                target_metadata(&tx)?;
+                create_schema(&tx, RESERVATION_SCHEMA)?;
+                tx.execute("INSERT INTO browser_reservations SELECT identity,operation,target,digest FROM browser_operations", [])?;
+                let next = if version == 1 {
+                    EFFECT_VERSION
+                } else {
+                    CONTROL_VERSION
+                };
+                tx.pragma_update(None, "user_version", next)?;
+            }
         }
         schema(&tx)?;
         tx.commit()?;
@@ -289,7 +367,8 @@ impl BrowserRegistry {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let old = read(&tx, &target)?;
+        let targets = validated_targets(&tx)?;
+        let old = read_record(&tx, &target)?;
         anyhow::ensure!(
             authority.verify(&target, client.payload_digest(), Action::Dispatch),
             "browser dispatch denied"
@@ -299,24 +378,12 @@ impl BrowserRegistry {
             tx.commit()?;
             return Ok(Outcome::Unknown);
         }
-        let count = validated_targets(&tx)?
+        let count = targets
             .iter()
             .filter(|t| !crate::browser_control::reserved(t))
             .count() as u64;
         anyhow::ensure!(count < CAPACITY, "browser registry capacity");
-        let raw = serde_json::to_string(&target)
-            .map_err(|_| anyhow::anyhow!("invalid browser target"))?;
-        anyhow::ensure!(raw.len() <= 8192, "browser target capacity");
-        tx.execute(
-            "INSERT INTO browser_operations VALUES(?1,?2,?3,?4,?5,'unknown',0,0)",
-            params![
-                identity(&target)?,
-                target.binding.operation,
-                raw,
-                payload,
-                client.payload_digest()
-            ],
-        )?;
+        reserve(&tx, &target, payload, client.payload_digest())?;
         tx.commit()?;
         // Only this newly committed reservation may ever enter dispatch.
         let result = client.dispatch(authority, peer)?;

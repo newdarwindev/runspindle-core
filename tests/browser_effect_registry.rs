@@ -268,6 +268,17 @@ fn restored_schema_cannot_hide_corrupt_bytes_keys_or_digest() {
             )
             .unwrap();
         db.execute_batch(&format!("PRAGMA ignore_check_constraints=ON;DROP TRIGGER browser_binding_immutable;UPDATE browser_operations SET {assignment};{trigger};PRAGMA ignore_check_constraints=OFF;")).unwrap();
+        // Independently exercise metadata validation even if both records agree.
+        if assignment == "identity='wrong',operation='wrong'" {
+            let trigger: String = db
+                .query_row(
+                    "SELECT sql FROM sqlite_master WHERE name='browser_reservations_immutable'",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            db.execute_batch(&format!("DROP TRIGGER browser_reservations_immutable;UPDATE browser_reservations SET {assignment};{trigger};")).unwrap();
+        }
         let before: Vec<u8> = db
             .query_row("SELECT payload FROM browser_operations", [], |r| r.get(0))
             .unwrap();
@@ -296,7 +307,12 @@ fn restored_schema_cannot_hide_corrupt_bytes_keys_or_digest() {
 }
 #[test]
 fn missing_schema_is_not_repaired_and_nonregistry_is_not_adopted() {
-    for name in ["browser_binding_immutable", "browser_operations_retained"] {
+    for name in [
+        "browser_binding_immutable",
+        "browser_operations_retained",
+        "browser_reservations_immutable",
+        "browser_reservations_retained",
+    ] {
         let temp = Temp::new();
         let mut registry = BrowserRegistry::open(temp.db()).unwrap();
         let mut peer = Spy::new("unknown");
@@ -327,6 +343,86 @@ fn missing_schema_is_not_repaired_and_nonregistry_is_not_adopted() {
     assert!(BrowserRegistry::open(temp.db()).is_err());
     assert!(BrowserRegistry::open(":memory:").is_err());
     assert!(BrowserRegistry::open("file:registry?mode=memory").is_err());
+}
+#[test]
+fn v1_effect_registry_upgrades_and_preserves_unknown_reservation() {
+    let temp = Temp::new();
+    let mut peer = Spy::new("unknown");
+    BrowserRegistry::open(temp.db())
+        .unwrap()
+        .dispatch(target(), b"x", &Allow, &mut peer)
+        .unwrap();
+    let db = Connection::open(temp.db()).unwrap();
+    db.execute_batch("DROP TABLE browser_reservations; PRAGMA user_version=1;")
+        .unwrap();
+
+    let mut registry = BrowserRegistry::open(temp.db()).unwrap();
+    assert_eq!(
+        registry
+            .dispatch(target(), b"x", &Allow, &mut peer)
+            .unwrap(),
+        Outcome::Unknown
+    );
+    assert_eq!(peer.actions, ["dispatch"]);
+    assert_eq!(
+        db.pragma_query_value(None, "user_version", |row| row.get::<_, u32>(0))
+            .unwrap(),
+        3
+    );
+    assert_eq!(
+        db.query_row("SELECT digest FROM browser_reservations", [], |row| row
+            .get::<_, String>(
+            0
+        ))
+        .unwrap(),
+        digest(b"x")
+    );
+    assert!(db.execute("DELETE FROM browser_reservations", []).is_err());
+}
+#[test]
+fn failed_reservation_migration_leaves_legacy_schema_and_record_intact() {
+    let temp = Temp::new();
+    let mut peer = Spy::new("unknown");
+    BrowserRegistry::open(temp.db())
+        .unwrap()
+        .dispatch(target(), b"x", &Allow, &mut peer)
+        .unwrap();
+    let db = Connection::open(temp.db()).unwrap();
+    let trigger: String = db
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE name='browser_binding_immutable'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    db.execute_batch(&format!(
+        "DROP TABLE browser_reservations; PRAGMA user_version=1;
+        DROP TRIGGER browser_binding_immutable; PRAGMA ignore_check_constraints=ON;
+        UPDATE browser_operations SET digest='invalid'; {trigger};"
+    ))
+    .unwrap();
+    assert!(BrowserRegistry::open(temp.db()).is_err());
+    assert_eq!(
+        db.pragma_query_value(None, "user_version", |row| row.get::<_, u32>(0))
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        db.query_row(
+            "SELECT count(*) FROM sqlite_master WHERE name LIKE 'browser_reservations%'",
+            [],
+            |row| row.get::<_, u32>(0)
+        )
+        .unwrap(),
+        0
+    );
+    assert_eq!(
+        db.query_row("SELECT digest FROM browser_operations", [], |row| row
+            .get::<_, String>(0))
+            .unwrap(),
+        "invalid"
+    );
+    assert_eq!(peer.actions, ["dispatch"]);
 }
 #[test]
 fn capacity_denies_new_operations_but_preserves_exact_duplicate() {
