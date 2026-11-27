@@ -723,6 +723,10 @@ impl Outbox {
         self.check_transport(request, guard)?;
         // This call path is reachable only after a newly committed reservation. An
         // existing reservation can only reach read-only reconciliation above.
+        anyhow::ensure!(
+            self.snapshot(request)?.as_ref() == Some(&reserved),
+            "dispatch reservation changed before send"
+        );
         let sent = transport
             .send_observation(request, &bytes)
             .unwrap_or_default();

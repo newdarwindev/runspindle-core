@@ -30,6 +30,11 @@ cannot overwrite an existing Delivered receipt. State/receipt updates compare an
 swap the persisted generation. Contending reconciliation may make an original
 owner stale; another readback resolves it without another send.
 
+After the final authority check and immediately before sending, the dispatching
+process rereads the reservation and requires it to match the exact snapshot it
+committed. If another process has already advanced or fenced the reservation,
+the original process stops before transport and leaves the current state intact.
+
 The `delivery-runtime` feature registers a single-attempt DeliveryWorkflow and
 activities around the real outbox. Different Temporal workflow IDs sharing one
 stable delivery operation still share its outbox reservation. Temporal replay does
